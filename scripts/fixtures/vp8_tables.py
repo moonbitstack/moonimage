@@ -98,9 +98,6 @@ def main() -> None:
     defaults = array_after(
         text, "default_coeff_probs [4] [8] [3] [num_dct_tokens - 1] =", 4 * 8 * 3 * 11
     )
-    ymode = array_after(text, "kf_ymode_prob [num_ymodes - 1] =", 4)
-    uvmode = array_after(text, "kf_uv_mode_prob [num_uv_modes - 1] =", 3)
-
     out = [
         "// Copyright 2026 Leo Cheng",
         "// SPDX-License-Identifier: Apache-2.0",
@@ -111,12 +108,12 @@ def main() -> None:
         "// more slowly than the AC one, because a DC coefficient carries the block's",
         "// average brightness and quantising it hard is what produces banding.",
         "///|",
-        "let dc_quant : Array[Int32] = [",
+        "let dc_quant : Array[Int] = [",
         chunked(dc),
         "]",
         "",
         "///|",
-        "let ac_quant : Array[Int32] = [",
+        "let ac_quant : Array[Int] = [",
         chunked(ac),
         "]",
         "",
@@ -124,38 +121,26 @@ def main() -> None:
         "// header: [block type][band][context][token]. A 255 means the encoder never",
         "// changes it, which is why most of the table is 255.",
         "///|",
-        "let coeff_update : Array[Int32] = [",
+        "let coeff_update : Array[Int] = [",
         chunked(coeff),
         "]",
         "",
         "// The probabilities a key frame starts from, before the header updates any",
         "// of them: [block type][band][context][token].",
         "///|",
-        "let default_coeff_probs : Array[Int32] = [",
+        "let default_coeff_probs : Array[Int] = [",
         chunked(defaults),
         "]",
         "",
         "// Subblock mode probabilities in a key frame, indexed by the mode above and",
         "// the mode to the left, then by the tree's nine interior nodes.",
         "///|",
-        "let bmode_probs : Array[Int32] = [",
+        "let bmode_probs : Array[Int] = [",
         chunked(bmode, 9),
         "]",
-        "",
-        "// The fixed probabilities of a key frame's 16x16 and chroma mode trees.",
-        "///|",
-        "let ymode_probs : Array[Int32] = [",
-        "  " + ", ".join(str(v) for v in ymode) + ",",
-        "]",
-        "",
-        "///|",
-        "let uv_mode_probs : Array[Int32] = [",
-        "  " + ", ".join(str(v) for v in uvmode) + ",",
-        "]",
-        "",
     ]
     TARGET.write_text("\n".join(out), encoding="utf-8")
-    print("wrote", TARGET, len(dc), len(ac), len(coeff), len(bmode))
+    print("wrote", TARGET, len(dc), len(ac), len(coeff), len(defaults), len(bmode))
 
 
 if __name__ == "__main__":
