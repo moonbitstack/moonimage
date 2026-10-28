@@ -83,10 +83,7 @@ pub fn decode_animation(
 ///
 /// A caller that wants to choose how it is written calls the format's own
 /// package, which takes its options record.
-pub fn encode(
-  image : @raster.Image,
-  format : @raster.Format,
-) -> Bytes raise @raster.Refused {
+pub fn encode(image : @raster.Image, format : @raster.Format) -> Bytes {
   match format {
     Png => @png.encode(image)
     Qoi => @qoi.encode(image)
@@ -112,6 +109,13 @@ pub fn encode_animation(
     Gif => @gif.encode_animation(animation)
     Webp => @webp.encode_animation(animation)
     _ => {
+      if animation.frames.is_empty() {
+        raise @raster.Unexpected(
+          at=0,
+          got="an animation with no frames",
+          want="at least one",
+        )
+      }
       let first = animation.frames[0]
       encode(first.image, format)
     }

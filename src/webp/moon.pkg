@@ -1,10 +1,12 @@
-// WebP, lossless read and write, lossy read, animation read and write.
+// WebP: the container, the lossless codec, and the lossy frames inside it.
 //
 // https://developers.google.com/speed/webp/docs/riff_container
 // https://datatracker.ietf.org/doc/html/rfc9649
 import {
   "moonbitstack/moonimage/raster",
   "moonbitstack/moonimage/wire",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/hashmap",
 }
 
 import {

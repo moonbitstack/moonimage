@@ -126,13 +126,29 @@ test "bytes that are no image at all are refused, and the refusal says what they
 }
 
 ///|
-test "WebP says that it is not read yet rather than returning something wrong" {
-  let refused = try {
-    ignore(@moonimage.encode(sample(), @moonimage.Format::Webp))
-    false
-  } catch {
-    @moonimage.Refused::Unsupported(..) => true
-    _ => false
+test "every format the library names can be written" {
+  let image = sample()
+  for
+    format in [
+      @moonimage.Format::Png,
+      @moonimage.Format::Qoi,
+      @moonimage.Format::Bmp,
+      @moonimage.Format::Tga,
+      @moonimage.Format::Jpeg,
+      @moonimage.Format::Gif,
+      @moonimage.Format::Webp,
+    ] {
+    let file = @moonimage.encode(image, format)
+    assert_eq(@moonimage.Format::of(file), format)
   }
-  assert_true(refused)
+}
+
+///|
+test "WebP is lossless, so what it writes it reads back exactly" {
+  let image = sample()
+  let file = @moonimage.encode(image, @moonimage.Format::Webp)
+  let back = @moonimage.decode(file) catch {
+    error => abort("the file should decode: \{error}")
+  }
+  assert_eq(back.convert(@moonimage.PixelFormat::Rgba8).pixels, image.pixels)
 }

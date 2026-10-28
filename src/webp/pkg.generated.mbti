@@ -10,9 +10,15 @@ pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raste
 
 pub fn decode_animation(BytesView, limits? : @raster.Limits) -> @raster.Animation raise @raster.Refused
 
-pub fn encode(@raster.Image) -> Bytes raise @raster.Refused
+pub fn decode_lossless(BytesView, @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn decode_lossy(BytesView, @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn encode(@raster.Image) -> Bytes
 
 pub fn encode_animation(@raster.Animation) -> Bytes raise @raster.Refused
+
+pub fn encode_lossless(@raster.Image) -> Bytes
 
 // Errors
 
