@@ -73,6 +73,11 @@ def main() -> None:
     # can differ by more than the middle does.
     cases.append(("odd-size", save(base.crop((0, 0, 37, 23)), quality=90), 32))
 
+    # A restart interval: the entropy stream is cut every four blocks, and the
+    # decoder has to resynchronise on each marker rather than trust its bit
+    # position.
+    cases.append(("restart", save(base, quality=90, subsampling=0, restart_marker_blocks=4), 4))
+
     # A file that says it is rotated a quarter turn.
     turned = save(base, quality=90, exif=orientation_bytes(6))
     cases.append(("exif-rotate90", turned, 4))

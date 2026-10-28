@@ -164,3 +164,27 @@ test "jpeg: damage is refused" {
   }
   assert_true(limited)
 }
+
+///|
+test "jpeg: a restart interval really cuts the stream" {
+  // The fixture is only worth having if the markers are there: eleven intervals
+  // of four blocks over an eight-by-six block grid.
+  let (file, _, _) = sample_file("restart")
+  let mut intervals = 0
+  let mut markers = 0
+  let mut index = 0
+  while index + 1 < file.length() {
+    if file[index].to_int() == 0xFF {
+      let next = file[index + 1].to_int()
+      if next == 0xDD {
+        intervals = intervals + 1
+      }
+      if next >= 0xD0 && next <= 0xD7 {
+        markers = markers + 1
+      }
+    }
+    index = index + 1
+  }
+  assert_eq(intervals, 1)
+  assert_eq(markers, 11)
+}
