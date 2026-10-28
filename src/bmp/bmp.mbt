@@ -45,20 +45,3 @@ pub(all) struct EncodeOptions {
 pub fn EncodeOptions::default() -> EncodeOptions {
   { depth: Bits32, top_down: false, }
 }
-
-///|
-/// The image in a BMP file.
-pub fn decode(
-  bytes : BytesView,
-  limits? : @raster.Limits,
-) -> @raster.Image raise @raster.Refused {
-  ignore((bytes, limits))
-  raise @raster.Unsupported(at=0, got="NOT IMPLEMENTED")
-}
-
-///|
-/// The image as a BMP file.
-pub fn encode(image : @raster.Image, options? : EncodeOptions) -> Bytes {
-  ignore((image, options))
-  abort("moonimage: not implemented yet")
-}

@@ -3,4 +3,6 @@
 // https://www.dca.fee.unicamp.br/~martino/disciplinas/ea978/tgaffs.pdf
 import {
   "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitlang/core/buffer",
 }

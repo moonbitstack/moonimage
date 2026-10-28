@@ -17,6 +17,7 @@ pub struct Cursor {
 }
 pub fn Cursor::at(Self) -> Int32
 pub fn Cursor::bits_be(Self) -> UInt32 raise @raster.Refused
+pub fn Cursor::bits_le(Self) -> UInt32 raise @raster.Refused
 pub fn Cursor::bytes(Self, Int32) -> BytesView raise @raster.Refused
 pub fn Cursor::i32_le(Self) -> Int32 raise @raster.Refused
 pub fn Cursor::is_empty(Self) -> Bool
@@ -36,6 +37,7 @@ pub struct Writer {
   buffer : @buffer.Buffer
 }
 pub fn Writer::bytes(Self, BytesView) -> Unit
+pub fn Writer::i32_le(Self, Int32) -> Unit
 pub fn Writer::length(Self) -> Int32
 pub fn Writer::new() -> Self
 pub fn Writer::to_bytes(Self) -> Bytes

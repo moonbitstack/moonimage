@@ -127,6 +127,12 @@ pub fn Cursor::u24_le(self : Cursor) -> Int32 raise @raster.Refused {
 }
 
 ///|
+/// A little-endian signed thirty-two-bit number written back out.
+pub fn Writer::i32_le(self : Writer, value : Int32) -> Unit {
+  self.u32_le(value)
+}
+
+///|
 /// A big-endian thirty-two-bit number, which is what PNG chunk lengths are.
 ///
 /// A field that does not fit in 31 bits is refused rather than wrapped: every
@@ -165,6 +171,20 @@ pub fn Cursor::bits_be(self : Cursor) -> UInt32 raise @raster.Refused {
     (b[p + 1].to_int().reinterpret_as_uint() << 16) |
     (b[p + 2].to_int().reinterpret_as_uint() << 8) |
     b[p + 3].to_int().reinterpret_as_uint()
+  self.pos = p + 4
+  value
+}
+
+///|
+/// A little-endian thirty-two-bit number as bits, for a mask or a tag.
+pub fn Cursor::bits_le(self : Cursor) -> UInt32 raise @raster.Refused {
+  self.need(4)
+  let b = self.data
+  let p = self.pos
+  let value = (b[p + 3].to_int().reinterpret_as_uint() << 24) |
+    (b[p + 2].to_int().reinterpret_as_uint() << 16) |
+    (b[p + 1].to_int().reinterpret_as_uint() << 8) |
+    b[p].to_int().reinterpret_as_uint()
   self.pos = p + 4
   value
 }

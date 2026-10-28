@@ -4,4 +4,5 @@
 // https://www.digicamsoft.com/bmp/bmp.html
 import {
   "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
 }
