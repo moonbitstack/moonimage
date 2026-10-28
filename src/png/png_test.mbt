@@ -222,6 +222,41 @@ test "png: the metadata a file was given is the metadata it comes back with" {
 }
 
 ///|
+test "png: metadata can be left out, and then there is none" {
+  // The other side of the flag the test above exercises: a caller writing an
+  // asset for a game wants the pixels and nothing else, and a file with no
+  // metadata chunks reads back with the default record rather than with
+  // whatever the original image happened to carry.
+  let picture = read(suite_file("basn2c08"))
+  let annotated = @raster.Image::of(
+    picture.width,
+    picture.height,
+    picture.format,
+    picture.pixels,
+    metadata=@raster.Metadata::{
+      gamma: Some(0.45455),
+      chromaticities: Some(@raster.Chromaticities::srgb()),
+      intent: Some(@raster.Intent::Relative),
+      icc: None,
+      texts: [@raster.Text::Latin(keyword="Title", text="a picture")],
+    },
+  )
+  let bare = @png.encode(annotated, options=@png.EncodeOptions::{
+    ..@png.EncodeOptions::default(),
+    metadata: false,
+  })
+  let back = read(bare)
+  assert_eq(back.pixels, picture.pixels)
+  assert_eq(back.metadata.gamma, None)
+  assert_eq(back.metadata.chromaticities, None)
+  assert_eq(back.metadata.intent, None)
+  assert_eq(back.metadata.texts.length(), 0)
+  // And it is smaller than the one that carries them, which is the point.
+  let full = @png.encode(annotated)
+  assert_true(bare.length() < full.length())
+}
+
+///|
 test "png: an animation keeps its frames, delays and rules" {
   let red = @raster.Image::of(
     4,

@@ -129,6 +129,58 @@ test "jpeg: what the writer writes, the reader reads back" {
 }
 
 ///|
+/// The sampling factors of the first component in the frame header: two nibbles,
+/// horizontal over vertical, where one means full resolution.
+///
+/// A JPEG records subsampling per component rather than naming it, so this is
+/// what "4:2:0" actually looks like in a file: two by two luma samples for every
+/// chroma sample, written as `0x22`.
+fn sampling_of(file : Bytes) -> Int32 {
+  let mut at = 2
+  while at + 4 < file.length() {
+    if file[at].to_int() != 0xFF {
+      abort("a marker should start with ff, at \{at}")
+    }
+    let marker = file[at + 1].to_int()
+    let size = file[at + 2].to_int() * 256 + file[at + 3].to_int()
+    if marker == 0xC0 || marker == 0xC2 {
+      // Precision, height, width, component count, then the components.
+      return file[at + 11].to_int()
+    }
+    at = at + 2 + size
+  }
+  abort("no frame header in the file")
+}
+
+///|
+test "jpeg: the subsampling asked for is the subsampling in the file" {
+  let (file, _, _) = sample_file("baseline-444")
+  let source = read(file)
+  let expected = [
+    (@jpeg.Subsampling::Yuv444, 0x11),
+    (@jpeg.Subsampling::Yuv422, 0x21),
+    (@jpeg.Subsampling::Yuv420, 0x22),
+  ]
+  for pair in expected {
+    let (subsampling, factors) = pair
+    let written = @jpeg.encode(source, options=@jpeg.EncodeOptions::{
+      quality: 90,
+      subsampling,
+    })
+    assert_eq(
+      sampling_of(written),
+      factors,
+      msg="sampling should be \{factors}",
+    )
+    // And the file still decodes to a picture of the same shape, which is the
+    // cheapest way to say the headers and the entropy data agree.
+    let back = read(written)
+    assert_eq(back.width, source.width)
+    assert_eq(back.height, source.height)
+  }
+}
+
+///|
 test "jpeg: a grey image is written as a grey file and read back as one" {
   let (file, _, _) = sample_file("greyscale")
   let source = read(file)
