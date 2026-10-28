@@ -4,4 +4,14 @@
 // https://wiki.mozilla.org/APNG_Specification
 import {
   "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitstack/moonzip/zlib",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/encoding/utf8",
 }
+
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitlang/core/buffer",
+} for "test"

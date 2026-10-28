@@ -70,7 +70,13 @@ pub(all) struct Chromaticities {
   green_y : Double
   blue_x : Double
   blue_y : Double
-}
+} derive(Eq, Debug)
+
+///|
+pub extend Chromaticities with Eq::{equal, not_equal}
+
+///|
+pub extend Chromaticities with Debug::{to_repr}
 
 ///|
 /// The primaries of sRGB, which is what almost every file means when it says
@@ -94,7 +100,13 @@ pub fn Chromaticities::srgb() -> Chromaticities {
 pub(all) struct Icc {
   name : String
   profile : Bytes
-}
+} derive(Eq, Debug)
+
+///|
+pub extend Icc with Eq::{equal, not_equal}
+
+///|
+pub extend Icc with Debug::{to_repr}
 
 ///|
 /// A text note, in the flavour of the chunk it came from, so that writing the
@@ -111,7 +123,13 @@ pub(all) enum Text {
     translated~ : String,
     text~ : String
   )
-}
+} derive(Eq, Debug)
+
+///|
+pub extend Text with Eq::{equal, not_equal}
+
+///|
+pub extend Text with Debug::{to_repr}
 
 ///|
 /// The keyword a note is filed under.
@@ -145,7 +163,13 @@ pub(all) struct Metadata {
   icc : Icc?
   /// The text notes, in the order the file had them.
   texts : Array[Text]
-}
+} derive(Eq, Debug)
+
+///|
+pub extend Metadata with Eq::{equal, not_equal}
+
+///|
+pub extend Metadata with Debug::{to_repr}
 
 ///|
 /// No metadata at all, which is what an image built in memory has.

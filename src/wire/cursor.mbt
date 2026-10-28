@@ -155,6 +155,21 @@ pub fn Cursor::u32_le(self : Cursor) -> Int32 raise @raster.Refused {
 }
 
 ///|
+/// A big-endian thirty-two-bit number as bits, for a field that is not a size and
+/// may use the whole range: a checksum, a mask, a fixed tag.
+pub fn Cursor::bits_be(self : Cursor) -> UInt32 raise @raster.Refused {
+  self.need(4)
+  let b = self.data
+  let p = self.pos
+  let value = (b[p].to_int().reinterpret_as_uint() << 24) |
+    (b[p + 1].to_int().reinterpret_as_uint() << 16) |
+    (b[p + 2].to_int().reinterpret_as_uint() << 8) |
+    b[p + 3].to_int().reinterpret_as_uint()
+  self.pos = p + 4
+  value
+}
+
+///|
 /// The value of a thirty-two-bit field split into halves, or a refusal when it
 /// is too large to be a length anyone meant.
 fn check_word(

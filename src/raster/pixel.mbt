@@ -119,7 +119,13 @@ pub(all) struct Pixel {
   g : Double
   b : Double
   a : Double
-}
+} derive(Eq, Debug)
+
+///|
+pub extend Pixel with Eq::{equal, not_equal}
+
+///|
+pub extend Pixel with Debug::{to_repr}
 
 ///|
 /// A pixel from the eight-bit values an editor shows.

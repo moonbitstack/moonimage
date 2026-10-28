@@ -16,6 +16,7 @@ pub struct Cursor {
   mut pos : Int32
 }
 pub fn Cursor::at(Self) -> Int32
+pub fn Cursor::bits_be(Self) -> UInt32 raise @raster.Refused
 pub fn Cursor::bytes(Self, Int32) -> BytesView raise @raster.Refused
 pub fn Cursor::i32_le(Self) -> Int32 raise @raster.Refused
 pub fn Cursor::is_empty(Self) -> Bool

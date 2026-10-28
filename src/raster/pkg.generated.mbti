@@ -52,8 +52,11 @@ pub(all) struct Chromaticities {
   green_y : Double
   blue_x : Double
   blue_y : Double
-}
+} derive(Eq, @debug.Debug)
+pub fn Chromaticities::equal(Self, Self) -> Bool
+pub fn Chromaticities::not_equal(Self, Self) -> Bool
 pub fn Chromaticities::srgb() -> Self
+pub fn Chromaticities::to_repr(Self) -> @debug.Repr
 
 pub(all) enum Dispose {
   Keep
@@ -93,7 +96,10 @@ pub fn Frame::new(Image, x? : Int32, y? : Int32, delay? : Int32, dispose? : Disp
 pub(all) struct Icc {
   name : String
   profile : Bytes
-}
+} derive(Eq, @debug.Debug)
+pub fn Icc::equal(Self, Self) -> Bool
+pub fn Icc::not_equal(Self, Self) -> Bool
+pub fn Icc::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Image {
   width : Int32
@@ -147,19 +153,25 @@ pub(all) struct Metadata {
   intent : Intent?
   icc : Icc?
   texts : Array[Text]
-}
+} derive(Eq, @debug.Debug)
 pub fn Metadata::default() -> Self
+pub fn Metadata::equal(Self, Self) -> Bool
 pub fn Metadata::is_empty(Self) -> Bool
+pub fn Metadata::not_equal(Self, Self) -> Bool
+pub fn Metadata::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Pixel {
   r : Double
   g : Double
   b : Double
   a : Double
-}
+} derive(Eq, @debug.Debug)
+pub fn Pixel::equal(Self, Self) -> Bool
+pub fn Pixel::not_equal(Self, Self) -> Bool
 pub fn Pixel::of_rgba8(Int32, Int32, Int32, a? : Int32) -> Self
 pub fn Pixel::rgba16(Self) -> (Int32, Int32, Int32, Int32)
 pub fn Pixel::rgba8(Self) -> (Int32, Int32, Int32, Int32)
+pub fn Pixel::to_repr(Self) -> @debug.Repr
 
 pub(all) enum PixelFormat {
   Gray8
@@ -195,9 +207,12 @@ pub(all) enum Text {
   Latin(keyword~ : String, text~ : String)
   Compressed(keyword~ : String, text~ : String)
   International(keyword~ : String, language~ : String, translated~ : String, text~ : String)
-}
+} derive(Eq, @debug.Debug)
+pub fn Text::equal(Self, Self) -> Bool
 pub fn Text::keyword(Self) -> String
+pub fn Text::not_equal(Self, Self) -> Bool
 pub fn Text::text(Self) -> String
+pub fn Text::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

@@ -31,37 +31,29 @@ def digest(data: bytes) -> str:
 
 
 def literal(data: bytes, width: int = 96) -> str:
-    """A byte literal, wrapped so that a diff of the fixture reads line by line."""
-    escapes = []
+    r"""A byte literal, wrapped so that a diff of the fixture reads line by line.
+
+    Every byte outside the printable range becomes `\xNN`, and a quote or a
+    backslash is escaped the same way, so that no split can land inside an escape
+    and leave a line that looks like it ends early.
+    """
+    tokens = []
     for byte in data:
-        if byte == 0x22:
-            escapes.append('\\"')
-        elif byte == 0x5C:
-            escapes.append("\\\\")
-        elif 0x20 <= byte < 0x7F:
-            escapes.append(chr(byte))
+        if 0x20 <= byte < 0x7F and byte not in (0x22, 0x5C):
+            tokens.append(chr(byte))
         else:
-            escapes.append("\\x%02x" % byte)
-    body = "".join(escapes)
-    if len(body) <= width:
-        return 'b"%s"' % body
+            tokens.append("\\x%02x" % byte)
     lines = []
-    limit = max(8, width)
-    index = 0
-    while index < len(body):
-        # never split an escape sequence
-        end = min(len(body), index + limit)
-        if end < len(body):
-            cut = body.rfind("\\x", index, end)
-            if cut > index and cut + 4 > end:
-                end = cut
-            elif body[end - 1] == "\\":
-                end -= 1
-        lines.append(body[index:end])
-        index = end
-    first, rest = lines[0], lines[1:]
-    out = 'b"%s"' % first
-    for line in rest:
+    current = ""
+    for token in tokens:
+        if len(current) + len(token) > width and current:
+            lines.append(current)
+            current = ""
+        current += token
+    if current or not lines:
+        lines.append(current)
+    out = 'b"%s"' % lines[0]
+    for line in lines[1:]:
         out += ' +\n      b"%s"' % line
     return out
 
