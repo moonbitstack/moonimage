@@ -23,6 +23,7 @@ pub(all) struct EncodeOptions {
   filter : Filter
   interlace : Bool
   metadata : Bool
+  palette : Bool
 }
 pub fn EncodeOptions::best() -> Self
 pub fn EncodeOptions::default() -> Self

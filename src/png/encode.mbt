@@ -49,6 +49,24 @@ fn encode_frames(
   } else {
     image
   }
+  if frames.is_empty() && !options.interlace && options.palette {
+    match paletted(source, options) {
+      Some(file) => {
+        // A palette is not always smaller: indices of a smooth gradient are
+        // noisier than the gradient was, and the table has to be paid for. The
+        // writer makes both and keeps the shorter, which is the only answer that
+        // is never wrong.
+        let plain = encode_frames(
+          image,
+          frames,
+          { ..options, palette: false, },
+          plays,
+        )
+        return if file.length() <= plain.length() { file } else { plain }
+      }
+      None => ()
+    }
+  }
   let (color, depth) = layout_of(source.format)
   let writer = @wire.Writer::new()
   writer.bytes(signature)
@@ -500,4 +518,129 @@ fn to_latin1(text : String) -> Bytes {
 /// A string as UTF-8, which is what an `iTXt` chunk carries.
 fn to_utf8(text : String) -> Bytes {
   @utf8.encode(text)
+}
+
+///|
+/// The image as a palette file, or `None` when it has too many colours to be one.
+///
+/// A palette replaces three bytes of colour with one index, so a sprite that
+/// uses twelve colours becomes a twelfth of its size; a photograph has no hope
+/// of fitting, and the caller falls back to true colour without being told.
+fn paletted(image : @raster.Image, options : EncodeOptions) -> Bytes? {
+  let source = image.convert(@raster.PixelFormat::Rgba8)
+  let total = source.width * source.height
+  if total == 0 {
+    return None
+  }
+  let colours : Array[UInt32] = []
+  let seen = @hashmap.HashMap::HashMap([], capacity=256)
+  for index in 0..<total {
+    let at = index * 4
+    let argb = (source.pixels[at + 3].to_int().reinterpret_as_uint() << 24) |
+      (source.pixels[at].to_int().reinterpret_as_uint() << 16) |
+      (source.pixels[at + 1].to_int().reinterpret_as_uint() << 8) |
+      source.pixels[at + 2].to_int().reinterpret_as_uint()
+    if seen.get(argb) is None {
+      if colours.length() >= 256 {
+        return None
+      }
+      seen.set(argb, colours.length())
+      colours.push(argb)
+    }
+  }
+  let count = colours.length()
+  let depth = if count <= 2 {
+    1
+  } else if count <= 4 {
+    2
+  } else if count <= 16 {
+    4
+  } else {
+    8
+  }
+  let per_byte = 8 / depth
+  let row_bytes = (source.width + per_byte - 1) / per_byte
+  // The packed indices are a grey image of `row_bytes` columns, which is what
+  // lets the same filter and deflate code write them.
+  let packed : FixedArray[Byte] = FixedArray::make(
+    row_bytes * source.height,
+    b'\x00',
+  )
+  for y in 0..<source.height {
+    for x in 0..<source.width {
+      let at = (y * source.width + x) * 4
+      let argb = (source.pixels[at + 3].to_int().reinterpret_as_uint() << 24) |
+        (source.pixels[at].to_int().reinterpret_as_uint() << 16) |
+        (source.pixels[at + 1].to_int().reinterpret_as_uint() << 8) |
+        source.pixels[at + 2].to_int().reinterpret_as_uint()
+      let value = seen.get(argb).unwrap_or(0)
+      // The leftmost pixel of a byte is the most significant bits of it.
+      let shift = 8 - depth * (x % per_byte + 1)
+      let to = y * row_bytes + x / per_byte
+      packed[to] = (packed[to].to_int() | (value << shift)).to_byte()
+    }
+  }
+  let rows = @raster.Image::of(
+    row_bytes,
+    source.height,
+    @raster.PixelFormat::Gray8,
+    Bytes::from_array(packed.clamped_view()),
+    metadata=source.metadata,
+  ) catch {
+    _ => return None
+  }
+  let writer = @wire.Writer::new()
+  writer.bytes(signature)
+  let header = @wire.Writer::new()
+  header.u32_be(source.width)
+  header.u32_be(source.height)
+  header.u8(depth)
+  header.u8(3)
+  header.u8(0)
+  header.u8(0)
+  header.u8(0)
+  write_chunk(writer, "IHDR", header.to_bytes())
+  if options.metadata {
+    write_metadata(writer, source.metadata)
+  }
+  let table = @wire.Writer::new()
+  for colour in colours {
+    table.u8(((colour >> 16) & 0xFFU).reinterpret_as_int())
+    table.u8(((colour >> 8) & 0xFFU).reinterpret_as_int())
+    table.u8((colour & 0xFFU).reinterpret_as_int())
+  }
+  write_chunk(writer, "PLTE", table.to_bytes())
+  // Alpha is a chunk of its own, and it stops at the last entry that needs one:
+  // everything after it is opaque by definition.
+  let mut last_alpha = -1
+  for index in 0..<count {
+    if ((colours[index] >> 24) & 0xFFU) != 255U {
+      last_alpha = index
+    }
+  }
+  if last_alpha >= 0 {
+    let alphas = @wire.Writer::new()
+    for index in 0..<count {
+      let alpha = ((colours[index] >> 24) & 0xFFU).reinterpret_as_int()
+      alphas.u8(if index <= last_alpha { alpha } else { 255 })
+    }
+    write_chunk(writer, "tRNS", alphas.to_bytes())
+  }
+  let data = image_bytes(rows, options)
+  let mut offset = 0
+  while offset < data.length() {
+    let take = if offset + 8_000 > data.length() {
+      data.length() - offset
+    } else {
+      8_000
+    }
+    write_chunk(
+      writer,
+      "IDAT",
+      data.clamped_view(start=offset, end=offset + take),
+    )
+    offset = offset + take
+  }
+  write_chunk(writer, "IEND", Bytes::new(0))
+  Some(writer.to_bytes())
 }

@@ -55,7 +55,7 @@ which takes its options record.
 
 | Format | Read | Write | Animation | Package |
 |:--|:--:|:--:|:--:|:--|
-| PNG | every colour type and depth, palette and `tRNS`, Adam7, five filters, CRC, `gAMA` `cHRM` `sRGB` `iCCP` `tEXt` `zTXt` `iTXt` | 8 and 16 bits, adaptive filtering, interlaced on request, metadata | APNG | `@moonimage/png` |
+| PNG | every colour type and depth, palette and `tRNS`, Adam7, five filters, CRC, `gAMA` `cHRM` `sRGB` `iCCP` `tEXt` `zTXt` `iTXt` | 8 and 16 bits, palette when it is smaller, adaptive filtering, interlaced on request, metadata | APNG | `@moonimage/png` |
 | QOI | all six opcodes | the reference encoder's choices, byte for byte | — | `@moonimage/qoi` |
 | BMP | every header version, 1/4/8/16/24/32 bits, `BI_RGB` `BI_RLE4` `BI_RLE8` `BI_BITFIELDS`, both row orders | 24 and 32 bits | — | `@moonimage/bmp` |
 | TGA | colour mapped, true colour and grey, run lengths, 8/15/16/24/32 bits, both row orders | 24 and 32 bits, run lengths on request | — | `@moonimage/tga` |

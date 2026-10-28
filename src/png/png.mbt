@@ -57,23 +57,39 @@ pub(all) struct EncodeOptions {
   interlace : Bool
   /// Whether to write the metadata the image carries.
   metadata : Bool
+  /// Whether to write a picture of at most 256 colours as a palette. A palette
+  /// costs a table of colours and saves three quarters of every pixel, which is
+  /// the difference between a sprite and a photograph in one flag.
+  palette : Bool
 }
 
 ///|
 /// Balanced: level 6, adaptive filtering, not interlaced, metadata kept.
 pub fn EncodeOptions::default() -> EncodeOptions {
-  { level: 6, filter: Adaptive, interlace: false, metadata: true, }
+  {
+    level: 6,
+    filter: Adaptive,
+    interlace: false,
+    metadata: true,
+    palette: true,
+  }
 }
 
 ///|
 /// For when the bytes are going to a screen immediately: level 1, no filtering,
 /// no metadata.
 pub fn EncodeOptions::fast() -> EncodeOptions {
-  { level: 1, filter: None, interlace: false, metadata: false, }
+  { level: 1, filter: None, interlace: false, metadata: false, palette: true, }
 }
 
 ///|
 /// For when the file is going to be stored: level 9, adaptive filtering.
 pub fn EncodeOptions::best() -> EncodeOptions {
-  { level: 9, filter: Adaptive, interlace: false, metadata: true, }
+  {
+    level: 9,
+    filter: Adaptive,
+    interlace: false,
+    metadata: true,
+    palette: true,
+  }
 }

@@ -129,7 +129,15 @@ test "png: what the writer writes, the reader reads back" {
       @raster.PixelFormat::Rgba16,
     ] {
     let picture = source.convert(format)
-    let back = read(@png.encode(picture))
+    let back = read(
+      @png.encode(picture, options=@png.EncodeOptions::{
+        level: 6,
+        filter: @png.Filter::Adaptive,
+        interlace: false,
+        metadata: true,
+        palette: false,
+      }),
+    )
     assert_eq(back.format, format)
     assert_eq(back.width, picture.width)
     assert_eq(back.height, picture.height)
@@ -162,6 +170,7 @@ test "png: every filter, every level and interlacing write the same pixels" {
           filter,
           interlace,
           metadata: true,
+          palette: false,
         })
         let back = read(file)
         assert_eq(back.pixels, picture.pixels)
@@ -372,4 +381,136 @@ fn crc_byte(value : UInt32, byte : Int32) -> UInt32 {
     crc = if (crc & 1U) != 0U { (crc >> 1) ^ 0xEDB8_8320U } else { crc >> 1 }
   }
   crc
+}
+
+///|
+/// Whether the file has a chunk of this name, which is how a test sees which
+/// colour type the writer chose.
+fn has_chunk(file : Bytes, name : String) -> Bool {
+  let mut index = 8
+  while index + 8 <= file.length() {
+    let mut kind = ""
+    for offset in 0..<4 {
+      kind = kind +
+        file[index + 4 + offset].to_int().unsafe_to_char().to_string()
+    }
+    if kind == name {
+      return true
+    }
+    let length = file[index].to_int() * 16_777_216 +
+      file[index + 1].to_int() * 65_536 +
+      file[index + 2].to_int() * 256 +
+      file[index + 3].to_int()
+    index = index + 12 + length
+  }
+  false
+}
+
+///|
+/// A picture with `count` colours and a transparent corner.
+fn few_colours_sized(count : Int32, size : Int32) -> @raster.Image {
+  let out = @buffer.Buffer::Buffer()
+  for y in 0..<size {
+    for x in 0..<size {
+      let index = (x + y) % count
+      out.write_byte((index * 37 % 256).to_byte())
+      out.write_byte((index * 91 % 256).to_byte())
+      out.write_byte((index * 53 % 256).to_byte())
+      out.write_byte(if x < 4 && y < 4 { 0 } else { 255 })
+    }
+  }
+  @raster.Image::of(size, size, @raster.PixelFormat::Rgba8, out.to_bytes()) catch {
+    error => abort("the picture is well formed: \{error}")
+  }
+}
+
+///|
+fn few_colours(count : Int32) -> @raster.Image {
+  few_colours_sized(count, 16)
+}
+
+///|
+test "png: a picture of few colours is written as a palette" {
+  // A sprite: sixty-four pixels square, four colours, a transparent corner. The
+  // palette replaces three bytes with two bits and the table is amortised after
+  // one row.
+  let image = few_colours_sized(4, 64)
+  let file = @png.encode(image)
+  assert_true(has_chunk(file, "PLTE"))
+  assert_true(has_chunk(file, "tRNS"))
+  assert_eq(read(file).convert(@raster.PixelFormat::Rgba8).pixels, image.pixels)
+  let plain = @png.encode(image, options=@png.EncodeOptions::{
+    level: 6,
+    filter: @png.Filter::Adaptive,
+    interlace: false,
+    metadata: true,
+    palette: false,
+  })
+  assert_true(file.length() < plain.length())
+  // Every count is decodable, whichever of the two the writer kept.
+  for count in [2, 3, 5, 16, 17, 100, 256] {
+    let picture = few_colours(count)
+    let written = @png.encode(picture)
+    assert_eq(
+      read(written).convert(@raster.PixelFormat::Rgba8).pixels,
+      picture.pixels,
+      msg="round trip of \{count} colours",
+    )
+  }
+}
+
+///|
+test "png: a palette is only used when it is smaller" {
+  // Two hundred colours on a gradient: the table and the noisier indices cost
+  // more than the three bytes a pixel they replace, so the writer keeps the true
+  // colour file it made alongside.
+  let image = few_colours(200)
+  let file = @png.encode(image)
+  let plain = @png.encode(image, options=@png.EncodeOptions::{
+    level: 6,
+    filter: @png.Filter::Adaptive,
+    interlace: false,
+    metadata: true,
+    palette: false,
+  })
+  assert_true(file.length() <= plain.length())
+  assert_eq(read(file).convert(@raster.PixelFormat::Rgba8).pixels, image.pixels)
+}
+
+///|
+test "png: a picture with more than 256 colours falls back to true colour" {
+  let out = @buffer.Buffer::Buffer()
+  for y in 0..<32 {
+    for x in 0..<32 {
+      out.write_byte((x * 8).to_byte())
+      out.write_byte((y * 8).to_byte())
+      out.write_byte((x * y % 256).to_byte())
+      out.write_byte((255).to_byte())
+    }
+  }
+  let image = @raster.Image::of(
+    32,
+    32,
+    @raster.PixelFormat::Rgba8,
+    out.to_bytes(),
+  ) catch {
+    error => abort("the picture is well formed: \{error}")
+  }
+  let file = @png.encode(image)
+  assert_true(!has_chunk(file, "PLTE"))
+  assert_eq(read(file).pixels, image.pixels)
+}
+
+///|
+test "png: a palette can be turned off" {
+  let image = few_colours(4)
+  let file = @png.encode(image, options=@png.EncodeOptions::{
+    level: 6,
+    filter: @png.Filter::Adaptive,
+    interlace: false,
+    metadata: true,
+    palette: false,
+  })
+  assert_true(!has_chunk(file, "PLTE"))
+  assert_eq(read(file).convert(@raster.PixelFormat::Rgba8).pixels, image.pixels)
 }
