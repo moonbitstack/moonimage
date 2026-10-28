@@ -111,18 +111,18 @@ test "gif: a palette image with four colours comes back as rich as it went in" {
   assert_eq(image.format, @raster.PixelFormat::Rgba8)
   // A GIF has no alpha beyond one transparent index, so every opaque pixel is
   // opaque here.
-  let mut opaque = true
+  let mut all_opaque = true
   for y in 0..<image.height {
     for x in 0..<image.width {
       let pixel = image.pixel(x, y) catch {
         error => abort("in range: \{error}")
       }
       if pixel.a < 1.0 {
-        opaque = false
+        all_opaque = false
       }
     }
   }
-  assert_true(opaque)
+  assert_true(all_opaque)
 }
 
 ///|

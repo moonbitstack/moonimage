@@ -3,4 +3,12 @@
 // https://www.w3.org/Graphics/JPEG/itu-t81.pdf
 import {
   "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/math",
 }
+
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/png",
+} for "test"

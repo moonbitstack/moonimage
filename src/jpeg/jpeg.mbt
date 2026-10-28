@@ -121,36 +121,3 @@ pub fn Orientation::of(code : Int32) -> Orientation? {
     _ => None
   }
 }
-
-///|
-/// The orientation in the EXIF block of a JPEG, or `None` when there is no EXIF
-/// or it says nothing this library understands.
-///
-/// A damaged EXIF block is not a damaged image: it comes back as `None` rather
-/// than as a refusal, because a picture with a broken camera note is still a
-/// picture.
-pub fn exif_orientation(bytes : BytesView) -> Orientation? {
-  ignore(bytes)
-  abort("moonimage: not implemented yet")
-}
-
-///|
-/// The image in a JPEG file.
-///
-/// With `orient=true` the pixels are rearranged to match the EXIF orientation,
-/// which is what a viewer does; without it they are as stored.
-pub fn decode(
-  bytes : BytesView,
-  limits? : @raster.Limits,
-  orient? : Bool,
-) -> @raster.Image raise @raster.Refused {
-  ignore((bytes, limits, orient))
-  raise @raster.Unsupported(at=0, got="NOT IMPLEMENTED")
-}
-
-///|
-/// The image as a baseline JPEG.
-pub fn encode(image : @raster.Image, options? : EncodeOptions) -> Bytes {
-  ignore((image, options))
-  abort("moonimage: not implemented yet")
-}
