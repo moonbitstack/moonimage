@@ -122,3 +122,28 @@ pub fn Image::pixel(self : Image, x : Int32, y : Int32) -> Pixel raise Refused {
   let offset = y * self.stride + x * self.format.bytes()
   read_pixel(self.pixels, offset, self.format)
 }
+
+///|
+/// The image over a buffer that has just been filled.
+///
+/// The buffer must hold `width * height` tight rows; every operation that
+/// builds an image builds it that way, so the check `Image::of` does would only
+/// ever pass.
+fn assemble(
+  width : Int32,
+  height : Int32,
+  format : PixelFormat,
+  buffer : FixedArray[Byte],
+  premultiplied : Bool,
+  metadata : Metadata,
+) -> Image {
+  {
+    width,
+    height,
+    format,
+    stride: width * format.bytes(),
+    pixels: Bytes::from_array(buffer.clamped_view()),
+    premultiplied,
+    metadata,
+  }
+}

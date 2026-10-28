@@ -164,7 +164,10 @@ fn unit_to_byte(x : Double) -> Int32 {
   } else if x >= 1.0 {
     255
   } else {
-    (x * 255.0 + 0.5).to_int()
+    // The epsilon is there for the exact halves. A filter that averages 200 and
+    // 255 reaches 0.892156862745098…, whose product with 255 is a hair under
+    // 227.5 in binary, and without it the answer would be 227 rather than 228.
+    (x * 255.0 + 0.5 + 1.0e-9).to_int()
   }
 }
 
@@ -180,7 +183,7 @@ fn unit_to_word(x : Double) -> Int32 {
   } else if x >= 1.0 {
     65535
   } else {
-    (x * 65535.0 + 0.5).to_int()
+    (x * 65535.0 + 0.5 + 1.0e-9).to_int()
   }
 }
 
@@ -254,6 +257,104 @@ fn word_at(data : BytesView, offset : Int32) -> Int32 {
 ///|
 /// A little-endian float, the layout a GPU buffer wants.
 fn float_at(data : BytesView, offset : Int32) -> Float {
+  let bits = data[offset].to_int() +
+    data[offset + 1].to_int() * 256 +
+    data[offset + 2].to_int() * 65536 +
+    data[offset + 3].to_int() * 16777216
+  Float::reinterpret_from_uint(bits.reinterpret_as_uint())
+}
+
+///|
+/// Store `pixel` at `offset` in `data`, in this format.
+fn write_pixel(
+  data : FixedArray[Byte],
+  offset : Int32,
+  format : PixelFormat,
+  pixel : Pixel,
+) -> Unit {
+  match format {
+    Gray8 => data[offset] = unit_to_byte(gray_of(pixel)).to_byte()
+    GrayAlpha8 => {
+      data[offset] = unit_to_byte(gray_of(pixel)).to_byte()
+      data[offset + 1] = unit_to_byte(pixel.a).to_byte()
+    }
+    Rgb8 => {
+      data[offset] = unit_to_byte(pixel.r).to_byte()
+      data[offset + 1] = unit_to_byte(pixel.g).to_byte()
+      data[offset + 2] = unit_to_byte(pixel.b).to_byte()
+    }
+    Rgba8 => {
+      data[offset] = unit_to_byte(pixel.r).to_byte()
+      data[offset + 1] = unit_to_byte(pixel.g).to_byte()
+      data[offset + 2] = unit_to_byte(pixel.b).to_byte()
+      data[offset + 3] = unit_to_byte(pixel.a).to_byte()
+    }
+    Gray16 => put_word(data, offset, unit_to_word(gray_of(pixel)))
+    GrayAlpha16 => {
+      put_word(data, offset, unit_to_word(gray_of(pixel)))
+      put_word(data, offset + 2, unit_to_word(pixel.a))
+    }
+    Rgb16 => {
+      put_word(data, offset, unit_to_word(pixel.r))
+      put_word(data, offset + 2, unit_to_word(pixel.g))
+      put_word(data, offset + 4, unit_to_word(pixel.b))
+    }
+    Rgba16 => {
+      put_word(data, offset, unit_to_word(pixel.r))
+      put_word(data, offset + 2, unit_to_word(pixel.g))
+      put_word(data, offset + 4, unit_to_word(pixel.b))
+      put_word(data, offset + 6, unit_to_word(pixel.a))
+    }
+    RgbaF32 => {
+      put_float(data, offset, unit_to_float(pixel.r))
+      put_float(data, offset + 4, unit_to_float(pixel.g))
+      put_float(data, offset + 8, unit_to_float(pixel.b))
+      put_float(data, offset + 12, unit_to_float(pixel.a))
+    }
+  }
+}
+
+///|
+fn put_word(data : FixedArray[Byte], offset : Int32, value : Int32) -> Unit {
+  data[offset] = ((value >> 8) & 0xFF).to_byte()
+  data[offset + 1] = (value & 0xFF).to_byte()
+}
+
+///|
+fn put_float(data : FixedArray[Byte], offset : Int32, value : Float) -> Unit {
+  let bits = value.reinterpret_as_uint().reinterpret_as_int()
+  data[offset] = (bits & 0xFF).to_byte()
+  data[offset + 1] = ((bits >> 8) & 0xFF).to_byte()
+  data[offset + 2] = ((bits >> 16) & 0xFF).to_byte()
+  data[offset + 3] = ((bits >> 24) & 0xFF).to_byte()
+}
+
+///|
+/// The grey a colour becomes when a format has one channel.
+///
+/// The weights are the ones television settled on, which is what every other
+/// converter uses for eight-bit sRGB, and they sum to one so that a grey pixel
+/// stays the grey it was.
+fn gray_of(pixel : Pixel) -> Double {
+  0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b
+}
+
+///|
+/// A sample from 0 to 1 as a float, clamped: a float image is where a filter
+/// can overshoot, and a channel outside 0–1 is not a colour.
+fn unit_to_float(x : Double) -> Float {
+  if x <= 0.0 {
+    0.0F
+  } else if x >= 1.0 {
+    1.0F
+  } else {
+    Float::from_double(x)
+  }
+}
+
+///|
+/// A little-endian float in a buffer being built.
+fn float_in(data : FixedArray[Byte], offset : Int32) -> Float {
   let bits = data[offset].to_int() +
     data[offset + 1].to_int() * 256 +
     data[offset + 2].to_int() * 65536 +

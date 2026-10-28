@@ -4,4 +4,5 @@
 // and the metadata that travelled with them. Nothing in this package touches a
 // file; the readers live in the packages beside it.
 import {
+  "moonbitlang/core/math",
 }
