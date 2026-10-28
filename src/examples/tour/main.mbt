@@ -74,6 +74,7 @@ fn main raise {
       @moonimage.Format::Tga,
       @moonimage.Format::Gif,
       @moonimage.Format::Jpeg,
+      @moonimage.Format::Webp,
     ] {
     let file = @moonimage.encode(image, format)
     let back = @moonimage.decode(file) catch {
@@ -83,6 +84,20 @@ fn main raise {
       "\{format}: \{file.length()} bytes, \{back.width} by \{back.height}, \{back.format.bytes()} bytes a pixel",
     )
   }
+
+  // WebP is two codecs under one container, and this library writes only the
+  // lossless one. The lossy one it reads, which is what most WebP on the web is;
+  // the file below was written by `cwebp -q 75` from a 16 by 16 gradient, and is
+  // here as the only way to show a decode without an encoder for it.
+  let lossy : Bytes = b"RIFFR\x00\x00\x00WEBPVP8 F\x00\x00\x00\xf0\x01\x00\x9d\x01*\x10\x00\x10\x00\x02\x004%\xb0" +
+    b"\x02t\x01\x0f\x0c\x12\xf2\xca\x80\x00\xfe\xfc\x03\xcb\xf2}\x12\xe9p\xe1\x0b\x86=\xa6\xed1" +
+    b"\xff\xc9\x8at\xfe\xf9\xf0\x851x\x14D3\x97\xff\xfc\x8b\xddO\xff\xa7>\xf7\x0b\xfec\x00\x00\x00"
+  let from_lossy = @moonimage.decode(lossy) catch {
+    error => abort("the lossy file is read: \{error}")
+  }
+  println(
+    "a lossy WebP of \{lossy.length()} bytes: \{from_lossy.width} by \{from_lossy.height}, \{from_lossy.format.bytes()} bytes a pixel",
+  )
 
   // A picture that says what it is: the text goes into a PNG and comes back out.
   let annotated = @moonimage.Image::of(
@@ -124,7 +139,12 @@ fn main raise {
     ],
     loops=2,
   )
-  for format in [@moonimage.Format::Png, @moonimage.Format::Gif] {
+  for
+    format in [
+      @moonimage.Format::Png,
+      @moonimage.Format::Gif,
+      @moonimage.Format::Webp,
+    ] {
     let file = @moonimage.encode_animation(animation, format)
     let back = @moonimage.decode_animation(file) catch {
       error => abort("the animation is read: \{error}")

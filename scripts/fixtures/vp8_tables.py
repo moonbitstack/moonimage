@@ -15,6 +15,7 @@ The RFC is fetched into .cache/, so a rerun does not need the network.
 """
 
 import re
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -109,6 +110,17 @@ def chunked(values: list[int], per_line: int = 16) -> str:
     return "\n".join(lines)
 
 
+def format_generated() -> None:
+    """Run the formatter, because the tree is checked for being formatted.
+
+    The generated file is a source file like any other: if `moon fmt` would
+    change a line of it, the continuous integration run fails on the difference.
+    Formatting here means a rerun of this script produces a file that is ready to
+    commit, rather than one that needs a second step nobody remembers.
+    """
+    subprocess.run(["moon", "fmt"], cwd=ROOT, check=True, shell=(sys.platform == "win32"))
+
+
 def main() -> None:
     text = specification()
     dc = array_after(text, "dc_qlookup[QINDEX_RANGE] =", 128)
@@ -162,6 +174,7 @@ def main() -> None:
         "]",
     ]
     TARGET.write_text("\n".join(out), encoding="utf-8")
+    format_generated()
     print("wrote", TARGET, len(dc), len(ac), len(coeff), len(defaults), len(bmode))
 
 

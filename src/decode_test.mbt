@@ -32,6 +32,7 @@ test "the format is recognised by what the bytes start with" {
       @moonimage.Format::Gif,
       @moonimage.Format::Jpeg,
       @moonimage.Format::Tga,
+      @moonimage.Format::Webp,
     ] {
     let file = @moonimage.encode(image, format)
     assert_eq(@moonimage.Format::of(file), format)
@@ -47,6 +48,7 @@ test "what is written is what is read, for the formats that keep every pixel" {
       @moonimage.Format::Qoi,
       @moonimage.Format::Bmp,
       @moonimage.Format::Tga,
+      @moonimage.Format::Webp,
     ] {
     let file = @moonimage.encode(image, format)
     let back = @moonimage.decode(file) catch {
@@ -60,6 +62,35 @@ test "what is written is what is read, for the formats that keep every pixel" {
       msg="format \{format}",
     )
   }
+}
+
+///|
+test "a lossy WebP comes back through the front door, pixel for pixel" {
+  // Written by `cwebp -q 75` from a 16 by 16 gradient; the same bytes the tour
+  // decodes. A caller with a file from the network has nothing but this call.
+  let file : Bytes = b"RIFFR\x00\x00\x00WEBPVP8 F\x00\x00\x00\xf0\x01\x00\x9d\x01*\x10\x00\x10\x00\x02\x004%\xb0\x02t" +
+    b"\x01\x0f\x0c\x12\xf2\xca\x80\x00\xfe\xfc\x03\xcb\xf2}\x12\xe9p\xe1\x0b\x86=\xa6\xed1\xff\xc9\x8a" +
+    b"t\xfe\xf9\xf0\x851x\x14D3\x97\xff\xfc\x8b\xddO\xff\xa7>\xf7\x0b\xfec\x00\x00\x00"
+  assert_eq(@moonimage.Format::of(file), @moonimage.Format::Webp)
+  let image = @moonimage.decode(file) catch {
+    error => abort("the file should decode: \{error}")
+  }
+  assert_eq(image.width, 16)
+  assert_eq(image.height, 16)
+  assert_eq(image.format, @moonimage.PixelFormat::Rgb8)
+  // A lossy file is not "close enough" either: these are the samples libwebp
+  // produces, and the corners of the gradient are where they show. A pixel is
+  // four samples from nought to one.
+  let corner = image.pixel(0, 0) catch {
+    error => abort("the pixel is inside the image: \{error}")
+  }
+  let far = image.pixel(15, 15) catch {
+    error => abort("the pixel is inside the image: \{error}")
+  }
+  assert_true(corner.r < 0.05)
+  assert_true(corner.b > 0.45)
+  assert_true(far.r > 0.95)
+  assert_true(far.g > 0.95)
 }
 
 ///|

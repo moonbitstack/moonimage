@@ -41,16 +41,16 @@
 /// takes the right, and the range is renormalised back above 128 each time.
 priv struct Coder {
   data : BytesView
-  end : Int
-  mut at : Int
-  mut range : Int
-  mut value : Int
-  mut count : Int
+  end : Int32
+  mut at : Int32
+  mut range : Int32
+  mut value : Int32
+  mut count : Int32
 }
 
 ///|
 /// A decoder over `data[at..<end]`, primed with the first two bytes.
-fn Coder::new(data : BytesView, at : Int, end : Int) -> Coder {
+fn Coder::new(data : BytesView, at : Int32, end : Int32) -> Coder {
   let mut value = 0
   let mut cursor = at
   if cursor < end {
@@ -62,7 +62,7 @@ fn Coder::new(data : BytesView, at : Int, end : Int) -> Coder {
     value = value | data[cursor].to_int()
     cursor = cursor + 1
   }
-  { data, end, at: cursor, range: 255, value, count: 0 }
+  { data, end, at: cursor, range: 255, value, count: 0, }
 }
 
 ///|
@@ -72,7 +72,7 @@ fn Coder::new(data : BytesView, at : Int, end : Int) -> Coder {
 /// on. That is not a concession: the coder holds a window of bits rather than
 /// consuming them, so a frame read to its last macroblock always asks for a
 /// byte or two that the encoder had no reason to write.
-fn Coder::bit(self : Coder, prob : Int) -> Int {
+fn Coder::bit(self : Coder, prob : Int32) -> Int32 {
   let split = 1 + (((self.range - 1) * prob) >> 8)
   let big = split << 8
   let mut answer = 0
@@ -102,13 +102,13 @@ fn Coder::bit(self : Coder, prob : Int) -> Int {
 
 ///|
 /// One bit at even odds.
-fn Coder::flag(self : Coder) -> Int {
+fn Coder::flag(self : Coder) -> Int32 {
   self.bit(128)
 }
 
 ///|
 /// An unsigned literal of `bits` bits, most significant first.
-fn Coder::literal(self : Coder, bits : Int) -> Int {
+fn Coder::literal(self : Coder, bits : Int32) -> Int32 {
   let mut value = 0
   for _ in 0..<bits {
     value = (value << 1) | self.flag()
@@ -119,7 +119,7 @@ fn Coder::literal(self : Coder, bits : Int) -> Int {
 ///|
 /// A literal that a trailing flag can turn negative: `bits` of magnitude, then
 /// the sign.
-fn Coder::signed_literal(self : Coder, bits : Int) -> Int {
+fn Coder::signed_literal(self : Coder, bits : Int32) -> Int32 {
   let magnitude = self.literal(bits)
   if self.flag() == 1 {
     -magnitude
@@ -136,39 +136,39 @@ fn Coder::signed_literal(self : Coder, bits : Int) -> Int {
 /// big it is, how hard it was quantised, how strongly its edges are filtered,
 /// and the probabilities its coefficients are coded at.
 priv struct Frame {
-  mb_w : Int
-  mb_h : Int
+  mb_w : Int32
+  mb_h : Int32
   // Segmentation: four quadrants with their own quantiser and filter strength.
   mut use_segment : Bool
   mut update_map : Bool
   mut absolute_delta : Bool
-  segment_quant : FixedArray[Int]
-  segment_filter : FixedArray[Int]
-  segment_probs : FixedArray[Int]
+  segment_quant : FixedArray[Int32]
+  segment_filter : FixedArray[Int32]
+  segment_probs : FixedArray[Int32]
   // The loop filter.
   mut filter_simple : Bool
-  mut filter_level : Int
-  mut sharpness : Int
+  mut filter_level : Int32
+  mut sharpness : Int32
   mut use_lf_delta : Bool
-  ref_lf_delta : FixedArray[Int]
-  mode_lf_delta : FixedArray[Int]
-  mut filter_type : Int
+  ref_lf_delta : FixedArray[Int32]
+  mode_lf_delta : FixedArray[Int32]
+  mut filter_type : Int32
   // Quantiser steps per segment: luma DC and AC, the second-order luma block
   // that holds sixteen DCs, and chroma.
-  y1dc : FixedArray[Int]
-  y1ac : FixedArray[Int]
-  y2dc : FixedArray[Int]
-  y2ac : FixedArray[Int]
-  uvdc : FixedArray[Int]
-  uvac : FixedArray[Int]
+  y1dc : FixedArray[Int32]
+  y1ac : FixedArray[Int32]
+  y2dc : FixedArray[Int32]
+  y2ac : FixedArray[Int32]
+  uvdc : FixedArray[Int32]
+  uvac : FixedArray[Int32]
   // [block type][band][context][token], flattened.
-  probs : FixedArray[Int]
+  probs : FixedArray[Int32]
   mut use_skip : Bool
-  mut skip_prob : Int
+  mut skip_prob : Int32
 }
 
 ///|
-fn Frame::new(width : Int, height : Int) -> Frame {
+fn Frame::new(width : Int32, height : Int32) -> Frame {
   {
     mb_w: (width + 15) >> 4,
     mb_h: (height + 15) >> 4,
@@ -198,7 +198,7 @@ fn Frame::new(width : Int, height : Int) -> Frame {
 }
 
 ///|
-fn clamp(value : Int, low : Int, high : Int) -> Int {
+fn clamp(value : Int32, low : Int32, high : Int32) -> Int32 {
   if value < low {
     low
   } else if value > high {
@@ -341,18 +341,18 @@ fn read_coefficient_probs(coder : Coder, frame : Frame) -> Unit {
 /// The band each coefficient belongs to. The first four get their own — DC, the
 /// first AC, and the two either side of it — and everything past the sixth
 /// shares the last, because their statistics differ little.
-let bands : Array[Int] = [0, 1, 2, 3, 6, 4, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 0]
+let bands : Array[Int32] = [0, 1, 2, 3, 6, 4, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 0]
 
 ///|
 /// The subblock mode tree as libwebp numbers it: a negative entry is a leaf
 /// holding minus the mode, a positive one the node to descend to.
-let mode_tree : Array[Int] = [
+let mode_tree : Array[Int32] = [
   0, 1, -1, 2, -2, 3, 4, 6, -3, 5, -4, -5, -6, 7, -7, 8, -8, -9,
 ]
 
 ///|
 /// Walk the mode tree, one bit per interior node.
-fn read_submode(coder : Coder, probs : Array[Int], base : Int) -> Int {
+fn read_submode(coder : Coder, probs : Array[Int32], base : Int32) -> Int32 {
   let mut node = mode_tree[coder.bit(probs[base])]
   while node > 0 {
     node = mode_tree[2 * node + coder.bit(probs[base + node])]
@@ -375,10 +375,10 @@ fn read_submode(coder : Coder, probs : Array[Int], base : Int) -> Int {
 fn read_modes(
   coder : Coder,
   frame : Frame,
-  top : FixedArray[Int],
-  left : FixedArray[Int],
-  mb_x : Int,
-  modes : FixedArray[Int],
+  top : FixedArray[Int32],
+  left : FixedArray[Int32],
+  mb_x : Int32,
+  modes : FixedArray[Int32],
 ) -> Unit {
   let mut segment = 0
   if frame.use_segment && frame.update_map {
@@ -393,7 +393,11 @@ fn read_modes(
     for y in 0..<4 {
       let mut mode = left[y]
       for x in 0..<4 {
-        mode = read_submode(coder, bmode_probs, (top[4 * mb_x + x] * 10 + mode) * 9)
+        mode = read_submode(
+          coder,
+          bmode_probs,
+          (top[4 * mb_x + x] * 10 + mode) * 9,
+        )
         top[4 * mb_x + x] = mode
         modes[4 * y + x] = mode
       }
@@ -438,19 +442,29 @@ fn read_modes(
 
 ///|
 /// The scan order: where each step of the run-length code lands in the block.
-let zigzag : Array[Int] = [0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15]
+let zigzag : Array[Int32] = [
+  0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15,
+]
 
 ///|
 /// The probabilities of the category bits, one table per category.
-let cat3 : Array[Int] = [173, 148, 140]
-let cat4 : Array[Int] = [176, 155, 140, 135]
-let cat5 : Array[Int] = [180, 157, 141, 134, 130]
-let cat6 : Array[Int] = [254, 254, 243, 230, 196, 177, 153, 140, 133, 130, 129]
+let cat3 : Array[Int32] = [173, 148, 140]
+
+///|
+let cat4 : Array[Int32] = [176, 155, 140, 135]
+
+///|
+let cat5 : Array[Int32] = [180, 157, 141, 134, 130]
+
+///|
+let cat6 : Array[Int32] = [
+  254, 254, 243, 230, 196, 177, 153, 140, 133, 130, 129,
+]
 
 ///|
 /// A coefficient larger than one, whose magnitude is coded in one of four
 /// lengths: two to four, five to six, seven to ten, then a run of category bits.
-fn read_large(coder : Coder, probs : FixedArray[Int], base : Int) -> Int {
+fn read_large(coder : Coder, probs : FixedArray[Int32], base : Int32) -> Int32 {
   if coder.bit(probs[base + 3]) == 0 {
     if coder.bit(probs[base + 4]) == 0 {
       2
@@ -487,7 +501,7 @@ fn read_large(coder : Coder, probs : FixedArray[Int], base : Int) -> Int {
 ///|
 /// Where one block's coefficient probabilities start: by block type, band and
 /// context, eleven tokens each.
-fn probability_base(kind : Int, band : Int, context : Int) -> Int {
+fn probability_base(kind : Int32, band : Int32, context : Int32) -> Int32 {
   ((kind * 8 + band) * 3 + context) * 11
 }
 
@@ -503,14 +517,14 @@ fn probability_base(kind : Int, band : Int, context : Int) -> Int {
 fn read_coefficients(
   coder : Coder,
   frame : Frame,
-  kind : Int,
-  context : Int,
-  dc : Int,
-  ac : Int,
-  first : Int,
-  out : FixedArray[Int],
-  base : Int,
-) -> Int {
+  kind : Int32,
+  context : Int32,
+  dc : Int32,
+  ac : Int32,
+  first : Int32,
+  out : FixedArray[Int32],
+  base : Int32,
+) -> Int32 {
   let mut n = first
   let mut offset = probability_base(kind, bands[n], context)
   while n < 16 {
@@ -548,24 +562,24 @@ fn read_coefficients(
 /// The two constants of VP8's transform in 16.16 — half, and √3/2 — with the
 /// rounding of the reference folded into the first, which is why it adds its
 /// argument back.
-fn mul1(value : Int) -> Int {
+fn mul1(value : Int32) -> Int32 {
   value + ((value * 20091) >> 16)
 }
 
 ///|
-fn mul2(value : Int) -> Int {
+fn mul2(value : Int32) -> Int32 {
   (value * 35468) >> 16
 }
 
 ///|
 /// Add a residual to one sample, clamped to a byte.
 fn store(
-  plane : FixedArray[Int],
-  base : Int,
-  stride : Int,
-  x : Int,
-  y : Int,
-  delta : Int,
+  plane : FixedArray[Int32],
+  base : Int32,
+  stride : Int32,
+  x : Int32,
+  y : Int32,
+  delta : Int32,
 ) -> Unit {
   let at = base + y * stride + x
   plane[at] = clamp(plane[at] + delta, 0, 255)
@@ -575,12 +589,12 @@ fn store(
 /// The inverse four-by-four transform: a butterfly down the columns, then one
 /// across the rows, with the rounder of the last pass folded into the DC.
 fn transform_one(
-  coeffs : FixedArray[Int],
-  at : Int,
-  plane : FixedArray[Int],
-  base : Int,
-  stride : Int,
-  tmp : FixedArray[Int],
+  coeffs : FixedArray[Int32],
+  at : Int32,
+  plane : FixedArray[Int32],
+  base : Int32,
+  stride : Int32,
+  tmp : FixedArray[Int32],
 ) -> Unit {
   for i in 0..<4 {
     let a = coeffs[at + i] + coeffs[at + 8 + i]
@@ -610,11 +624,11 @@ fn transform_one(
 /// first horizontal and the first vertical: the common case, and worth not
 /// running the whole butterfly for.
 fn transform_ac3(
-  coeffs : FixedArray[Int],
-  at : Int,
-  plane : FixedArray[Int],
-  base : Int,
-  stride : Int,
+  coeffs : FixedArray[Int32],
+  at : Int32,
+  plane : FixedArray[Int32],
+  base : Int32,
+  stride : Int32,
 ) -> Unit {
   let dc = coeffs[at] + 4
   let c4 = mul2(coeffs[at + 4])
@@ -646,11 +660,11 @@ fn transform_ac3(
 ///|
 /// A block that is one flat value.
 fn transform_dc(
-  coeffs : FixedArray[Int],
-  at : Int,
-  plane : FixedArray[Int],
-  base : Int,
-  stride : Int,
+  coeffs : FixedArray[Int32],
+  at : Int32,
+  plane : FixedArray[Int32],
+  base : Int32,
+  stride : Int32,
 ) -> Unit {
   let dc = (coeffs[at] + 4) >> 3
   for y in 0..<4 {
@@ -665,8 +679,8 @@ fn transform_dc(
 /// block: a Walsh-Hadamard, which is what lets those sixteen numbers be coded as
 /// a block of their own, at a coarser quantiser, instead of being spread across
 /// the sixteen they belong to.
-fn transform_wht(dc : FixedArray[Int], coeffs : FixedArray[Int]) -> Unit {
-  let tmp : Array[Int] = Array::make(16, 0)
+fn transform_wht(dc : FixedArray[Int32], coeffs : FixedArray[Int32]) -> Unit {
+  let tmp : Array[Int32] = Array::make(16, 0)
   for i in 0..<4 {
     let a0 = dc[i] + dc[12 + i]
     let a1 = dc[4 + i] + dc[8 + i]
@@ -694,12 +708,12 @@ fn transform_wht(dc : FixedArray[Int], coeffs : FixedArray[Int]) -> Unit {
 // Prediction
 
 ///|
-fn avg3(a : Int, b : Int, c : Int) -> Int {
+fn avg3(a : Int32, b : Int32, c : Int32) -> Int32 {
   (a + 2 * b + c + 2) >> 2
 }
 
 ///|
-fn avg2(a : Int, b : Int) -> Int {
+fn avg2(a : Int32, b : Int32) -> Int32 {
   (a + b + 1) >> 1
 }
 
@@ -712,25 +726,27 @@ fn avg2(a : Int, b : Int) -> Int {
 /// horizontal, down-right, vertical-right, down-left, vertical-left,
 /// horizontal-down, horizontal-up.
 fn predict4(
-  mode : Int,
-  out : FixedArray[Int],
-  top : FixedArray[Int],
-  left : FixedArray[Int],
-  corner : Int,
+  mode : Int32,
+  out : FixedArray[Int32],
+  top : FixedArray[Int32],
+  left : FixedArray[Int32],
+  corner : Int32,
 ) -> Unit {
   // The samples are named as the specification names them: `corner` is X, the
   // row above is A B C D and past the edge E F G H, the column to the left is
   // I J K L. A destination is `out[x + 4 * y]`.
   if mode == 0 {
-    let dc = (top[0] +
-      top[1] +
-      top[2] +
-      top[3] +
-      left[0] +
-      left[1] +
-      left[2] +
-      left[3] +
-      4) >>
+    let dc = (
+        top[0] +
+        top[1] +
+        top[2] +
+        top[3] +
+        left[0] +
+        left[1] +
+        left[2] +
+        left[3] +
+        4
+      ) >>
       3
     for i in 0..<16 {
       out[i] = dc
@@ -886,7 +902,7 @@ fn predict4(
 /// Which of the seven sixteen-by-sixteen or chroma predictors a mode means: the
 /// DC one degrades when it has no row above or no column to the left, and which
 /// it lacks is a property of the macroblock, not of the block.
-fn corner_mode(mb_x : Int, mb_y : Int, mode : Int) -> Int {
+fn corner_mode(mb_x : Int32, mb_y : Int32, mode : Int32) -> Int32 {
   if mode != 0 {
     mode
   } else if mb_x == 0 {
@@ -905,10 +921,10 @@ fn corner_mode(mb_x : Int, mb_y : Int, mode : Int) -> Int {
 ///|
 /// A sixteen-by-sixteen prediction, written straight into the plane.
 fn predict16(
-  mode : Int,
-  plane : FixedArray[Int],
-  base : Int,
-  stride : Int,
+  mode : Int32,
+  plane : FixedArray[Int32],
+  base : Int32,
+  stride : Int32,
 ) -> Unit {
   if mode == 4 {
     // No row above: the DC comes from the column to the left alone.
@@ -981,10 +997,10 @@ fn predict16(
 ///|
 /// An eight-by-eight chroma prediction.
 fn predict8(
-  mode : Int,
-  plane : FixedArray[Int],
-  base : Int,
-  stride : Int,
+  mode : Int32,
+  plane : FixedArray[Int32],
+  base : Int32,
+  stride : Int32,
 ) -> Unit {
   if mode == 4 {
     // No row above: the DC comes from the column to the left alone.
@@ -1058,7 +1074,7 @@ fn predict8(
 // The loop filter
 
 ///|
-fn distance(a : Int, b : Int) -> Int {
+fn distance(a : Int32, b : Int32) -> Int32 {
   let d = a - b
   if d < 0 {
     -d
@@ -1068,14 +1084,14 @@ fn distance(a : Int, b : Int) -> Int {
 }
 
 ///|
-fn signed_clip(value : Int) -> Int {
+fn signed_clip(value : Int32) -> Int32 {
   clamp(value, -16, 15)
 }
 
 ///|
 /// A small correction across an edge: two samples either side moved towards each
 /// other by a quarter of their disagreement, limited to sixteen.
-fn filter2(plane : FixedArray[Int], at : Int, step : Int) -> Unit {
+fn filter2(plane : FixedArray[Int32], at : Int32, step : Int32) -> Unit {
   let p1 = plane[at - 2 * step]
   let p0 = plane[at - step]
   let q0 = plane[at]
@@ -1090,7 +1106,7 @@ fn filter2(plane : FixedArray[Int], at : Int, step : Int) -> Unit {
 ///|
 /// Four samples either side of an inner edge, where there is no sample beyond
 /// the two that are changed.
-fn filter4(plane : FixedArray[Int], at : Int, step : Int) -> Unit {
+fn filter4(plane : FixedArray[Int32], at : Int32, step : Int32) -> Unit {
   let p1 = plane[at - 2 * step]
   let p0 = plane[at - step]
   let q0 = plane[at]
@@ -1108,7 +1124,7 @@ fn filter4(plane : FixedArray[Int], at : Int, step : Int) -> Unit {
 ///|
 /// Six samples either side of a macroblock edge, where there is room for the
 /// full filter.
-fn filter6(plane : FixedArray[Int], at : Int, step : Int) -> Unit {
+fn filter6(plane : FixedArray[Int32], at : Int32, step : Int32) -> Unit {
   let p2 = plane[at - 3 * step]
   let p1 = plane[at - 2 * step]
   let p0 = plane[at - step]
@@ -1132,7 +1148,12 @@ fn filter6(plane : FixedArray[Int], at : Int, step : Int) -> Unit {
 /// the neighbourhood smooth enough that the step is a quantisation artefact
 /// rather than a real edge? A real edge is left alone, which is the whole point
 /// of the filter being conditional.
-fn needs_filter(plane : FixedArray[Int], at : Int, step : Int, t : Int) -> Bool {
+fn needs_filter(
+  plane : FixedArray[Int32],
+  at : Int32,
+  step : Int32,
+  t : Int32,
+) -> Bool {
   let p1 = plane[at - 2 * step]
   let p0 = plane[at - step]
   let q0 = plane[at]
@@ -1142,11 +1163,11 @@ fn needs_filter(plane : FixedArray[Int], at : Int, step : Int, t : Int) -> Bool 
 
 ///|
 fn needs_filter2(
-  plane : FixedArray[Int],
-  at : Int,
-  step : Int,
-  t : Int,
-  it : Int,
+  plane : FixedArray[Int32],
+  at : Int32,
+  step : Int32,
+  t : Int32,
+  it : Int32,
 ) -> Bool {
   let p3 = plane[at - 4 * step]
   let p2 = plane[at - 3 * step]
@@ -1159,24 +1180,23 @@ fn needs_filter2(
   if 4 * distance(p0, q0) + distance(p1, q1) > t {
     return false
   }
-  distance(p3, p2) <=
-    it &&
-  distance(p2, p1) <=
-    it &&
-  distance(p1, p0) <=
-    it &&
-  distance(q3, q2) <=
-    it &&
-  distance(q2, q1) <=
-    it &&
-  distance(q1, q0) <=
-    it
+  distance(p3, p2) <= it &&
+  distance(p2, p1) <= it &&
+  distance(p1, p0) <= it &&
+  distance(q3, q2) <= it &&
+  distance(q2, q1) <= it &&
+  distance(q1, q0) <= it
 }
 
 ///|
 /// Whether a high-variance edge runs alongside: if it does, the six-tap filter
 /// would smear it and the two-tap one is used instead.
-fn high_edge(plane : FixedArray[Int], at : Int, step : Int, thresh : Int) -> Bool {
+fn high_edge(
+  plane : FixedArray[Int32],
+  at : Int32,
+  step : Int32,
+  thresh : Int32,
+) -> Bool {
   let p1 = plane[at - 2 * step]
   let p0 = plane[at - step]
   let q0 = plane[at]
@@ -1187,14 +1207,14 @@ fn high_edge(plane : FixedArray[Int], at : Int, step : Int, thresh : Int) -> Boo
 ///|
 /// Filter `size` samples along one edge, the full six-tap variant.
 fn filter_loop6(
-  plane : FixedArray[Int],
-  at : Int,
-  across : Int,
-  down : Int,
-  size : Int,
-  thresh : Int,
-  inner : Int,
-  hev : Int,
+  plane : FixedArray[Int32],
+  at : Int32,
+  across : Int32,
+  down : Int32,
+  size : Int32,
+  thresh : Int32,
+  inner : Int32,
+  hev : Int32,
 ) -> Unit {
   let t = 2 * thresh + 1
   for i in 0..<size {
@@ -1212,14 +1232,14 @@ fn filter_loop6(
 ///|
 /// Filter `size` samples along an inner edge, the four-tap variant.
 fn filter_loop4(
-  plane : FixedArray[Int],
-  at : Int,
-  across : Int,
-  down : Int,
-  size : Int,
-  thresh : Int,
-  inner : Int,
-  hev : Int,
+  plane : FixedArray[Int32],
+  at : Int32,
+  across : Int32,
+  down : Int32,
+  size : Int32,
+  thresh : Int32,
+  inner : Int32,
+  hev : Int32,
 ) -> Unit {
   let t = 2 * thresh + 1
   for i in 0..<size {
@@ -1238,12 +1258,12 @@ fn filter_loop4(
 /// Filter `size` samples with the simple two-tap filter, which only ever moves
 /// the two samples either side of the edge.
 fn filter_loop_simple(
-  plane : FixedArray[Int],
-  at : Int,
-  across : Int,
-  down : Int,
-  size : Int,
-  thresh : Int,
+  plane : FixedArray[Int32],
+  at : Int32,
+  across : Int32,
+  down : Int32,
+  size : Int32,
+  thresh : Int32,
 ) -> Unit {
   let t = 2 * thresh + 1
   for i in 0..<size {
@@ -1260,9 +1280,9 @@ fn filter_loop_simple(
 ///|
 /// One macroblock's filter strength, worked out once per segment and block size.
 priv struct Strength {
-  limit : Int
-  ilevel : Int
-  hev : Int
+  limit : Int32
+  ilevel : Int32
+  hev : Int32
 }
 
 ///|
@@ -1271,7 +1291,7 @@ priv struct Strength {
 ///
 /// Sharpness lowers the inner level and caps it at `9 - sharpness`, which is why
 /// a sharp setting filters the block edges but barely touches the inner ones.
-fn strength_for(frame : Frame, segment : Int, i4x4 : Bool) -> Strength {
+fn strength_for(frame : Frame, segment : Int32, i4x4 : Bool) -> Strength {
   let base = if frame.use_segment {
     if frame.absolute_delta {
       frame.segment_filter[segment]
@@ -1290,7 +1310,7 @@ fn strength_for(frame : Frame, segment : Int, i4x4 : Bool) -> Strength {
   }
   level = clamp(level, 0, 63)
   if level == 0 {
-    return { limit: 0, ilevel: 0, hev: 0 }
+    return { limit: 0, ilevel: 0, hev: 0, }
   }
   let mut ilevel = level
   if frame.sharpness > 0 {
@@ -1324,17 +1344,17 @@ fn strength_for(frame : Frame, segment : Int, i4x4 : Bool) -> Strength {
 /// The planes the frame is reconstructed on, each already carrying a row above
 /// and a column to the left of border samples.
 priv struct Planes {
-  y : FixedArray[Int]
-  u : FixedArray[Int]
-  v : FixedArray[Int]
-  sy : Int
-  sc : Int
+  y : FixedArray[Int32]
+  u : FixedArray[Int32]
+  v : FixedArray[Int32]
+  sy : Int32
+  sc : Int32
 }
 
 ///|
 /// Where sample `(x, y)` lives, with `(-1, -1)` being the top-left corner of the
 /// border.
-fn at(stride : Int, x : Int, y : Int) -> Int {
+fn at(stride : Int32, x : Int32, y : Int32) -> Int32 {
   (y + 1) * stride + (x + 1)
 }
 
@@ -1343,7 +1363,12 @@ fn at(stride : Int, x : Int, y : Int) -> Int {
 /// top. The two differ because a DC prediction with no neighbours uses 128 and
 /// the borders are meant to pull it towards the picture's own average, which is
 /// brighter than mid-grey in practice.
-fn fill_border(plane : FixedArray[Int], stride : Int, width : Int, height : Int) -> Unit {
+fn fill_border(
+  plane : FixedArray[Int32],
+  stride : Int32,
+  width : Int32,
+  height : Int32,
+) -> Unit {
   for y in -1..<height {
     plane[at(stride, -1, y)] = 129
   }
@@ -1365,23 +1390,23 @@ fn fill_border(plane : FixedArray[Int], stride : Int, width : Int, height : Int)
 fn reconstruct(
   frame : Frame,
   planes : Planes,
-  coeffs : FixedArray[Int],
-  modes : FixedArray[Int],
-  non_zero_y : Int,
-  non_zero_uv : Int,
-  mb_x : Int,
-  mb_y : Int,
+  coeffs : FixedArray[Int32],
+  modes : FixedArray[Int32],
+  non_zero_y : Int32,
+  non_zero_uv : Int32,
+  mb_x : Int32,
+  mb_y : Int32,
 ) -> Unit {
   let sy = planes.sy
   let sc = planes.sc
   let px = mb_x * 16
   let py = mb_y * 16
   let base = at(sy, px, py)
-  let tmp : FixedArray[Int] = FixedArray::make(16, 0)
-  let block : FixedArray[Int] = FixedArray::make(16, 0)
-  let top : FixedArray[Int] = FixedArray::make(8, 0)
-  let left : FixedArray[Int] = FixedArray::make(4, 0)
-  let corner : FixedArray[Int] = FixedArray::make(4, 0)
+  let tmp : FixedArray[Int32] = FixedArray::make(16, 0)
+  let block : FixedArray[Int32] = FixedArray::make(16, 0)
+  let top : FixedArray[Int32] = FixedArray::make(8, 0)
+  let left : FixedArray[Int32] = FixedArray::make(4, 0)
+  let corner : FixedArray[Int32] = FixedArray::make(4, 0)
   for i in 0..<4 {
     corner[i] = if mb_x == frame.mb_w - 1 {
       planes.y[at(sy, px + 15, py - 1)]
@@ -1473,8 +1498,8 @@ fn filter_macroblock(
   planes : Planes,
   strength : Strength,
   inner : Bool,
-  mb_x : Int,
-  mb_y : Int,
+  mb_x : Int32,
+  mb_y : Int32,
 ) -> Unit {
   if strength.limit == 0 {
     return
@@ -1497,15 +1522,49 @@ fn filter_macroblock(
     }
     if inner {
       for k in 1..<4 {
-        filter_loop_simple(planes.y, base + 4 * k * sy, sy, 1, 16, strength.limit)
+        filter_loop_simple(
+          planes.y,
+          base + 4 * k * sy,
+          sy,
+          1,
+          16,
+          strength.limit,
+        )
       }
     }
   } else {
     let outer = strength.limit + 4
     if mb_x > 0 {
-      filter_loop6(planes.y, base, 1, sy, 16, outer, strength.ilevel, strength.hev)
-      filter_loop6(planes.u, chroma, 1, sc, 8, outer, strength.ilevel, strength.hev)
-      filter_loop6(planes.v, chroma, 1, sc, 8, outer, strength.ilevel, strength.hev)
+      filter_loop6(
+        planes.y,
+        base,
+        1,
+        sy,
+        16,
+        outer,
+        strength.ilevel,
+        strength.hev,
+      )
+      filter_loop6(
+        planes.u,
+        chroma,
+        1,
+        sc,
+        8,
+        outer,
+        strength.ilevel,
+        strength.hev,
+      )
+      filter_loop6(
+        planes.v,
+        chroma,
+        1,
+        sc,
+        8,
+        outer,
+        strength.ilevel,
+        strength.hev,
+      )
     }
     if inner {
       for k in 1..<4 {
@@ -1521,13 +1580,58 @@ fn filter_macroblock(
         )
       }
       // Chroma is eight wide, so it has one inner edge and not three.
-      filter_loop4(planes.u, chroma + 4, 1, sc, 8, strength.limit, strength.ilevel, strength.hev)
-      filter_loop4(planes.v, chroma + 4, 1, sc, 8, strength.limit, strength.ilevel, strength.hev)
+      filter_loop4(
+        planes.u,
+        chroma + 4,
+        1,
+        sc,
+        8,
+        strength.limit,
+        strength.ilevel,
+        strength.hev,
+      )
+      filter_loop4(
+        planes.v,
+        chroma + 4,
+        1,
+        sc,
+        8,
+        strength.limit,
+        strength.ilevel,
+        strength.hev,
+      )
     }
     if mb_y > 0 {
-      filter_loop6(planes.y, base, sy, 1, 16, outer, strength.ilevel, strength.hev)
-      filter_loop6(planes.u, chroma, sc, 1, 8, outer, strength.ilevel, strength.hev)
-      filter_loop6(planes.v, chroma, sc, 1, 8, outer, strength.ilevel, strength.hev)
+      filter_loop6(
+        planes.y,
+        base,
+        sy,
+        1,
+        16,
+        outer,
+        strength.ilevel,
+        strength.hev,
+      )
+      filter_loop6(
+        planes.u,
+        chroma,
+        sc,
+        1,
+        8,
+        outer,
+        strength.ilevel,
+        strength.hev,
+      )
+      filter_loop6(
+        planes.v,
+        chroma,
+        sc,
+        1,
+        8,
+        outer,
+        strength.ilevel,
+        strength.hev,
+      )
     }
     if inner {
       for k in 1..<4 {
@@ -1586,21 +1690,21 @@ fn filter_macroblock(
 fn read_residuals(
   coder : Coder,
   frame : Frame,
-  segment : Int,
+  segment : Int32,
   i4x4 : Bool,
-  mb_x : Int,
-  nz_top : FixedArray[Int],
-  nz_dc_top : FixedArray[Int],
-  nz_left : FixedArray[Int],
-  coeffs : FixedArray[Int],
-) -> (Int, Int) {
+  mb_x : Int32,
+  nz_top : FixedArray[Int32],
+  nz_dc_top : FixedArray[Int32],
+  nz_left : FixedArray[Int32],
+  coeffs : FixedArray[Int32],
+) -> (Int32, Int32) {
   for i in 0..<384 {
     coeffs[i] = 0
   }
   let mut first = 0
   let mut kind = 3
   if !i4x4 {
-    let dc : FixedArray[Int] = FixedArray::make(16, 0)
+    let dc : FixedArray[Int32] = FixedArray::make(16, 0)
     let context = nz_dc_top[mb_x] + nz_left[1]
     let nz = read_coefficients(
       coder,
@@ -1648,15 +1752,16 @@ fn read_residuals(
       )
       l = if nz > first { 1 } else { 0 }
       tnz = (tnz >> 1) | (l << 7)
-      bits = (bits << 2) | (if nz > 3 {
-        3
-      } else if nz > 1 {
-        2
-      } else if coeffs[16 * block] != 0 {
-        1
-      } else {
-        0
-      })
+      bits = (bits << 2) |
+        (if nz > 3 {
+          3
+        } else if nz > 1 {
+          2
+        } else if coeffs[16 * block] != 0 {
+          1
+        } else {
+          0
+        })
     }
     tnz = tnz >> 4
     lnz = (lnz >> 1) | (l << 7)
@@ -1687,21 +1792,22 @@ fn read_residuals(
         )
         l = if nz > 0 { 1 } else { 0 }
         ctnz = (ctnz >> 1) | (l << 3)
-        bits = (bits << 2) | (if nz > 3 {
-          3
-        } else if nz > 1 {
-          2
-        } else if coeffs[offset] != 0 {
-          1
-        } else {
-          0
-        })
+        bits = (bits << 2) |
+          (if nz > 3 {
+            3
+          } else if nz > 1 {
+            2
+          } else if coeffs[offset] != 0 {
+            1
+          } else {
+            0
+          })
       }
       ctnz = ctnz >> 2
       clnz = (clnz >> 1) | (l << 5)
     }
     non_zero_uv = non_zero_uv | (bits << (8 * plane))
-    top_out = top_out | ((ctnz << 4) << (2 * plane))
+    top_out = top_out | (ctnz << 4 << (2 * plane))
     left_out = left_out | ((clnz & 0xF0) << (2 * plane))
   }
   nz_top[mb_x] = top_out
@@ -1718,10 +1824,13 @@ fn read_residuals(
 /// last one runs to the end of the payload.
 fn read_partitions(
   payload : BytesView,
-  from : Int,
-  count : Int,
+  from : Int32,
+  count : Int32,
 ) -> FixedArray[Coder] raise @raster.Refused {
-  let parts : FixedArray[Coder] = FixedArray::make(count, Coder::new(payload, 0, 0))
+  let parts : FixedArray[Coder] = FixedArray::make(
+    count,
+    Coder::new(payload, 0, 0),
+  )
   let tail = count - 1
   if from + 3 * tail > payload.length() {
     raise @raster.Truncated(
@@ -1750,7 +1859,7 @@ fn read_partitions(
 ///|
 /// One sample, clipped the way the reference clips it: the fixed-point value
 /// carries six fractional bits, and anything outside the byte range saturates.
-fn clip8(value : Int) -> Byte {
+fn clip8(value : Int32) -> Byte {
   if value < 0 {
     b'\x00'
   } else if value > 16383 {
@@ -1764,7 +1873,13 @@ fn clip8(value : Int) -> Byte {
 /// Three samples from one luma and two chroma, BT.601 with the coefficients in
 /// 16-bit fixed point: 1.164 for luma, 1.596 for red from V, 0.813 and 0.391 for
 /// green, 2.018 for blue from U.
-fn rgb(out : FixedArray[Byte], at : Int, y : Int, u : Int, v : Int) -> Unit {
+fn rgb(
+  out : FixedArray[Byte],
+  at : Int32,
+  y : Int32,
+  u : Int32,
+  v : Int32,
+) -> Unit {
   let luma = (y * 19077) >> 8
   out[at] = clip8(luma + ((v * 26149) >> 8) - 14234)
   out[at + 1] = clip8(luma - ((u * 6419) >> 8) - ((v * 13320) >> 8) + 8708)
@@ -1787,12 +1902,12 @@ fn rgb(out : FixedArray[Byte], at : Int, y : Int, u : Int, v : Int) -> Unit {
 /// there is twice, which is what the reference does by mirroring.
 fn emit_rows(
   out : FixedArray[Byte],
-  width : Int,
+  width : Int32,
   planes : Planes,
-  y_top : Int,
-  y_bottom : Int,
-  c_top : Int,
-  c_bottom : Int,
+  y_top : Int32,
+  y_bottom : Int32,
+  c_top : Int32,
+  c_bottom : Int32,
 ) -> Unit {
   let sy = planes.sy
   let sc = planes.sc
@@ -1886,26 +2001,26 @@ fn emit_rows(
 /// The planes as the library's three-byte pixels.
 fn to_rgb_image(
   planes : Planes,
-  width : Int,
-  height : Int,
+  width : Int32,
+  height : Int32,
 ) -> @raster.Image raise @raster.Refused {
   let out : FixedArray[Byte] = FixedArray::make(width * height * 3, b'\x00')
   emit_rows(out, width, planes, 0, -1, 0, 0)
   let mut pair = 0
   while 2 * pair + 2 < height {
+    emit_rows(out, width, planes, 2 * pair + 1, 2 * pair + 2, pair, pair + 1)
+    pair = pair + 1
+  }
+  if height % 2 == 0 && height > 1 {
     emit_rows(
       out,
       width,
       planes,
-      2 * pair + 1,
-      2 * pair + 2,
-      pair,
-      pair + 1,
+      height - 1,
+      -1,
+      height / 2 - 1,
+      height / 2 - 1,
     )
-    pair = pair + 1
-  }
-  if height % 2 == 0 && height > 1 {
-    emit_rows(out, width, planes, height - 1, -1, height / 2 - 1, height / 2 - 1)
   }
   @raster.Image::of(
     width,
@@ -1935,10 +2050,17 @@ pub fn decode_lossy(
     (payload[1].to_int() << 8) |
     (payload[2].to_int() << 16)
   if (tag & 1) == 1 {
-    raise @raster.Unsupported(at=0, got="an interframe, which a WebP never holds")
+    raise @raster.Unsupported(
+      at=0,
+      got="an interframe, which a WebP never holds",
+    )
   }
   if ((tag >> 1) & 7) > 3 {
-    raise @raster.Unexpected(at=0, got="a profile above three", want="a key frame")
+    raise @raster.Unexpected(
+      at=0,
+      got="a profile above three",
+      want="a key frame",
+    )
   }
   if ((tag >> 4) & 1) == 0 {
     raise @raster.Unexpected(
@@ -1997,7 +2119,7 @@ pub fn decode_lossy(
   fill_border(py, sy, mb_w * 16, ph)
   fill_border(pu, sc, mb_w * 8, ch)
   fill_border(pv, sc, mb_w * 8, ch)
-  let planes : Planes = { y: py, u: pu, v: pv, sy, sc }
+  let planes : Planes = { y: py, u: pu, v: pv, sy, sc, }
 
   let top = FixedArray::make(4 * mb_w, 0)
   let left = FixedArray::make(4, 0)
@@ -2045,14 +2167,7 @@ pub fn decode_lossy(
         non_zero_uv = uv
       }
       reconstruct(
-        frame,
-        planes,
-        coeffs,
-        modes,
-        non_zero_y,
-        non_zero_uv,
-        mb_x,
-        mb_y,
+        frame, planes, coeffs, modes, non_zero_y, non_zero_uv, mb_x, mb_y,
       )
       let index = mb_y * mb_w + mb_x
       segments[index] = modes[19]
@@ -2106,10 +2221,13 @@ pub fn decode_alpha(
   let compression = header & 0x03
   let filtering = (header >> 2) & 0x03
   let count = width * height
-  let plane : FixedArray[Int] = FixedArray::make(count, 0)
+  let plane : FixedArray[Int32] = FixedArray::make(count, 0)
   if compression == 0 {
     if payload.length() < 1 + count {
-      raise @raster.Truncated(at=payload.length(), want=1 + count - payload.length())
+      raise @raster.Truncated(
+        at=payload.length(),
+        want=1 + count - payload.length(),
+      )
     }
     for index in 0..<count {
       plane[index] = payload[1 + index].to_int()
@@ -2132,7 +2250,10 @@ pub fn decode_alpha(
       plane[index] = image.pixels[index * 4 + 1].to_int()
     }
   } else {
-    raise @raster.Unsupported(at=0, got="an alpha compression of \{compression}")
+    raise @raster.Unsupported(
+      at=0,
+      got="an alpha compression of \{compression}",
+    )
   }
   let stride = width
   for y in 0..<height {

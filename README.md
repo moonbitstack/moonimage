@@ -69,13 +69,14 @@ predictors for four-by-four blocks and four for sixteen-by-sixteen ones, a
 residual coded as quantised transform coefficients, a loop filter along every
 edge, and chroma interpolated between the two rows it sits between. Its output is
 compared with libwebp sample by sample and comes out byte for byte identical, on
-a flat colour, a photograph, an odd size and a picture of two hundred
-macroblocks; a lossy file that decodes "nearly right" is a file with a bug in
-it, not a tolerance.
+a flat colour, a patterned picture, an odd size, a single pixel and a picture of
+eighty macroblocks; a lossy file that decodes "nearly right" is a file with a bug
+in it, not a tolerance.
 
 A lossy picture has no alpha in VP8 itself, so a transparent one carries a
 separate `ALPH` chunk, compressed with the lossless codec and filtered along its
-rows; that is read too, and comes back as four samples per pixel.
+rows; that is read too, and comes back as four samples per pixel, in a still
+picture and inside an animation frame alike.
 
 The writer is within 1.25 to 1.5 times libwebp's size on the fixtures: it has no
 colour transform, no palette and no per-block prefix code groups, and it does not
@@ -223,6 +224,7 @@ untrusted files should pass `strict` or a tighter record of its own.
 | `jpeg.encode`, `jpeg.decode`, `jpeg.EncodeOptions`, `jpeg.Subsampling`, `jpeg.exif_orientation` | JPEG, and the orientation a camera wrote |
 | `gif.encode`, `gif.encode_animation`, `gif.decode`, `gif.decode_animation`, `gif.EncodeOptions` | GIF, with dithering and transparency |
 | `webp.decode`, `webp.decode_animation`, `webp.encode`, `webp.encode_animation` | WebP: lossless and lossy read, lossless written |
+| `webp.decode_lossy`, `webp.decode_alpha`, `webp.decode_lossless_stream` | one chunk at a time, for a caller that has already split the container |
 
 ## Licence
 

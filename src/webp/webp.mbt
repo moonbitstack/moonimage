@@ -68,7 +68,10 @@ pub fn decode_animation(
         let image = decode_lossy(payload, limits)
         let picture = match alpha {
           Some(plane) =>
-            with_alpha(image, decode_alpha(plane, image.width, image.height, limits))
+            with_alpha(
+              image,
+              decode_alpha(plane, image.width, image.height, limits),
+            )
           None => image
         }
         alpha = None
@@ -123,7 +126,10 @@ fn read_frame(
         picture = Some(
           match alpha {
             Some(plane) =>
-              with_alpha(image, decode_alpha(plane, image.width, image.height, limits))
+              with_alpha(
+                image,
+                decode_alpha(plane, image.width, image.height, limits),
+              )
             None => image
           },
         )
@@ -201,6 +207,14 @@ pub fn encode_animation(
   loop_count.u16_le(animation.loops)
   chunks.push(("ANIM", loop_count.to_bytes()))
   for frame in animation.frames {
+    // A frame record holds its offset in units of two pixels, because a frame
+    // that landed on an odd pixel would not survive the chroma subsampling.
+    if frame.x % 2 != 0 || frame.y % 2 != 0 {
+      raise @raster.Unsupported(
+        at=0,
+        got="a frame at an odd offset, which a WebP cannot hold",
+      )
+    }
     let record = @wire.Writer::new()
     record.u24_le(frame.x / 2)
     record.u24_le(frame.y / 2)
@@ -211,7 +225,15 @@ pub fn encode_animation(
       (if frame.blend == @raster.Blend::Source { 0x02 } else { 0x00 }) |
       (if frame.dispose == @raster.Dispose::Background { 0x01 } else { 0x00 }),
     )
-    record.bytes(encode_lossless(frame.image))
+    // What follows the record is an ordinary chunk list, which is what the
+    // reader looks for there; a bare picture payload is not a file.
+    let picture = encode_lossless(frame.image)
+    record.bytes(b"VP8L")
+    record.u32_le(picture.length())
+    record.bytes(picture)
+    if picture.length() % 2 == 1 {
+      record.u8(0)
+    }
     chunks.push(("ANMF", record.to_bytes()))
   }
   write_riff(chunks)
