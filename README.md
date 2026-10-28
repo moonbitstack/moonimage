@@ -1,7 +1,7 @@
 # moonimage
 
-Image codecs for MoonBit: PNG, QOI, BMP, TGA, JPEG and GIF read and written, with
-the pixel arithmetic that sits between them.
+Image codecs for MoonBit: PNG, QOI, BMP, TGA, JPEG, GIF and WebP read, all but
+WebP written as well, with the pixel arithmetic that sits between them.
 
 No I/O, no dependencies beyond the deflate stream a PNG needs, all four backends.
 
@@ -63,24 +63,24 @@ which takes its options record.
 | GIF | palettes, transparency, interlace, run lengths | palette by exact colours or median cut, dithering | yes | `@moonimage/gif` |
 | WebP | lossless (VP8L) with its four transforms, colour cache and prefix code groups, and lossy (VP8) with its boolean coder, fourteen predictors, loop filter and chroma upsampling; alpha in either; animated files | lossless, with a predictor transform and LZ77 | yes | `@moonimage/webp` |
 
-Both halves of WebP are read. The lossless one, VP8L, is also written. The lossy
-one, VP8, is the intra frame of a video codec: a boolean arithmetic coder, ten
+Both halves of WebP are read; the lossless one, VP8L, is also written. VP8 is the
+intra frame of a video codec, so its picture is rebuilt rather than decoded: a
+boolean arithmetic coder over prediction modes and transform coefficients, ten
 predictors for four-by-four blocks and four for sixteen-by-sixteen ones, a
-residual coded as quantised transform coefficients, a loop filter along every
-edge, and chroma interpolated between the two rows it sits between. Its output is
-compared with libwebp sample by sample and comes out byte for byte identical, on
-a flat colour, a patterned picture, an odd size, a single pixel and a picture of
-eighty macroblocks; a lossy file that decodes "nearly right" is a file with a bug
-in it, not a tolerance.
+residual carried as quantised coefficients, a loop filter along every macroblock
+and transform edge, and chroma interpolated between the two rows it sits between.
+What comes out is the reconstruction the format defines, sample for sample — a
+lossy decoder that is "nearly right" is one with a bug in it.
 
 A lossy picture has no alpha in VP8 itself, so a transparent one carries a
-separate `ALPH` chunk, compressed with the lossless codec and filtered along its
-rows; that is read too, and comes back as four samples per pixel, in a still
-picture and inside an animation frame alike.
+separate `ALPH` chunk beside the picture: compressed with the lossless codec, then
+filtered along its rows. That is read too, in a still picture and inside an
+animation frame, and comes back as four samples per pixel.
 
-The writer is within 1.25 to 1.5 times libwebp's size on the fixtures: it has no
-colour transform, no palette and no per-block prefix code groups, and it does not
-need them to be correct.
+The writer produces VP8L, the half that can be exact. It picks one predictor
+transform per block group by residual cost and finds repeats with a hash of the
+pixel value; it does not write a palette, a colour transform, or per-block prefix
+code groups, which cost size and not correctness.
 
 ## The image
 
@@ -185,7 +185,7 @@ animation.compose()                           // every frame as a full canvas
 ```
 
 `compose` applies the disposal and blending rules in order, which is what a viewer
-does and what a test compares against.
+shows.
 
 ## Limits
 
