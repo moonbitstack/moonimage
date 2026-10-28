@@ -5,13 +5,18 @@
 
     python scripts/fixtures/webp.py
 
-A lossless WebP has exactly one correct decoding, so the reference is a digest
-of the pixels libwebp reads back: no tolerance, no colour conversion, a byte out
-of place is a failure. The shapes are the ones that exercise a different part of
-the format — a plain picture, one with alpha, a flat one that is all
-back-references, one with few enough colours for the palette transform, a size
-that is not a multiple of the block grid, a single pixel, and a picture big
-enough for libwebp to split into several prefix code groups.
+Neither codec has a range of acceptable answers — a lossless file has one correct
+decoding, and a lossy one has whatever libwebp reconstructs, which is what the
+reader here reproduces — so the reference is a digest of the pixels libwebp reads
+back: no tolerance, no colour conversion, a byte out of place is a failure.
+
+The shapes are the ones that exercise a different part of the format — a plain
+picture, one with alpha, a flat one that is all back-references, one with few
+enough colours for the palette transform, a size that is not a multiple of the
+block grid, a single pixel, and a picture big enough for libwebp to split into
+several prefix code groups. The lossy half adds quality settings from ten to a
+hundred, which decide how much residue there is to get wrong and how hard the
+encoder filters, and a transparent picture whose alpha lives in its own chunk.
 """
 
 import hashlib
