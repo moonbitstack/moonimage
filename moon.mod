@@ -1,15 +1,29 @@
-name = "moonbitstack/CHANGE-ME"
+name = "moonbitstack/moonimage"
 
 version = "0.1.0"
 
 readme = "README.md"
 
-repository = "https://github.com/moonbitstack/CHANGE-ME"
+repository = "https://github.com/moonbitstack/moonimage"
 
 license = "Apache-2.0"
 
-keywords = [ "moonbit" ]
+keywords = [
+  "image",
+  "png",
+  "jpeg",
+  "gif",
+  "webp",
+  "qoi",
+  "bmp",
+  "tga",
+  "moonbit",
+]
 
-description = "One sentence saying what this is and what it is not."
+description = "Image codecs for MoonBit: PNG, QOI, BMP, TGA, JPEG, GIF and WebP, and the pixel arithmetic between them."
 
 source = "src"
+
+import {
+  "moonbitstack/moonzip@0.3.1",
+}

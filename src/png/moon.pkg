@@ -1,0 +1,7 @@
+// PNG, read and written, with APNG for animation.
+//
+// https://www.w3.org/TR/png-3/
+// https://wiki.mozilla.org/APNG_Specification
+import {
+  "moonbitstack/moonimage/raster",
+}

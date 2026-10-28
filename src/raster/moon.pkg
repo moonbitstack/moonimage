@@ -1,0 +1,7 @@
+// The pixel types, the formats, and the arithmetic over them that needs no file.
+//
+// An image here is a rectangle of samples, a layout that says how to read them,
+// and the metadata that travelled with them. Nothing in this package touches a
+// file; the readers live in the packages beside it.
+import {
+}

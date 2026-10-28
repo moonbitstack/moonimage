@@ -1,0 +1,204 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/raster"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn hex(BytesView, Int32, Int32) -> String
+
+// Errors
+pub(all) suberror Refused {
+  Unexpected(at~ : Int32, got~ : String, want~ : String)
+  Unknown(at~ : Int32, got~ : String)
+  Unsupported(at~ : Int32, got~ : String)
+  Truncated(at~ : Int32, want~ : Int32)
+  OverLimit(limit~ : Int32, got~ : Int32)
+  Checksum(at~ : Int32, got~ : String, want~ : String)
+} derive(Eq, @debug.Debug)
+pub fn Refused::equal(Self, Self) -> Bool
+pub fn Refused::not_equal(Self, Self) -> Bool
+pub fn Refused::output(Self, &Logger) -> Unit
+pub fn Refused::to_repr(Self) -> @debug.Repr
+pub fn Refused::to_string(Self) -> String
+pub impl Show for Refused
+
+// Types and methods
+pub(all) struct Animation {
+  width : Int32
+  height : Int32
+  loops : Int32
+  frames : Array[Frame]
+  metadata : Metadata
+}
+pub fn Animation::compose(Self) -> Array[Image]
+pub fn Animation::new(Int32, Int32, Array[Frame], loops? : Int32, metadata? : Metadata) -> Self
+
+pub(all) enum Blend {
+  Source
+  Over
+} derive(Eq, @debug.Debug)
+pub fn Blend::equal(Self, Self) -> Bool
+pub fn Blend::not_equal(Self, Self) -> Bool
+pub fn Blend::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Chromaticities {
+  white_x : Double
+  white_y : Double
+  red_x : Double
+  red_y : Double
+  green_x : Double
+  green_y : Double
+  blue_x : Double
+  blue_y : Double
+}
+pub fn Chromaticities::srgb() -> Self
+
+pub(all) enum Dispose {
+  Keep
+  Background
+  Previous
+} derive(Eq, @debug.Debug)
+pub fn Dispose::equal(Self, Self) -> Bool
+pub fn Dispose::not_equal(Self, Self) -> Bool
+pub fn Dispose::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Format {
+  Png
+  Qoi
+  Bmp
+  Tga
+  Jpeg
+  Gif
+  Webp
+} derive(Eq, @debug.Debug)
+pub fn Format::equal(Self, Self) -> Bool
+pub fn Format::extension(Self) -> String
+pub fn Format::mime(Self) -> String
+pub fn Format::not_equal(Self, Self) -> Bool
+pub fn Format::of(BytesView) -> Self raise Refused
+pub fn Format::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Frame {
+  image : Image
+  x : Int32
+  y : Int32
+  delay : Int32
+  dispose : Dispose
+  blend : Blend
+}
+pub fn Frame::new(Image, x? : Int32, y? : Int32, delay? : Int32, dispose? : Dispose, blend? : Blend) -> Self
+
+pub(all) struct Icc {
+  name : String
+  profile : Bytes
+}
+
+pub(all) struct Image {
+  width : Int32
+  height : Int32
+  format : PixelFormat
+  stride : Int32
+  pixels : Bytes
+  premultiplied : Bool
+  metadata : Metadata
+}
+pub fn Image::convert(Self, PixelFormat) -> Self
+pub fn Image::crop(Self, Int32, Int32, Int32, Int32) -> Self raise Refused
+pub fn Image::flip_horizontal(Self) -> Self
+pub fn Image::flip_vertical(Self) -> Self
+pub fn Image::new(Int32, Int32, PixelFormat, stride? : Int32, premultiplied? : Bool, metadata? : Metadata) -> Self
+pub fn Image::of(Int32, Int32, PixelFormat, Bytes, stride? : Int32, premultiplied? : Bool, metadata? : Metadata) -> Self raise Refused
+pub fn Image::pixel(Self, Int32, Int32) -> Pixel raise Refused
+pub fn Image::rotate(Self, quarters? : Int32) -> Self
+pub fn Image::row(Self, Int32) -> BytesView raise Refused
+pub fn Image::scale(Self, Int32, Int32, sampling? : Sampling) -> Self raise Refused
+pub fn Image::to_premultiplied(Self) -> Self
+pub fn Image::to_straight(Self) -> Self
+
+pub(all) enum Intent {
+  Perceptual
+  Relative
+  Saturation
+  Absolute
+} derive(Eq, @debug.Debug)
+pub fn Intent::code(Self) -> Int32
+pub fn Intent::equal(Self, Self) -> Bool
+pub fn Intent::not_equal(Self, Self) -> Bool
+pub fn Intent::of(Int32) -> Self?
+pub fn Intent::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Limits {
+  width : Int32
+  height : Int32
+  pixels : Int32
+  bytes : Int32
+}
+pub fn Limits::allows(Self, Int32, Int32) -> Bool
+pub fn Limits::check(Self, Int32, Int32) -> Unit raise Refused
+pub fn Limits::check_bytes(Self, Int32) -> Unit raise Refused
+pub fn Limits::default() -> Self
+pub fn Limits::strict() -> Self
+
+pub(all) struct Metadata {
+  gamma : Double?
+  chromaticities : Chromaticities?
+  intent : Intent?
+  icc : Icc?
+  texts : Array[Text]
+}
+pub fn Metadata::default() -> Self
+pub fn Metadata::is_empty(Self) -> Bool
+
+pub(all) struct Pixel {
+  r : Double
+  g : Double
+  b : Double
+  a : Double
+}
+pub fn Pixel::of_rgba8(Int32, Int32, Int32, a? : Int32) -> Self
+pub fn Pixel::rgba16(Self) -> (Int32, Int32, Int32, Int32)
+pub fn Pixel::rgba8(Self) -> (Int32, Int32, Int32, Int32)
+
+pub(all) enum PixelFormat {
+  Gray8
+  GrayAlpha8
+  Rgb8
+  Rgba8
+  Gray16
+  GrayAlpha16
+  Rgb16
+  Rgba16
+  RgbaF32
+} derive(Eq, @debug.Debug)
+pub fn PixelFormat::bits(Self) -> Int32
+pub fn PixelFormat::bytes(Self) -> Int32
+pub fn PixelFormat::channels(Self) -> Int32
+pub fn PixelFormat::equal(Self, Self) -> Bool
+pub fn PixelFormat::has_alpha(Self) -> Bool
+pub fn PixelFormat::is_float(Self) -> Bool
+pub fn PixelFormat::is_gray(Self) -> Bool
+pub fn PixelFormat::not_equal(Self, Self) -> Bool
+pub fn PixelFormat::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Sampling {
+  Nearest
+  Bilinear
+  Lanczos
+} derive(Eq, @debug.Debug)
+pub fn Sampling::equal(Self, Self) -> Bool
+pub fn Sampling::not_equal(Self, Self) -> Bool
+pub fn Sampling::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Text {
+  Latin(keyword~ : String, text~ : String)
+  Compressed(keyword~ : String, text~ : String)
+  International(keyword~ : String, language~ : String, translated~ : String, text~ : String)
+}
+pub fn Text::keyword(Self) -> String
+pub fn Text::text(Self) -> String
+
+// Type aliases
+
+// Traits

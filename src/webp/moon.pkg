@@ -1,0 +1,7 @@
+// WebP, lossless read and write, lossy read, animation read and write.
+//
+// https://developers.google.com/speed/webp/docs/riff_container
+// https://datatracker.ietf.org/doc/html/rfc9649
+import {
+  "moonbitstack/moonimage/raster",
+}

@@ -1,0 +1,33 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/bmp"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
+
+// Errors
+
+// Types and methods
+pub(all) enum Depth {
+  Bits24
+  Bits32
+} derive(Eq, @debug.Debug)
+pub fn Depth::equal(Self, Self) -> Bool
+pub fn Depth::not_equal(Self, Self) -> Bool
+pub fn Depth::to_repr(Self) -> @debug.Repr
+
+pub(all) struct EncodeOptions {
+  depth : Depth
+  top_down : Bool
+}
+pub fn EncodeOptions::default() -> Self
+
+// Type aliases
+
+// Traits

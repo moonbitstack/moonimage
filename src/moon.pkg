@@ -1,2 +1,16 @@
-// What this package implements, and a first-hand link to the specification it
-// implements. A package without that link is not finished.
+// Every format in the repository, chosen by what the bytes are.
+//
+// `decode` reads the signature and hands the bytes to the package that knows
+// that format; `encode` writes the one the caller names. The types are
+// re-exported from `raster`, so a caller that only imports this package has the
+// image, the limits, the error and the operations in hand.
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/png",
+  "moonbitstack/moonimage/qoi",
+  "moonbitstack/moonimage/bmp",
+  "moonbitstack/moonimage/tga",
+  "moonbitstack/moonimage/jpeg",
+  "moonbitstack/moonimage/gif",
+  "moonbitstack/moonimage/webp",
+}

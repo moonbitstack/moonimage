@@ -1,13 +1,54 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "moonbitstack/CHANGE-ME"
+package "moonbitstack/moonimage"
+
+import {
+  "moonbitstack/moonimage/raster",
+}
 
 // Values
-pub fn greet(StringView) -> String
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn decode_animation(BytesView, limits? : @raster.Limits) -> @raster.Animation raise @raster.Refused
+
+pub fn encode(@raster.Image, @raster.Format) -> Bytes
+
+pub fn encode_animation(@raster.Animation, @raster.Format) -> Bytes
 
 // Errors
 
 // Types and methods
 
 // Type aliases
+pub using @raster {type Animation}
+
+pub using @raster {type Blend}
+
+pub using @raster {type Chromaticities}
+
+pub using @raster {type Dispose}
+
+pub using @raster {type Format}
+
+pub using @raster {type Frame}
+
+pub using @raster {type Icc}
+
+pub using @raster {type Image}
+
+pub using @raster {type Intent}
+
+pub using @raster {type Limits}
+
+pub using @raster {type Metadata}
+
+pub using @raster {type Pixel}
+
+pub using @raster {type PixelFormat}
+
+pub using @raster {type Refused}
+
+pub using @raster {type Sampling}
+
+pub using @raster {type Text}
 
 // Traits

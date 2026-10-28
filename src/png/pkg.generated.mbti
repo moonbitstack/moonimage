@@ -1,0 +1,45 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/png"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn decode_animation(BytesView, limits? : @raster.Limits) -> @raster.Animation raise @raster.Refused
+
+pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
+
+pub fn encode_animation(@raster.Animation, options? : EncodeOptions) -> Bytes
+
+// Errors
+
+// Types and methods
+pub(all) struct EncodeOptions {
+  level : Int32
+  filter : Filter
+  interlace : Bool
+  metadata : Bool
+}
+pub fn EncodeOptions::best() -> Self
+pub fn EncodeOptions::default() -> Self
+pub fn EncodeOptions::fast() -> Self
+
+pub(all) enum Filter {
+  Adaptive
+  None
+  Sub
+  Up
+  Average
+  Paeth
+} derive(Eq, @debug.Debug)
+pub fn Filter::equal(Self, Self) -> Bool
+pub fn Filter::not_equal(Self, Self) -> Bool
+pub fn Filter::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

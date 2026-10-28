@@ -1,0 +1,53 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/jpeg"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits, orient? : Bool) -> @raster.Image raise @raster.Refused
+
+pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
+
+pub fn exif_orientation(BytesView) -> Orientation?
+
+// Errors
+
+// Types and methods
+pub(all) struct EncodeOptions {
+  quality : Int32
+  subsampling : Subsampling
+}
+pub fn EncodeOptions::best() -> Self
+pub fn EncodeOptions::default() -> Self
+
+pub(all) enum Orientation {
+  Normal
+  FlipHorizontal
+  Rotate180
+  FlipVertical
+  Transpose
+  Rotate90
+  Transverse
+  Rotate270
+} derive(Eq, @debug.Debug)
+pub fn Orientation::code(Self) -> Int32
+pub fn Orientation::equal(Self, Self) -> Bool
+pub fn Orientation::not_equal(Self, Self) -> Bool
+pub fn Orientation::of(Int32) -> Self?
+pub fn Orientation::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Subsampling {
+  Yuv444
+  Yuv422
+  Yuv420
+} derive(Eq, @debug.Debug)
+pub fn Subsampling::equal(Self, Self) -> Bool
+pub fn Subsampling::not_equal(Self, Self) -> Bool
+pub fn Subsampling::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

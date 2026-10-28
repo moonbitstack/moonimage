@@ -1,0 +1,6 @@
+// QOI, read and written, in the whole of its specification.
+//
+// https://qoiformat.org/qoi-specification.pdf
+import {
+  "moonbitstack/moonimage/raster",
+}

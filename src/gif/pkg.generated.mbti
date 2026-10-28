@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/gif"
+
+import {
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn decode_animation(BytesView, limits? : @raster.Limits) -> @raster.Animation raise @raster.Refused
+
+pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
+
+pub fn encode_animation(@raster.Animation, options? : EncodeOptions) -> Bytes
+
+// Errors
+
+// Types and methods
+pub(all) struct EncodeOptions {
+  dither : Bool
+  transparent : Bool
+}
+pub fn EncodeOptions::default() -> Self
+
+// Type aliases
+
+// Traits

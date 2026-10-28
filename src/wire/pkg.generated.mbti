@@ -1,0 +1,51 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/wire"
+
+import {
+  "moonbitlang/core/buffer",
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Cursor {
+  data : BytesView
+  mut pos : Int32
+}
+pub fn Cursor::at(Self) -> Int32
+pub fn Cursor::bytes(Self, Int32) -> BytesView raise @raster.Refused
+pub fn Cursor::i32_le(Self) -> Int32 raise @raster.Refused
+pub fn Cursor::is_empty(Self) -> Bool
+pub fn Cursor::left(Self) -> Int32
+pub fn Cursor::new(BytesView) -> Self
+pub fn Cursor::rest(Self) -> BytesView
+pub fn Cursor::seek(Self, Int32) -> Unit raise @raster.Refused
+pub fn Cursor::skip(Self, Int32) -> Unit raise @raster.Refused
+pub fn Cursor::u16_be(Self) -> Int32 raise @raster.Refused
+pub fn Cursor::u16_le(Self) -> Int32 raise @raster.Refused
+pub fn Cursor::u24_le(Self) -> Int32 raise @raster.Refused
+pub fn Cursor::u32_be(Self) -> Int32 raise @raster.Refused
+pub fn Cursor::u32_le(Self) -> Int32 raise @raster.Refused
+pub fn Cursor::u8(Self) -> Int32 raise @raster.Refused
+
+pub struct Writer {
+  buffer : @buffer.Buffer
+}
+pub fn Writer::bytes(Self, BytesView) -> Unit
+pub fn Writer::length(Self) -> Int32
+pub fn Writer::new() -> Self
+pub fn Writer::to_bytes(Self) -> Bytes
+pub fn Writer::u16_be(Self, Int32) -> Unit
+pub fn Writer::u16_le(Self, Int32) -> Unit
+pub fn Writer::u24_le(Self, Int32) -> Unit
+pub fn Writer::u32_be(Self, Int32) -> Unit
+pub fn Writer::u32_le(Self, Int32) -> Unit
+pub fn Writer::u8(Self, Int32) -> Unit
+pub fn Writer::zeros(Self, Int32) -> Unit
+
+// Type aliases
+
+// Traits

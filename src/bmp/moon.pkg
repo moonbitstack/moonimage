@@ -1,0 +1,7 @@
+// Windows bitmaps, read and written.
+//
+// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-wmf/
+// https://www.digicamsoft.com/bmp/bmp.html
+import {
+  "moonbitstack/moonimage/raster",
+}

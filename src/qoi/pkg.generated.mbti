@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/qoi"
+
+import {
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn encode(@raster.Image) -> Bytes
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
