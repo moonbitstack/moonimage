@@ -3,4 +3,12 @@
 // https://www.w3.org/Graphics/GIF/spec-gif89a.txt
 import {
   "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/hashmap",
 }
+
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitlang/core/buffer",
+} for "test"
