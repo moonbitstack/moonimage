@@ -83,7 +83,10 @@ pub fn decode_animation(
 ///
 /// A caller that wants to choose how it is written calls the format's own
 /// package, which takes its options record.
-pub fn encode(image : @raster.Image, format : @raster.Format) -> Bytes {
+pub fn encode(
+  image : @raster.Image,
+  format : @raster.Format,
+) -> Bytes raise @raster.Refused {
   match format {
     Png => @png.encode(image)
     Qoi => @qoi.encode(image)
@@ -103,7 +106,7 @@ pub fn encode(image : @raster.Image, format : @raster.Format) -> Bytes {
 pub fn encode_animation(
   animation : @raster.Animation,
   format : @raster.Format,
-) -> Bytes {
+) -> Bytes raise @raster.Refused {
   match format {
     Png => @png.encode_animation(animation)
     Gif => @gif.encode_animation(animation)

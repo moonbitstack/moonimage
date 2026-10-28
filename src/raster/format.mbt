@@ -36,6 +36,15 @@ pub extend Format with Eq::{equal, not_equal}
 pub extend Format with Debug::{to_repr}
 
 ///|
+/// A format writes itself as its extension, which is what a person calls it.
+pub impl Show for Format with fn output(self, logger) {
+  logger.write_string(self.extension())
+}
+
+///|
+pub extend Format with Show::{to_string, output}
+
+///|
 /// The extension a file of this format usually has, without the dot.
 pub fn Format::extension(self : Format) -> String {
   match self {

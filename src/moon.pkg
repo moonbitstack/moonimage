@@ -14,3 +14,7 @@ import {
   "moonbitstack/moonimage/gif",
   "moonbitstack/moonimage/webp",
 }
+
+import {
+  "moonbitlang/core/buffer",
+} for "test"

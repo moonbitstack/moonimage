@@ -4,4 +4,11 @@
 // https://datatracker.ietf.org/doc/html/rfc9649
 import {
   "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
 }
+
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitlang/core/encoding/utf8",
+} for "test"

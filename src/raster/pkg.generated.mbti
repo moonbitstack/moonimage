@@ -81,7 +81,10 @@ pub fn Format::extension(Self) -> String
 pub fn Format::mime(Self) -> String
 pub fn Format::not_equal(Self, Self) -> Bool
 pub fn Format::of(BytesView) -> Self raise Refused
+pub fn Format::output(Self, &Logger) -> Unit
 pub fn Format::to_repr(Self) -> @debug.Repr
+pub fn Format::to_string(Self) -> String
+pub impl Show for Format
 
 pub(all) struct Frame {
   image : Image

@@ -10,9 +10,9 @@ pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raste
 
 pub fn decode_animation(BytesView, limits? : @raster.Limits) -> @raster.Animation raise @raster.Refused
 
-pub fn encode(@raster.Image) -> Bytes
+pub fn encode(@raster.Image) -> Bytes raise @raster.Refused
 
-pub fn encode_animation(@raster.Animation) -> Bytes
+pub fn encode_animation(@raster.Animation) -> Bytes raise @raster.Refused
 
 // Errors
 
