@@ -29,7 +29,8 @@ pub(all) struct Limits {
 }
 
 ///|
-/// A megapixel ceiling of 16384 × 16384, a gigabyte of expansion.
+/// The desktop defaults: a million pixels a side, 256 megapixels in all, and a
+/// gigabyte of expansion.
 pub fn Limits::default() -> Limits {
   {
     width: 1_048_576,
