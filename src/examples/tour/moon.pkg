@@ -1,0 +1,7 @@
+// The whole surface in one run: `moon run src/examples/tour`.
+pkgtype(kind: "executable")
+
+import {
+  "moonbitstack/moonimage",
+  "moonbitlang/core/buffer",
+}
