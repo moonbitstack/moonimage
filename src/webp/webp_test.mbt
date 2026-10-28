@@ -169,6 +169,22 @@ test "webp: an alpha chunk decodes without its container" {
   }
   assert_eq(plane.length(), width * height)
   assert_eq(digest(plane), expected)
+  // The byte also names how the plane is stored, and two of those four numbers
+  // were never assigned: a chunk that claims one of them is refused rather than
+  // read as though it were the one next door.
+  for compression in [b'\x02', b'\x03'] {
+    let unknown = with_byte(chunk, 0, compression)
+    let failed = try {
+      ignore(
+        @webp.decode_alpha(unknown, width, height, @raster.Limits::default()),
+      )
+      false
+    } catch {
+      @raster.Refused::Unsupported(..) => true
+      _ => false
+    }
+    assert_true(failed)
+  }
 }
 
 ///|

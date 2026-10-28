@@ -60,7 +60,7 @@ def reference(data: bytes) -> tuple[bytes, int, int]:
     return rgba.tobytes(), rgba.width, rgba.height
 
 
-def stills() -> list[tuple[str, bytes]]:
+def build_stills() -> list[tuple[str, bytes]]:
     base = sources.pattern(64, 48).convert("RGB")
     cases = [
         ("lossless-rgb", lossless(base, method=6)),
@@ -97,10 +97,13 @@ def stills() -> list[tuple[str, bytes]]:
     # codec and filtered along the rows, so it is a separate path to get right.
     cases.append(("lossy-alpha", lossy(sources.pattern(64, 48), 80)))
     cases.append(("lossy-alpha-odd", lossy(sources.pattern(37, 23), 80)))
+    # The alpha chunk's four row filters. The first is what an encoder picks in
+    # practice; the other three are built and then confirmed against libwebp.
+    cases.extend(alpha_filtered_files())
     return cases
 
 
-def animations() -> list[tuple[str, bytes]]:
+def build_animations() -> list[tuple[str, bytes]]:
     """Animated files, one of each codec.
 
     Every frame is the whole canvas, which is the only shape where the digest of
@@ -130,6 +133,85 @@ def animations() -> list[tuple[str, bytes]]:
             method=6,
         )
         out.append((name, handle.getvalue()))
+    return out
+
+
+def alpha_filter(plane: bytes, width: int, height: int, method: int) -> bytes:
+    """The forward filter the `ALPH` chunk applies, one of the four methods.
+
+    The inverse is a predictor added back to each residual, so this is the same
+    predictor subtracted: the pixel to the left for a horizontal row, the one
+    above for a vertical column, and the clamped left-plus-above-minus-corner for
+    the gradient. The first row has nothing above it and uses the horizontal rule
+    alone, which is what the decoder does too.
+    """
+    out = bytearray(len(plane))
+
+    def at(x, y):
+        return plane[y * width + x]
+
+    for y in range(height):
+        for x in range(width):
+            if method == 0:
+                predicted = 0
+            elif method == 1:
+                predicted = at(x - 1, y) if x > 0 else (at(0, y - 1) if y > 0 else 0)
+            elif y == 0:
+                predicted = at(x - 1, y) if x > 0 else 0
+            elif method == 2:
+                predicted = at(x, y - 1)
+            else:
+                left = at(x - 1, y) if x > 0 else at(0, y - 1)
+                above = at(x, y - 1)
+                corner = at(x - 1, y - 1) if x > 0 else above
+                predicted = min(255, max(0, left + above - corner))
+            out[y * width + x] = (at(x, y) - predicted) & 0xFF
+    return bytes(out)
+
+
+def alpha_filtered_files() -> list[tuple[str, bytes]]:
+    """The same picture with its alpha stored each of the four ways.
+
+    A transparent lossy file says in one byte how its alpha is filtered, and the
+    encoders in the wild pick the first method almost always, so the other three
+    would never be reached by a fixture written by an encoder. They are built here
+    instead: the plane is filtered by hand and the chunk is dropped into a real
+    file, and the result is kept only if libwebp reads the alpha back unchanged,
+    which is what makes it a reference rather than an assertion about our own
+    arithmetic. What compression each file uses is still whatever the encoder
+    chose, so only the filter differs.
+    """
+    source = lossy(sources.pattern(64, 48), 80)
+    image = Image.open(io.BytesIO(source)).convert("RGBA")
+    width, height = image.size
+    plane = image.getchannel("A").tobytes()
+    structure = {}
+    at = 12
+    while at + 8 <= len(source):
+        name = source[at:at + 4]
+        size = int.from_bytes(source[at + 4:at + 8], "little")
+        if name in (b"VP8X", b"VP8 "):
+            structure[name] = source[at + 8:at + 8 + size]
+        at += 8 + size + (size & 1)
+
+    def chunk(name, payload):
+        body = name + len(payload).to_bytes(4, "little") + payload
+        return body + (b"\x00" if len(payload) & 1 else b"")
+
+    out = []
+    for method in (0, 1, 2, 3):
+        # The order is the format's: the extended header, then the alpha it
+        # announces, then the picture that has none of its own.
+        payload = bytes([method << 2]) + alpha_filter(plane, width, height, method)
+        body = b"WEBP"
+        body += chunk(b"VP8X", structure[b"VP8X"])
+        body += chunk(b"ALPH", payload)
+        body += chunk(b"VP8 ", structure[b"VP8 "])
+        file = b"RIFF" + len(body).to_bytes(4, "little") + body
+        back = Image.open(io.BytesIO(file)).convert("RGBA").getchannel("A").tobytes()
+        if back != plane:
+            raise SystemExit("libwebp disagrees about alpha filter %d" % method)
+        out.append(("lossy-alpha-filter-%d" % method, file))
     return out
 
 
@@ -168,6 +250,28 @@ def format_generated() -> None:
     commit, rather than one that needs a second step nobody remembers.
     """
     subprocess.run(["moon", "fmt"], cwd=ROOT, check=True, shell=(sys.platform == "win32"))
+
+
+_CACHE: dict[str, list[tuple[str, bytes]]] = {}
+
+
+def stills() -> list[tuple[str, bytes]]:
+    """The still pictures, encoded once however many times they are asked for.
+
+    Encoding is the slow part of this script — every picture goes through the
+    reference encoder at its slowest setting — and the lists below each want the
+    same set, so the work is done on the first call and kept.
+    """
+    if "stills" not in _CACHE:
+        _CACHE["stills"] = build_stills()
+    return _CACHE["stills"]
+
+
+def animations() -> list[tuple[str, bytes]]:
+    """The animated files, encoded once."""
+    if "animations" not in _CACHE:
+        _CACHE["animations"] = build_animations()
+    return _CACHE["animations"]
 
 
 def main() -> None:
