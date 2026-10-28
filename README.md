@@ -61,11 +61,18 @@ which takes its options record.
 | TGA | colour mapped, true colour and grey, run lengths, 8/15/16/24/32 bits, both row orders | 24 and 32 bits, run lengths on request | — | `@moonimage/tga` |
 | JPEG | baseline and progressive, every subsampling, greyscale, EXIF orientation | baseline, quality 1–100 | — | `@moonimage/jpeg` |
 | GIF | palettes, transparency, interlace, run lengths | palette by exact colours or median cut, dithering | yes | `@moonimage/gif` |
-| WebP | the container and its frame records | — | — | `@moonimage/webp` |
+| WebP | lossless (VP8L) with its four transforms, colour cache and prefix code groups; animated files | lossless, with a predictor transform and LZ77 | yes | `@moonimage/webp` |
 
-WebP is the one gap: the RIFF container and the animation records are read, and
-the codecs inside — VP8L for lossless and VP8 for lossy — are not implemented yet,
-so both directions raise `Unsupported` rather than return something wrong.
+WebP is half the codec it could be: the lossless one, VP8L, is read and written,
+and the lossy one, VP8, is not. A lossy file — which is what `cwebp -q 75`
+writes, and what most WebP on the web is — is refused by name rather than decoded
+into something that only looks like a picture. The RIFF container, the extended
+header and the frame records are read either way, so a lossy animation says which
+frame it could not decode.
+
+The writer is within 1.25 to 1.5 times libwebp's size on the fixtures: it has no
+colour transform, no palette and no per-block prefix code groups, and it does not
+need them to be correct.
 
 ## The image
 
@@ -208,7 +215,7 @@ untrusted files should pass `strict` or a tighter record of its own.
 | `tga.encode`, `tga.decode`, `tga.EncodeOptions`, `tga.Depth` | TGA, with run lengths |
 | `jpeg.encode`, `jpeg.decode`, `jpeg.EncodeOptions`, `jpeg.Subsampling`, `jpeg.exif_orientation` | JPEG, and the orientation a camera wrote |
 | `gif.encode`, `gif.encode_animation`, `gif.decode`, `gif.decode_animation`, `gif.EncodeOptions` | GIF, with dithering and transparency |
-| `webp.decode`, `webp.encode` | WebP: the container is read, the codecs are not |
+| `webp.decode`, `webp.decode_animation`, `webp.encode`, `webp.encode_animation` | WebP: lossless read and written, lossy refused by name |
 
 ## Licence
 
