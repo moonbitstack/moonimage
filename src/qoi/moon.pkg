@@ -3,4 +3,9 @@
 // https://qoiformat.org/qoi-specification.pdf
 import {
   "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
 }
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"
