@@ -38,21 +38,41 @@ fn expected_size(name : String) -> (Int32, Int32) {
 }
 
 ///|
-test "webp: every lossless sample decodes to the pixels libwebp reads" {
+test "webp: every sample decodes to the pixels libwebp reads" {
   for entry in webp_samples {
     let (name, file, expected) = entry
     let image = read(file)
     let (width, height) = expected_size(name)
     assert_eq(image.width, width, msg=name)
     assert_eq(image.height, height, msg=name)
-    // A lossless file has one correct decoding, so this is an equality and not
-    // a tolerance.
+    // Both codecs have one correct decoding, so this is an equality and not a
+    // tolerance: a lossy file is not "close enough", it is exact. What makes
+    // that possible is that the reader reproduces libwebp's own reconstruction,
+    // including the loop filter and the interpolation of chroma between rows.
     assert_eq(
       digest(image.convert(@raster.PixelFormat::Rgba8).pixels),
       expected,
       msg=name,
     )
   }
+}
+
+///|
+test "webp: a lossy image carries its alpha in its own chunk" {
+  let image = read(by_name("lossy-alpha"))
+  assert_eq(image.format, @raster.PixelFormat::Rgba8)
+  let mut transparent = 0
+  let mut solid = 0
+  for index in 0..<(image.width * image.height) {
+    let alpha = image.pixels[index * 4 + 3].to_int()
+    if alpha == 0 {
+      transparent = transparent + 1
+    } else if alpha == 255 {
+      solid = solid + 1
+    }
+  }
+  assert_true(transparent > 0)
+  assert_true(solid > 0)
 }
 
 ///|
@@ -169,6 +189,17 @@ test "webp: a chunk nobody knows is skipped, and a still file is one frame" {
   }
   assert_eq(animation.frames.length(), 1)
   assert_eq(animation.width, read(file).width)
+}
+
+///|
+/// The bytes of one sample, by the name the fixture gives it.
+fn by_name(name : String) -> Bytes {
+  for entry in webp_samples {
+    if entry.0 == name {
+      return entry.1
+    }
+  }
+  abort("no sample called \{name}")
 }
 
 ///|

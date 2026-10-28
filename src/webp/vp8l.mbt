@@ -1008,6 +1008,23 @@ pub fn decode_lossless(
 }
 
 ///|
+/// The image in a lossless *stream*: the part of a VP8L file that comes after
+/// its five-byte header, with the size supplied by the caller.
+///
+/// A lossy WebP codes its alpha channel this way, in a separate `ALPH` chunk
+/// whose size is the picture's own, which is why there is no header to read.
+pub fn decode_lossless_stream(
+  payload : BytesView,
+  width : Int32,
+  height : Int32,
+  limits : @raster.Limits,
+) -> @raster.Image raise @raster.Refused {
+  limits.check(width, height)
+  let plane = decode_stream(Bits::new(payload, 0), width, height, true, limits)
+  to_image(plane)
+}
+
+///|
 /// ARGB words as the library's four-byte pixels.
 fn to_image(plane : Plane) -> @raster.Image raise @raster.Refused {
   let buffer : FixedArray[Byte] = FixedArray::make(

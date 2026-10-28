@@ -35,6 +35,13 @@ def lossless(image: Image.Image, **options) -> bytes:
     return handle.getvalue()
 
 
+def lossy(image: Image.Image, quality: int = 90, method: int = 6) -> bytes:
+    """A lossy WebP: the other codec, and the one with a loop filter."""
+    handle = io.BytesIO()
+    image.save(handle, format="WEBP", lossless=False, quality=quality, method=method)
+    return handle.getvalue()
+
+
 def digest_of(data: bytes) -> str:
     """The digest the decoder's own `digest` helper computes, of RGBA bytes."""
     return moonbit.digest(data)
@@ -67,6 +74,23 @@ def stills() -> list[tuple[str, bytes]]:
     # The same picture at the encoder's fastest setting, which picks different
     # transforms and different trees.
     cases.append(("lossless-fast", lossless(base, method=0)))
+    # The lossy codec. VP8 reconstructs by prediction and residue, so what it
+    # exercises is nothing like the lossless path: the mode trees, the three
+    # coefficient contexts, the transforms, the loop filter, and the chroma
+    # upsampling. Quality decides how much residue there is to get wrong and how
+    # hard the encoder filters, so the range runs from almost transparent to
+    # very lossy.
+    cases.append(("lossy-pattern", lossy(base, 90)))
+    cases.append(("lossy-flat", lossy(sources.flat(40, 30).convert("RGB"), 90)))
+    cases.append(("lossy-odd", lossy(base.crop((0, 0, 37, 23)), 90)))
+    cases.append(("lossy-wide", lossy(sources.pattern(160, 120, "RGB"), 75)))
+    cases.append(("lossy-low", lossy(base, 10)))
+    cases.append(("lossy-clean", lossy(base, 100)))
+    cases.append(("lossy-one", lossy(Image.new("RGB", (1, 1), (9, 200, 90)), 90)))
+    # Transparency in a lossy file lives in its own chunk, coded with the other
+    # codec and filtered along the rows, so it is a separate path to get right.
+    cases.append(("lossy-alpha", lossy(sources.pattern(64, 48), 80)))
+    cases.append(("lossy-alpha-odd", lossy(sources.pattern(37, 23), 80)))
     return cases
 
 

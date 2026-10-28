@@ -61,14 +61,21 @@ which takes its options record.
 | TGA | colour mapped, true colour and grey, run lengths, 8/15/16/24/32 bits, both row orders | 24 and 32 bits, run lengths on request | — | `@moonimage/tga` |
 | JPEG | baseline and progressive, every subsampling, greyscale, EXIF orientation | baseline, quality 1–100 | — | `@moonimage/jpeg` |
 | GIF | palettes, transparency, interlace, run lengths | palette by exact colours or median cut, dithering | yes | `@moonimage/gif` |
-| WebP | lossless (VP8L) with its four transforms, colour cache and prefix code groups; animated files | lossless, with a predictor transform and LZ77 | yes | `@moonimage/webp` |
+| WebP | lossless (VP8L) with its four transforms, colour cache and prefix code groups, and lossy (VP8) with its boolean coder, fourteen predictors, loop filter and chroma upsampling; alpha in either; animated files | lossless, with a predictor transform and LZ77 | yes | `@moonimage/webp` |
 
-WebP is half the codec it could be: the lossless one, VP8L, is read and written,
-and the lossy one, VP8, is not. A lossy file — which is what `cwebp -q 75`
-writes, and what most WebP on the web is — is refused by name rather than decoded
-into something that only looks like a picture. The RIFF container, the extended
-header and the frame records are read either way, so a lossy animation says which
-frame it could not decode.
+Both halves of WebP are read. The lossless one, VP8L, is also written. The lossy
+one, VP8, is the intra frame of a video codec: a boolean arithmetic coder, ten
+predictors for four-by-four blocks and four for sixteen-by-sixteen ones, a
+residual coded as quantised transform coefficients, a loop filter along every
+edge, and chroma interpolated between the two rows it sits between. Its output is
+compared with libwebp sample by sample and comes out byte for byte identical, on
+a flat colour, a photograph, an odd size and a picture of two hundred
+macroblocks; a lossy file that decodes "nearly right" is a file with a bug in
+it, not a tolerance.
+
+A lossy picture has no alpha in VP8 itself, so a transparent one carries a
+separate `ALPH` chunk, compressed with the lossless codec and filtered along its
+rows; that is read too, and comes back as four samples per pixel.
 
 The writer is within 1.25 to 1.5 times libwebp's size on the fixtures: it has no
 colour transform, no palette and no per-block prefix code groups, and it does not
@@ -215,7 +222,7 @@ untrusted files should pass `strict` or a tighter record of its own.
 | `tga.encode`, `tga.decode`, `tga.EncodeOptions`, `tga.Depth` | TGA, with run lengths |
 | `jpeg.encode`, `jpeg.decode`, `jpeg.EncodeOptions`, `jpeg.Subsampling`, `jpeg.exif_orientation` | JPEG, and the orientation a camera wrote |
 | `gif.encode`, `gif.encode_animation`, `gif.decode`, `gif.decode_animation`, `gif.EncodeOptions` | GIF, with dithering and transparency |
-| `webp.decode`, `webp.decode_animation`, `webp.encode`, `webp.encode_animation` | WebP: lossless read and written, lossy refused by name |
+| `webp.decode`, `webp.decode_animation`, `webp.encode`, `webp.encode_animation` | WebP: lossless and lossy read, lossless written |
 
 ## Licence
 

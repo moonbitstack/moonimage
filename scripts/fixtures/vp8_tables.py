@@ -82,6 +82,26 @@ def array_after(text: str, declaration: str, count: int) -> list[int]:
     return values
 
 
+# The four diagonal predictors are numbered differently in two places in the
+# specification: the enumeration in section 11.2 lists the down-left one before
+# the down-right one, and the table in section 11.5 is printed in that order,
+# while the tree that actually codes the modes emits them in the other order —
+# down-right, then vertical-right, then down-left. Every encoder follows the
+# tree, so the table has to be re-indexed into tree order: row and column 4, 5
+# and 6 are cycled. Without this the first row of subblocks decodes correctly
+# and everything after it turns to noise, which is a memorable way to learn it.
+TREE_ORDER = [0, 1, 2, 3, 5, 6, 4, 7, 8, 9]
+
+
+def to_tree_order(values: list[int]) -> list[int]:
+    out = []
+    for above in range(10):
+        for left in range(10):
+            at = (TREE_ORDER[above] * 10 + TREE_ORDER[left]) * 9
+            out.extend(values[at:at + 9])
+    return out
+
+
 def chunked(values: list[int], per_line: int = 16) -> str:
     lines = []
     for index in range(0, len(values), per_line):
@@ -94,7 +114,9 @@ def main() -> None:
     dc = array_after(text, "dc_qlookup[QINDEX_RANGE] =", 128)
     ac = array_after(text, "ac_qlookup[QINDEX_RANGE] =", 128)
     coeff = array_after(text, "coeff_update_probs [4] [8] [3] [num_dct_tokens-1] =", 4 * 8 * 3 * 11)
-    bmode = array_after(text, "kf_bmode_prob [num_intra_bmodes] [num_intra_bmodes]", 10 * 10 * 9)
+    bmode = to_tree_order(
+        array_after(text, "kf_bmode_prob [num_intra_bmodes] [num_intra_bmodes]", 10 * 10 * 9)
+    )
     defaults = array_after(
         text, "default_coeff_probs [4] [8] [3] [num_dct_tokens - 1] =", 4 * 8 * 3 * 11
     )

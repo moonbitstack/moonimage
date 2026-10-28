@@ -37,6 +37,7 @@ pub fn decode_animation(
   let frames : Array[@raster.Frame] = []
   let mut canvas_width = 0
   let mut canvas_height = 0
+  let mut alpha : BytesView? = None
   let mut loops = 0
   for chunk in chunks {
     let (name, payload) = chunk
@@ -56,13 +57,22 @@ pub fn decode_animation(
         loops = payload[4].to_int() + payload[5].to_int() * 256
       }
       "ANMF" => frames.push(read_frame(payload, limits))
+      "ALPH" => alpha = Some(payload)
       "VP8L" => {
-        let image = decode_lossless(payload, limits)
-        frames.push(@raster.Frame::new(image))
+        // A lossless picture carries its own alpha, so anything pending here
+        // belonged to a chunk that was never followed by a lossy one.
+        alpha = None
+        frames.push(@raster.Frame::new(decode_lossless(payload, limits)))
       }
       "VP8 " => {
         let image = decode_lossy(payload, limits)
-        frames.push(@raster.Frame::new(image))
+        let picture = match alpha {
+          Some(plane) =>
+            with_alpha(image, decode_alpha(plane, image.width, image.height, limits))
+          None => image
+        }
+        alpha = None
+        frames.push(@raster.Frame::new(picture))
       }
       _ => ()
     }
@@ -102,11 +112,22 @@ fn read_frame(
   limits.check(width, height)
   let inner = read_riff_body(payload, 16)
   let mut picture : @raster.Image? = None
+  let mut alpha : BytesView? = None
   for chunk in inner {
     let (name, body) = chunk
     match name {
+      "ALPH" => alpha = Some(body)
       "VP8L" => picture = Some(decode_lossless(body, limits))
-      "VP8 " => picture = Some(decode_lossy(body, limits))
+      "VP8 " => {
+        let image = decode_lossy(body, limits)
+        picture = Some(
+          match alpha {
+            Some(plane) =>
+              with_alpha(image, decode_alpha(plane, image.width, image.height, limits))
+            None => image
+          },
+        )
+      }
       _ => ()
     }
   }
