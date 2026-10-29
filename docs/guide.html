@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide — moonimage</title>
+<meta name="description" content="From an empty project to seven formats: reading, pixels, layouts, geometry, writing, animation, and what happens when a file is not one this library reads.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <nav>
+    <a class="brand" href="index.html"><b>moonimage</b><span>image codecs</span></a>
+    <a class="link" href="guide.html" aria-current="page">Guide</a>
+    <a class="link" href="api.html">API</a>
+    <a class="icon-link" href="https://github.com/moonbitstack/moonimage" aria-label="The repository" title="github.com/moonbitstack/moonimage">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+    </a>
+  </nav>
+</header>
+
+<main class="wrap">
+  <div class="guide">
+    <div>
+      <p class="eyebrow">Guide</p>
+      <h1 style="font-size: 2.6rem; max-width: none; margin-bottom: 10px;">From an empty project</h1>
+      <p class="lede" style="margin-top: 0;">
+        Nine steps: a picture made from nothing, written, read, examined,
+        resized, written in six more formats, animated, and finally refused.
+        Every block of output on this page is what the program in
+        <code>src/examples/02-guide</code> prints when it is run.
+      </p>
+
+      <article class="step" id="add">
+        <p class="num">01</p>
+        <h2>Add the package</h2>
+        <p>
+          One package holds the codecs and the arithmetic between them. The
+          sub-packages exist for callers who want one format and its options
+          without the rest.
+        </p>
+<pre><code>moon add moonbitstack/moonimage</code></pre>
+        <p>Then, in a package that uses it:</p>
+<pre><code><span class="tok-kw">import</span> {
+  <span class="tok-str">"moonbitstack/moonimage"</span>,
+  <span class="tok-str">"moonbitstack/moonimage/raster"</span>,
+}</code></pre>
+      </article>
+
+      <article class="step" id="make">
+        <p class="num">02</p>
+        <h2>Make a picture</h2>
+        <p>
+          A picture is a width, a height, a layout and the bytes. Here is a
+          four-by-three one, written out pixel by pixel so that what follows has
+          numbers that can be checked by eye.
+        </p>
+<pre><code><span class="tok-kw">let</span> bytes : FixedArray[Byte] = FixedArray::make(<span class="tok-num">4</span> * <span class="tok-num">3</span> * <span class="tok-num">4</span>, b'\x00')
+<span class="tok-kw">for</span> y <span class="tok-kw">in</span> <span class="tok-num">0</span>..&lt;<span class="tok-num">3</span> {
+  <span class="tok-kw">for</span> x <span class="tok-kw">in</span> <span class="tok-num">0</span>..&lt;<span class="tok-num">4</span> {
+    <span class="tok-kw">let</span> at = (y * <span class="tok-num">4</span> + x) * <span class="tok-num">4</span>
+    bytes[at] = r
+    bytes[at + <span class="tok-num">1</span>] = g
+    bytes[at + <span class="tok-num">2</span>] = b
+    bytes[at + <span class="tok-num">3</span>] = a
+  }
+}
+<span class="tok-kw">let</span> image = <span class="tok-fn">@raster.Image</span>::of(
+  <span class="tok-num">4</span>, <span class="tok-num">3</span>, <span class="tok-fn">@raster.PixelFormat</span>::Rgba8,
+  Bytes::from_array(bytes.clamped_view()),
+)</code></pre>
+<pre class="output"><code>4 x 3, Rgba8, 48 bytes</code></pre>
+        <p>
+          <code>Image::of</code> checks that the byte count matches the shape and
+          raises <code>Refused</code> if it does not, which is why the call is
+          wrapped in a <code>catch</code> everywhere it appears below.
+        </p>
+      </article>
+
+      <article class="step" id="read">
+        <p class="num">03</p>
+        <h2>Read and write</h2>
+        <p>
+          <code>encode</code> takes a picture and a format; <code>decode</code>
+          takes bytes and works out the format itself. There is no format
+          argument on the reading side, because a file already says what it is.
+        </p>
+<pre><code><span class="tok-kw">let</span> file = <span class="tok-fn">@moonimage.encode</span>(image, <span class="tok-fn">@moonimage.Format</span>::Png)
+<span class="tok-kw">let</span> back = <span class="tok-fn">@moonimage.decode</span>(file) <span class="tok-kw">catch</span> {
+  error =&gt; abort(<span class="tok-str">"the file is one this library wrote: \{error}"</span>)
+}
+println(<span class="tok-str">"\{file.length()} bytes of PNG, read back as \{back.width} x \{back.height} \{back.format}"</span>)</code></pre>
+<pre class="output"><code>116 bytes of PNG, read back as 4 x 3 Rgba8</code></pre>
+        <p>
+          If the format is known and the file is too, the sub-package is a
+          smaller door: <code>@png.decode(file)</code>,
+          <code>@qoi.encode(image)</code>, and so on. Both routes end in the same
+          function.
+        </p>
+      </article>
+
+      <article class="step" id="pixels">
+        <p class="num">04</p>
+        <h2>Look at a pixel</h2>
+        <p>
+          <code>pixel</code> gives four numbers from nought to one, alpha
+          straight rather than multiplied in. A grey pixel has all three of red,
+          green and blue equal, so there is no third case to handle.
+        </p>
+<pre><code><span class="tok-kw">let</span> pixel = back.pixel(<span class="tok-num">1</span>, <span class="tok-num">0</span>) <span class="tok-kw">catch</span> {
+  error =&gt; abort(<span class="tok-str">"inside the picture: \{error}"</span>)
+}
+<span class="tok-kw">let</span> eighth = <span class="tok-kw">fn</span>(value : Double) -&gt; Int { (value * <span class="tok-num">255.0</span> + <span class="tok-num">0.5</span>).to_int() }
+println(<span class="tok-str">"\{eighth(pixel.r)} \{eighth(pixel.g)} \{eighth(pixel.b)} \{eighth(pixel.a)}"</span>)</code></pre>
+<pre class="output"><code>122 58 44 255</code></pre>
+        <p>
+          A coordinate outside the picture is not a panic and not a clamp: it
+          raises <code>Refused</code>, so a loop that runs off the edge stops
+          where it went wrong.
+        </p>
+      </article>
+
+      <article class="step" id="layouts">
+        <p class="num">05</p>
+        <h2>Change the layout</h2>
+        <p>
+          <code>convert</code> rewrites the samples in another of the nine
+          layouts. Going from colour to grey is the weighted sum the eye uses,
+          not an average of the three channels.
+        </p>
+<pre><code><span class="tok-kw">let</span> grey = back.convert(<span class="tok-fn">@raster.PixelFormat</span>::Gray8)
+<span class="tok-kw">let</span> shade = grey.pixel(<span class="tok-num">1</span>, <span class="tok-num">0</span>) <span class="tok-kw">catch</span> {
+  error =&gt; abort(<span class="tok-str">"inside the picture: \{error}"</span>)
+}
+println(<span class="tok-str">"as grey: \{grey.format}, \{eighth(shade.r)}"</span>)</code></pre>
+<pre class="output"><code>as grey: Gray8, 76</code></pre>
+        <p>
+          The eight-bit layouts are the common case; sixteen-bit ones keep the
+          full depth a PNG or a TGA can carry, and <code>RgbaF32</code> is there
+          for arithmetic that would rather not round.
+        </p>
+      </article>
+
+      <article class="step" id="geometry">
+        <p class="num">06</p>
+        <h2>Move it about</h2>
+        <p>
+          Four operations, each returning a new picture: rotate by quarter
+          turns, mirror, crop, scale. Scaling defaults to bilinear and also
+          takes <code>Nearest</code> and <code>Lanczos</code>.
+        </p>
+<pre><code><span class="tok-kw">let</span> turned = back.rotate(quarters=<span class="tok-num">1</span>)
+<span class="tok-kw">let</span> mirrored = back.flip_horizontal()
+<span class="tok-kw">let</span> cut = back.crop(<span class="tok-num">0</span>, <span class="tok-num">0</span>, <span class="tok-num">2</span>, <span class="tok-num">2</span>) <span class="tok-kw">catch</span> {
+  error =&gt; abort(<span class="tok-str">"the rectangle fits: \{error}"</span>)
+}
+<span class="tok-kw">let</span> small = back.scale(<span class="tok-num">8</span>, <span class="tok-num">6</span>) <span class="tok-kw">catch</span> {
+  error =&gt; abort(<span class="tok-str">"the size is legal: \{error}"</span>)
+}</code></pre>
+<pre class="output"><code>turned 3 x 4, mirrored 4 x 3, cut 2 x 2, scaled 8 x 6</code></pre>
+        <p>
+          <code>crop</code> takes the left, top, width and height of the
+          rectangle; a rectangle that reaches outside raises rather than
+          trimming itself to fit.
+        </p>
+      </article>
+
+      <article class="step" id="formats">
+        <p class="num">07</p>
+        <h2>Write every format</h2>
+        <p>
+          The same four-by-three picture, written seven ways. The sizes differ
+          by an order of magnitude and none of them is wrong.
+        </p>
+<pre><code><span class="tok-kw">for</span> entry <span class="tok-kw">in</span> formats {
+  <span class="tok-kw">let</span> (format, name) = entry
+  <span class="tok-kw">let</span> written = <span class="tok-fn">@moonimage.encode</span>(back, format)
+  println(<span class="tok-str">"\{name}: \{written.length()} bytes"</span>)
+}</code></pre>
+<pre class="output"><code>png: 116 bytes
+qoi: 56 bytes
+bmp: 170 bytes
+tga: 67 bytes
+jpeg: 729 bytes
+gif: 65 bytes
+webp: 102 bytes</code></pre>
+        <p>
+          BMP is uncompressed, so it is the size of the pixels plus a header;
+          JPEG carries its tables in every file, which for a picture this small
+          costs more than it saves. WebP is written lossless — the half of the
+          format that can be exact.
+        </p>
+        <p>
+          Formats with options take them as a record with a default:
+          <code>@png.encode(image, options=@png.EncodeOptions::best())</code>,
+          <code>@jpeg.encode(image, options=@jpeg.EncodeOptions::{ quality: 92, subsampling: @jpeg.Subsampling::Yuv444 })</code>.
+        </p>
+      </article>
+
+      <article class="step" id="animation">
+        <p class="num">08</p>
+        <h2>Animation</h2>
+        <p>
+          Frames carry an offset, a delay, and what to do with the canvas
+          afterwards. <code>compose</code> applies those rules in order and
+          returns the pictures a viewer would show.
+        </p>
+<pre><code><span class="tok-kw">let</span> animation = <span class="tok-fn">@moonimage.Animation</span>::new(
+  <span class="tok-num">4</span>, <span class="tok-num">3</span>,
+  [<span class="tok-fn">@moonimage.Frame</span>::new(back, delay=<span class="tok-num">100</span>), <span class="tok-fn">@moonimage.Frame</span>::new(turned, delay=<span class="tok-num">50</span>)],
+  loops=<span class="tok-num">0</span>,
+)
+<span class="tok-kw">let</span> gif = <span class="tok-fn">@moonimage.encode_animation</span>(animation, <span class="tok-fn">@moonimage.Format</span>::Gif)
+<span class="tok-kw">let</span> again = <span class="tok-fn">@moonimage.decode_animation</span>(gif) <span class="tok-kw">catch</span> {
+  error =&gt; abort(<span class="tok-str">"the file is one this library wrote: \{error}"</span>)
+}
+<span class="tok-kw">let</span> frames = again.compose()</code></pre>
+<pre class="output"><code>136 bytes of GIF, 2 frames, first delay 100, 2 composed</code></pre>
+        <p>
+          The same shape reads and writes GIF, APNG and animated WebP. A frame
+          smaller than the canvas is placed at its offset and blended according
+          to its rule, which is how a real animation saves the space it does.
+        </p>
+      </article>
+
+      <article class="step" id="refuse">
+        <p class="num">09</p>
+        <h2>When it refuses</h2>
+        <p>
+          A file that is not one this library reads raises
+          <code>Refused</code>, and the message says where the reading stopped
+          and what it wanted. Half a PNG, for instance:
+        </p>
+<pre><code><span class="tok-kw">let</span> broken = file.clamped_view(start=<span class="tok-num">0</span>, end=file.length() / <span class="tok-num">2</span>).to_owned()
+<span class="tok-kw">let</span> refused = <span class="tok-kw">try</span> {
+  <span class="tok-kw">ignore</span>(<span class="tok-fn">@moonimage.decode</span>(broken))
+  <span class="tok-str">"it did not"</span>
+} <span class="tok-kw">catch</span> {
+  error =&gt; error.to_string()
+}
+println(<span class="tok-str">"half a file: \{refused}"</span>)</code></pre>
+<pre class="output"><code>half a file: at 41: 42 bytes wanted</code></pre>
+        <p>
+          A header can also ask for more than the caller is willing to give.
+          <code>Limits</code> is checked before the allocation, not after:
+        </p>
+<pre><code><span class="tok-kw">let</span> limits = <span class="tok-fn">@raster.Limits</span>::{ width: <span class="tok-num">2</span>, height: <span class="tok-num">2</span>, pixels: <span class="tok-num">4</span>, bytes: <span class="tok-num">1024</span> }
+<span class="tok-kw">let</span> capped = <span class="tok-kw">try</span> {
+  <span class="tok-kw">ignore</span>(<span class="tok-fn">@moonimage.decode</span>(file, limits~))
+  <span class="tok-str">"it did not"</span>
+} <span class="tok-kw">catch</span> {
+  error =&gt; error.to_string()
+}
+println(<span class="tok-str">"two by two limit: \{capped}"</span>)</code></pre>
+<pre class="output"><code>two by two limit: over limit: 4 beyond 2</code></pre>
+        <p>
+          That is the whole error surface: <code>Unknown</code>,
+          <code>Unsupported</code>, <code>Truncated</code>,
+          <code>OverLimit</code>, <code>Unexpected</code> and
+          <code>Checksum</code>, each carrying the offset it happened at.
+        </p>
+      </article>
+
+      <p class="note" style="margin-top: 30px;">
+        Next: the <a href="api.html">API reference</a>, every type and function
+        with the arguments they take.
+      </p>
+    </div>
+
+    <aside>
+      <p class="eyebrow">Contents</p>
+      <a href="#add">Add the package</a>
+      <a href="#make">Make a picture</a>
+      <a href="#read">Read and write</a>
+      <a href="#pixels">Look at a pixel</a>
+      <a href="#layouts">Change the layout</a>
+      <a href="#geometry">Move it about</a>
+      <a href="#formats">Write every format</a>
+      <a href="#animation">Animation</a>
+      <a href="#refuse">When it refuses</a>
+    </aside>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <span class="mark">moonimage</span>
+    <a href="index.html">Home</a>
+    <a href="api.html">API</a>
+    <a href="https://github.com/moonbitstack/moonimage">Repository</a>
+    <a href="https://mooncakes.io/docs/#/moonbitstack/moonimage/">mooncakes</a>
+    <span>Apache-2.0</span>
+  </div>
+</footer>
+
+</body>
+</html>

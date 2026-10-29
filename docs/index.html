@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>moonimage — image codecs for MoonBit</title>
+<meta name="description" content="Seven image formats read and written in pure MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA and QOI, with conversion, geometry and scaling between them.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <nav>
+    <a class="brand" href="index.html"><b>moonimage</b><span>image codecs</span></a>
+    <a class="link" href="guide.html">Guide</a>
+    <a class="link" href="api.html">API</a>
+    <a class="icon-link" href="https://github.com/moonbitstack/moonimage" aria-label="The repository" title="github.com/moonbitstack/moonimage">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+    </a>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Image codecs, in pure MoonBit</p>
+        <h1>Seven image formats, read and written.</h1>
+        <p class="lede">
+          PNG, JPEG, GIF, WebP, BMP, TGA and QOI, with the pixel arithmetic
+          between them: layouts, transparency, rotation, cropping, scaling.
+          One package, no C bindings.
+        </p>
+        <p class="actions">
+          <a class="button" href="guide.html">Read the guide</a>
+          <a class="button ghost" href="api.html">API reference</a>
+        </p>
+      </div>
+
+      <figure class="frame">
+        <span class="corner" aria-hidden="true"></span>
+        <img src="plate.png" width="1200" height="800" alt="A lens test plate: a Siemens star, a colour strip, a sixteen-step grey wedge and four rulings, printed on warm paper.">
+        <figcaption><span>Test plate 07</span><span>1200 × 800</span></figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <section class="band" id="plate">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>The plate, read in this browser</h2>
+        <p>decoded and written by the library, not by a server</p>
+      </div>
+
+      <div class="workbench">
+        <div class="stage" id="stage" aria-live="polite">
+          <canvas id="canvas" width="1200" height="800"></canvas>
+          <div class="readout" id="readout">
+            <span>format <b id="r-format">—</b></span>
+            <span>size <b id="r-size">—</b></span>
+            <span>layout <b id="r-layout">—</b></span>
+            <span>bytes <b id="r-bytes">—</b></span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Written back</h3>
+          <table class="formats" id="formats">
+            <thead>
+              <tr><th>Format</th><th>Bytes</th><th>Round trip</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="3">reading the plate…</td></tr>
+            </tbody>
+          </table>
+          <p class="note" id="format-note">
+            The row above the rule is the file on disk: a PNG written by a
+            drawing script at 1200 × 800. Every row below it is this library
+            decoding that file, writing the pixels in another format, and
+            reading them back. <em>Exact</em> means the samples came back
+            identical; JPEG quantises, and GIF has two hundred and fifty-six
+            colours to spend.
+          </p>
+          <div class="drop">
+            Drop any image on this panel — PNG, JPEG, GIF, WebP, BMP, TGA or QOI —
+            and it is read the same way.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="what">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>What it does</h2>
+        <p>one package, seven codecs, the arithmetic between them</p>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/></svg>
+          <h3>Seven formats, one call</h3>
+          <p>
+            <code>decode</code> looks at the first bytes and picks the codec;
+            <code>encode</code> takes a picture and a format. The same picture
+            goes out as PNG, QOI, BMP, TGA, JPEG or GIF, or as lossless WebP,
+            without the call site changing.
+          </p>
+        </div>
+
+        <div class="card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>
+          <h3>Pixels you can count</h3>
+          <p>
+            Nine layouts: grey or colour, eight or sixteen bits, with or without
+            alpha, and 32-bit floats. <code>convert</code> moves between them,
+            <code>pixel</code> gives back four numbers, <code>pixels</code> is
+            the bytes themselves.
+          </p>
+        </div>
+
+        <div class="card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="4" y="4" width="16" height="16"/><path d="M4 9h16M9 20V9"/><path d="M14 13l3 3-3 3"/></svg>
+          <h3>Geometry</h3>
+          <p>
+            Mirror on either axis, rotate by quarter turns, crop to a rectangle,
+            and scale with nearest, bilinear or Lanczos resampling. Each returns
+            a new picture; the original is untouched.
+          </p>
+        </div>
+
+        <div class="card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>
+          <h3>Animation</h3>
+          <p>
+            GIF, APNG and animated WebP carry frames with delays, disposal and
+            blending. All three arrive as one shape, and <code>compose</code>
+            applies the rules in order to give the frames a viewer shows.
+          </p>
+        </div>
+
+        <div class="card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8Z"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          <h3>Refuses rather than guesses</h3>
+          <p>
+            A file this library will not read raises <code>Refused</code> with
+            the offset, what it found and what it expected. <code>Limits</code>
+            puts a ceiling on the allocation before a hostile header can ask for
+            it.
+          </p>
+        </div>
+
+        <div class="card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M3 4h11l7 8-7 8H3Z"/><circle cx="8" cy="12" r="1.6"/></svg>
+          <h3>Metadata, kept</h3>
+          <p>
+            A PNG keeps its gamma, chromaticities, rendering intent, ICC profile
+            and text chunks. A JPEG's EXIF orientation can be read on its own,
+            or applied while decoding.
+          </p>
+        </div>
+      </div>
+
+      <div class="figures" style="margin-top: 26px;">
+        <div class="figure"><b>7</b><span>formats, read and written</span></div>
+        <div class="figure"><b>9</b><span>pixel layouts</span></div>
+        <div class="figure"><b>3</b><span>resampling filters</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="use">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>A smaller file, in one function</h2>
+        <p>the whole of the call site, for a picture that has to travel</p>
+      </div>
+
+      <pre><code><span class="tok-kw">fn</span> small_copy(file : Bytes) -&gt; Bytes <span class="tok-kw">raise</span> @moonimage.Refused {
+  <span class="tok-kw">let</span> image = <span class="tok-fn">@moonimage.decode</span>(file)      <span class="tok-com">// the format is in the bytes</span>
+  <span class="tok-kw">let</span> small = image.<span class="tok-fn">scale</span>(<span class="tok-num">320</span>, <span class="tok-num">200</span>)          <span class="tok-com">// bilinear, the default</span>
+  <span class="tok-fn">@moonimage.encode</span>(small, <span class="tok-fn">Format</span>::Webp)   <span class="tok-com">// lossless, no options</span>
+}</code></pre>
+      <p class="note">
+        The guide starts from an empty project and ends with all of this, each
+        step with the output it really printed.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <span class="mark">moonimage</span>
+    <a href="guide.html">Guide</a>
+    <a href="api.html">API</a>
+    <a href="https://github.com/moonbitstack/moonimage">Repository</a>
+    <a href="https://mooncakes.io/docs/#/moonbitstack/moonimage/">mooncakes</a>
+    <span>Apache-2.0</span>
+  </div>
+</footer>
+
+<script src="demo.js" defer></script>
+<script src="site.js" defer></script>
+</body>
+</html>

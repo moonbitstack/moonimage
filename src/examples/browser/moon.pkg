@@ -1,0 +1,13 @@
+// The glue the documentation homepage loads: the library, compiled to
+// JavaScript, behind the four calls the page makes.
+//
+// It exists for the site and nothing else, so it is not part of the library's
+// public surface and not in the API reference.
+pkgtype(kind: "executable")
+
+supported_targets = "js"
+
+import {
+  "moonbitstack/moonimage",
+  "moonbitstack/moonimage/raster",
+}

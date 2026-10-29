@@ -3,6 +3,13 @@
 Image codecs for MoonBit: PNG, QOI, BMP, TGA, JPEG, GIF and WebP read, all but
 WebP written as well, with the pixel arithmetic that sits between them.
 
+<p>
+  <a href="https://moonbitstack.github.io/moonimage/"><b>Homepage</b></a> &nbsp;·&nbsp;
+  <a href="https://moonbitstack.github.io/moonimage/guide.html">Guide</a> &nbsp;·&nbsp;
+  <a href="https://moonbitstack.github.io/moonimage/api.html">API</a> &nbsp;·&nbsp;
+  <a href="https://mooncakes.io/docs/#/moonbitstack/moonimage/">mooncakes</a>
+</p>
+
 No I/O, no dependencies beyond the deflate stream a PNG needs, all four backends.
 
 <!-- nocheck -->
@@ -16,8 +23,13 @@ let small = image.scale(160, 120, sampling=@moonimage.Sampling::Bilinear)
 let file = @moonimage.encode(small, @moonimage.Format::Png)
 ```
 
-`moon run src/examples/tour` walks one picture through every format and every
-operation in one run.
+<p align="center">
+  <img src="docs/plate.png" alt="A lens test plate: a Siemens star, a colour strip, a sixteen-step grey wedge and four rulings, printed on warm paper" width="620">
+</p>
+
+Two runs to start from: `moon run src/examples/01-tour` walks one picture
+through every format and every operation, and `moon run src/examples/02-guide`
+is the program behind the [guide](https://moonbitstack.github.io/moonimage/guide.html).
 
 ## Reading and writing
 
