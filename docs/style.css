@@ -1,29 +1,46 @@
 /* Copyright 2026 Leo Cheng
  * SPDX-License-Identifier: Apache-2.0
  *
- * The site is printed on paper: warm stock, brass rules, ink that is brown
- * rather than black. Code is the one place that goes into the darkroom — a code
- * block is always dark, in both themes, because a screen in a darkroom is.
+ * Two designs, not one inverted.
+ *
+ * Daylight is a print on warm paper: ink that is brown rather than black, brass
+ * rules, a vignette where the light fell off, and a little grain so the paper is
+ * paper. The darkroom is the same room after the lamp goes off: a safelight in
+ * the top corner, surfaces that catch a hairline of it along their top edge,
+ * shadows that stop working as shadows and become edges, and a display face set
+ * a weight lighter because light on dark reads heavier than dark on light.
+ *
+ * Code is the one thing that carries across: by day it is a darkroom in the
+ * middle of the page, and at night it is the sheet on the enlarger — lighter than
+ * what surrounds it, lit from above.
  */
 
 :root {
-  --paper: #f4edde;
-  --paper-deep: #eae0cc;
-  --card: #fbf7ee;
-  --ink: #241c15;
-  --ink-soft: #4c4034;
-  --ink-faint: #7d6c57;
-  --rule: #cfc0a7;
-  --rule-soft: #ddd1bb;
-  --brass: #a1742d;
-  --brass-bright: #c9a15e;
-  --oxblood: #7a3a2c;
-  --sage: #4f6a54;
-  --code: #1b1714;
-  --code-ink: #ece0cd;
-  --code-dim: #9c8d78;
-  --code-rule: #352d26;
-  --shadow: 0 1px 0 rgb(36 28 21 / 6%), 0 12px 28px -18px rgb(36 28 21 / 45%);
+  color-scheme: light dark;
+
+  /* Daylight first, the darkroom second, in the same pair. */
+  --paper: light-dark(#f4edde, #131110);
+  --paper-deep: light-dark(#eae0cc, #0b0a09);
+  --card: light-dark(#fbf7ee, #1c1815);
+  --ink: light-dark(#241c15, #f2e8d6);
+  --ink-soft: light-dark(#4c4034, #c9baa4);
+  --ink-faint: light-dark(#7d6c57, #9b8b74);
+  --rule: light-dark(#cfc0a7, #362c23);
+  --rule-soft: light-dark(#ddd1bb, #241e18);
+  --brass: light-dark(#a1742d, #e0a95e);
+  --brass-bright: light-dark(#c9a15e, #f3c98d);
+  --oxblood: light-dark(#7a3a2c, #d98d75);
+  --sage: light-dark(#4f6a54, #a7c3ab);
+  --code: light-dark(#1b1714, #241d18);
+  --code-ink: light-dark(#ece0cd, #f5ecdc);
+  --code-dim: light-dark(#9c8d78, #ab9a83);
+  --code-rule: light-dark(#352d26, #3c3029);
+  --shadow-ink: light-dark(rgb(36 28 21 / 7%), rgb(0 0 0 / 55%));
+  --glow: light-dark(transparent, rgb(255 214 160 / 6%));
+
+  --grain: 0.045;
+  --photo-filter: none;
+  --display-weight: 600;
 
   --serif: "EB Garamond", Georgia, "Times New Roman", serif;
   --display: "Cormorant Garamond", "EB Garamond", Georgia, serif;
@@ -33,26 +50,21 @@
   --pad: clamp(18px, 4vw, 40px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #16120f;
-    --paper-deep: #1d1814;
-    --card: #1f1a15;
-    --ink: #ece1ce;
-    --ink-soft: #c6b8a2;
-    --ink-faint: #93826c;
-    --rule: #3a3129;
-    --rule-soft: #2b241e;
-    --brass: #c99a53;
-    --brass-bright: #e0b878;
-    --oxblood: #c07a66;
-    --sage: #8fae94;
-    --code: #120f0d;
-    --code-ink: #e6d9c5;
-    --code-dim: #8d7e6a;
-    --code-rule: #2c2520;
-    --shadow: 0 1px 0 rgb(0 0 0 / 30%), 0 14px 30px -20px rgb(0 0 0 / 80%);
-  }
+/* The darkroom's own decisions, which are not colours and so cannot live in the
+ * pairs above: the weight of the display face, the treatment of photographs, the
+ * texture of paper that at night is not paper at all. */
+:root[data-theme="dark"] {
+  --grain: 0;
+  --photo-filter: brightness(0.88) saturate(0.94);
+  --display-weight: 500;
+}
+
+:root[data-theme="light"] {
+  color-scheme: only light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: only dark;
 }
 
 *,
@@ -73,9 +85,11 @@ body {
   color: var(--ink);
   font: 400 1.0625rem/1.62 var(--serif);
   text-rendering: optimizeLegibility;
+  transition: background-color 240ms ease, color 240ms ease;
 }
 
-/* A vignette, as a print has: the middle is where the light was. */
+/* Where the light falls: a vignette by day, the safelight and the shadow of the
+ * room at night. */
 body::before {
   content: "";
   position: fixed;
@@ -87,14 +101,33 @@ body::before {
     radial-gradient(90% 70% at 50% 100%, transparent 60%, rgb(36 28 21 / 4%) 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  body::before {
-    background: radial-gradient(120% 90% at 50% 0%, transparent 50%, rgb(0 0 0 / 45%) 100%);
-  }
+:root[data-theme="dark"] body::before {
+  background:
+    radial-gradient(78% 55% at 88% -6%, rgb(198 96 44 / 13%), transparent 68%),
+    radial-gradient(120% 70% at 50% 104%, rgb(0 0 0 / 55%), transparent 62%);
+}
+
+/* Grain: a photograph of paper, not paper. Daylight only — at night the stock is
+ * gone and there is nothing to be grainy. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain);
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--brass) 30%, transparent);
+  background: color-mix(in srgb, var(--brass) 26%, transparent);
+}
+
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 /* Scrollbars: the standard properties and the WebKit ones fight, so the
@@ -121,7 +154,7 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--brass) 40%, var(--rule));
+  background: color-mix(in srgb, var(--brass) 38%, var(--rule));
   border: 3px solid var(--paper);
   border-radius: 8px;
 }
@@ -137,7 +170,7 @@ h2,
 h3,
 h4 {
   font-family: var(--display);
-  font-weight: 600;
+  font-weight: var(--display-weight);
   letter-spacing: 0.01em;
   line-height: 1.12;
   margin: 0;
@@ -145,8 +178,8 @@ h4 {
 }
 
 h1 {
-  font-size: clamp(2.5rem, 4.6vw, 3.75rem);
-  max-width: 15ch;
+  font-size: clamp(2.4rem, 4.2vw, 3.5rem);
+  max-width: 21ch;
 }
 
 h2 {
@@ -211,15 +244,15 @@ hr {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: color-mix(in srgb, var(--paper) 92%, transparent);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  backdrop-filter: blur(10px) saturate(1.1);
   border-bottom: 1px solid var(--rule);
 }
 
 .top nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   height: 62px;
   max-width: var(--rail);
   margin-inline: auto;
@@ -238,7 +271,7 @@ hr {
 }
 
 .brand b {
-  font-weight: 600;
+  font-weight: var(--display-weight);
 }
 
 .brand span {
@@ -290,6 +323,68 @@ hr {
   display: block;
 }
 
+/* The switch: an aperture, wide open by day and stopped down at night. Both
+ * states are drawn, and the blades cross-fade so it reads as the ring turning. */
+.aperture-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.aperture-toggle:hover {
+  color: var(--brass);
+  background: color-mix(in srgb, var(--brass) 12%, transparent);
+}
+
+.aperture-toggle svg {
+  width: 21px;
+  height: 21px;
+  display: block;
+  overflow: visible;
+}
+
+.aperture-toggle .ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.45;
+}
+
+.aperture-toggle .iris {
+  fill: currentColor;
+  opacity: 0.85;
+}
+
+.aperture-toggle g {
+  transform-origin: 12px 12px;
+  transition: opacity 260ms ease, transform 420ms cubic-bezier(0.34, 0.9, 0.3, 1);
+}
+
+.aperture-toggle .closed {
+  opacity: 0;
+  transform: rotate(-20deg);
+}
+
+:root[data-theme="dark"] .aperture-toggle .open {
+  opacity: 0;
+  transform: rotate(20deg);
+}
+
+:root[data-theme="dark"] .aperture-toggle .closed {
+  opacity: 1;
+  transform: none;
+}
+
 /* --------------------------------------------------------------- masthead */
 
 .hero {
@@ -335,6 +430,7 @@ hr {
   text-decoration: none;
   font-size: 1rem;
   letter-spacing: 0.02em;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
 .button:hover {
@@ -355,13 +451,41 @@ hr {
   color: var(--ink);
 }
 
+:root[data-theme="dark"] .button {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #16120e;
+}
+
+:root[data-theme="dark"] .button:hover {
+  background: var(--brass-bright);
+  border-color: var(--brass-bright);
+  color: #16120e;
+}
+
+:root[data-theme="dark"] .button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--brass) 45%, transparent);
+}
+
+:root[data-theme="dark"] .button.ghost:hover {
+  background: color-mix(in srgb, var(--brass) 14%, transparent);
+  color: var(--brass-bright);
+}
+
 /* The plate hangs in a frame with brass corners, like a print on a wall. */
 .frame {
   position: relative;
   background: var(--card);
   border: 1px solid var(--rule);
   padding: 12px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 1px 0 var(--shadow-ink), 0 14px 32px -22px var(--shadow-ink);
+}
+
+:root[data-theme="dark"] .frame {
+  border-color: color-mix(in srgb, var(--brass) 22%, var(--rule));
+  box-shadow: inset 0 1px 0 var(--glow), 0 26px 60px -40px rgb(0 0 0 / 90%);
 }
 
 .frame::before,
@@ -407,6 +531,7 @@ hr {
   display: block;
   width: 100%;
   height: auto;
+  filter: var(--photo-filter);
 }
 
 .frame figcaption {
@@ -460,7 +585,11 @@ hr {
   background: var(--code);
   border: 1px solid var(--rule);
   padding: 14px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 1px 0 var(--shadow-ink), 0 14px 32px -24px var(--shadow-ink);
+}
+
+:root[data-theme="dark"] .stage {
+  box-shadow: inset 0 1px 0 var(--glow), 0 30px 60px -44px rgb(0 0 0 / 90%);
 }
 
 .stage canvas {
@@ -468,7 +597,8 @@ hr {
   width: 100%;
   height: auto;
   image-rendering: auto;
-  background: #0d0b09;
+  background: #0c0a08;
+  filter: var(--photo-filter);
 }
 
 .stage .readout {
@@ -496,6 +626,10 @@ hr {
   background: var(--card);
   border: 1px solid var(--rule);
   padding: 18px;
+}
+
+:root[data-theme="dark"] .panel {
+  box-shadow: inset 0 1px 0 var(--glow);
 }
 
 .panel h3 {
@@ -606,6 +740,10 @@ table.formats tbody tr[aria-current="true"] td {
   gap: 10px;
 }
 
+:root[data-theme="dark"] .card {
+  box-shadow: inset 0 1px 0 var(--glow);
+}
+
 .card svg {
   width: 30px;
   height: 30px;
@@ -646,7 +784,7 @@ table.formats tbody tr[aria-current="true"] td {
   display: block;
   font-family: var(--display);
   font-size: 2.15rem;
-  font-weight: 600;
+  font-weight: var(--display-weight);
   line-height: 1;
 }
 
@@ -670,6 +808,10 @@ pre {
   line-height: 1.62;
   font-size: 0.84rem;
   tab-size: 2;
+}
+
+:root[data-theme="dark"] pre {
+  box-shadow: inset 0 1px 0 var(--glow), 0 24px 50px -40px rgb(0 0 0 / 90%);
 }
 
 pre::-webkit-scrollbar {
@@ -696,6 +838,7 @@ pre.output {
   border-left: 3px solid var(--rule);
   border-radius: 0 4px 4px 0;
   font-size: 0.8rem;
+  box-shadow: none;
 }
 
 pre.output::before {
@@ -710,19 +853,19 @@ pre.output::before {
 }
 
 .tok-kw {
-  color: #d9a05b;
+  color: light-dark(#a1691f, #e9b978);
 }
 
 .tok-fn {
-  color: #e8d7a8;
+  color: light-dark(#4b5b74, #a9c2e6);
 }
 
 .tok-str {
-  color: #9dbf8e;
+  color: light-dark(#587a4e, #a8c79b);
 }
 
 .tok-num {
-  color: #cf9a9a;
+  color: light-dark(#8d4b48, #e0a09a);
 }
 
 .tok-com {
@@ -857,6 +1000,7 @@ article.step h3 {
 .pkg > p {
   color: var(--ink-soft);
   margin-top: 8px;
+  max-width: 68ch;
 }
 
 .entry {
@@ -899,10 +1043,6 @@ code.sig .kw {
   max-width: 68ch;
   font-size: 0.96rem;
   color: var(--ink-soft);
-}
-
-.pkg > p {
-  max-width: 68ch;
 }
 
 .doc p {
@@ -1062,7 +1202,7 @@ footer .mark {
 
   .top nav {
     height: 56px;
-    gap: 4px;
+    gap: 2px;
   }
 
   .brand span {
@@ -1074,8 +1214,10 @@ footer .mark {
     font-size: 0.92rem;
   }
 
-  .icon-link {
+  .icon-link,
+  .aperture-toggle {
     width: 30px;
+    height: 30px;
   }
 
   ul.fields li {
@@ -1091,5 +1233,12 @@ footer .mark {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  body,
+  .aperture-toggle,
+  .aperture-toggle g,
+  .button {
+    transition: none;
   }
 }

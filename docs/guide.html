@@ -3,8 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+
 <title>Guide — moonimage</title>
 <meta name="description" content="From an empty project to seven formats: reading, pixels, layouts, geometry, writing, animation, and what happens when a file is not one this library reads.">
+<script>
+  // The stock is chosen before the first paint, so nothing flashes the wrong
+  // colour while the stylesheet loads.
+  (() => {
+    let stored = null;
+    try {
+      stored = localStorage.getItem("moonimage-theme");
+    } catch {}
+    const theme = stored === "light" || stored === "dark"
+      ? stored
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.dataset.theme = theme;
+  })();
+</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -298,5 +314,6 @@ println(<span class="tok-str">"two by two limit: \{capped}"</span>)</code></pre>
   </div>
 </footer>
 
+<script src="theme.js" defer></script>
 </body>
 </html>

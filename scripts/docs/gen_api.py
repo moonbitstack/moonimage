@@ -410,8 +410,23 @@ def main():
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>API reference — moonimage</title>
 <meta name="description" content="Every public type, function, method and value in moonimage, generated from the packages' interfaces and their documentation comments.">
+<script>
+  // The stock is chosen before the first paint, so nothing flashes the wrong
+  // colour while the stylesheet loads.
+  (() => {
+    let stored = null;
+    try {
+      stored = localStorage.getItem("moonimage-theme");
+    } catch {}
+    const theme = stored === "light" || stored === "dark"
+      ? stored
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.dataset.theme = theme;
+  })();
+</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -464,6 +479,7 @@ def main():
   </div>
 </footer>
 
+<script src="theme.js" defer></script>
 </body>
 </html>
 """ % (nav, "\n".join(bodies))
