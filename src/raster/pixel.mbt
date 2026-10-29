@@ -46,6 +46,30 @@ pub extend PixelFormat with Eq::{equal, not_equal}
 pub extend PixelFormat with Debug::{to_repr}
 
 ///|
+/// The layout spelled the way the type spells it: `Rgba8`, `Gray16`.
+///
+/// A log line and an error message both want to say which layout was in play,
+/// and neither wants a sentence about it.
+pub impl Show for PixelFormat with fn output(self, logger) {
+  logger.write_string(
+    match self {
+      Gray8 => "Gray8"
+      GrayAlpha8 => "GrayAlpha8"
+      Rgb8 => "Rgb8"
+      Rgba8 => "Rgba8"
+      Gray16 => "Gray16"
+      GrayAlpha16 => "GrayAlpha16"
+      Rgb16 => "Rgb16"
+      Rgba16 => "Rgba16"
+      RgbaF32 => "RgbaF32"
+    },
+  )
+}
+
+///|
+pub extend PixelFormat with Show::{to_string, output}
+
+///|
 /// How many samples a pixel of this format has.
 pub fn PixelFormat::channels(self : PixelFormat) -> Int32 {
   match self {

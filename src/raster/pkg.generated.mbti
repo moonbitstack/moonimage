@@ -195,7 +195,10 @@ pub fn PixelFormat::has_alpha(Self) -> Bool
 pub fn PixelFormat::is_float(Self) -> Bool
 pub fn PixelFormat::is_gray(Self) -> Bool
 pub fn PixelFormat::not_equal(Self, Self) -> Bool
+pub fn PixelFormat::output(Self, &Logger) -> Unit
 pub fn PixelFormat::to_repr(Self) -> @debug.Repr
+pub fn PixelFormat::to_string(Self) -> String
+pub impl Show for PixelFormat
 
 pub(all) enum Sampling {
   Nearest
