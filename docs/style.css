@@ -82,15 +82,14 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* At the top there is nothing to scroll to, and a bar down the side of a title
- * page is furniture nobody asked for. */
-:root.at-top {
-  scrollbar-width: none;
+/* The bar shows while the page moves or under the pointer and hides a moment
+ * after: the thumb goes, its place stays. */
+@supports selector(::-webkit-scrollbar) {
+  :root:not(.scrolling)::-webkit-scrollbar-thumb { background: transparent; border-color: transparent; box-shadow: none; }
 }
 
-:root.at-top::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+@supports not selector(::-webkit-scrollbar) {
+  :root:not(.scrolling) { scrollbar-color: transparent transparent; }
 }
 
 body {
@@ -145,11 +144,6 @@ body::after {
 
 /* Scrollbars: the standard properties and the WebKit ones fight, so the
  * standard pair is only declared where WebKit's pseudo-elements do not exist. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-}
-
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;
@@ -263,7 +257,8 @@ samp {
   border: 1px solid color-mix(in srgb, var(--brass) 22%, transparent);
   border-radius: 4px;
   padding: 0.05em 0.32em;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 hr {
@@ -1299,3 +1294,10 @@ footer .mark {
     transition: none;
   }
 }
+
+/* Long identifiers in running text break rather than widen the page. */
+:where(p, li, td, dd, h1, h2, h3, h4) code { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Grid items give way to their scrolling code and tables instead of widening the page. */
+.guide > *, .workbench > * { min-width: 0; }
+.panel:has(> table.formats) { overflow-x: auto; }
