@@ -85,6 +85,18 @@ function install() {
 
 install();
 
+// The scroll bar retracts while the page is at the top: a title page does not
+// need a bar down its side, and it comes back the moment there is something to
+// scroll to.
+const root = document.documentElement;
+function watchTop() {
+  const sync = () => root.classList.toggle("at-top", window.scrollY <= 0);
+  sync();
+  window.addEventListener("scroll", sync, { passive: true });
+}
+
+watchTop();
+
 // With no stored choice, a change in the system preference is followed live.
 QUERY.addEventListener("change", () => {
   try {

@@ -24,10 +24,10 @@
   --card: light-dark(#fbf7ee, #1c1815);
   --ink: light-dark(#241c15, #f2e8d6);
   --ink-soft: light-dark(#4c4034, #c9baa4);
-  --ink-faint: light-dark(#7d6c57, #9b8b74);
+  --ink-faint: light-dark(#75644f, #9b8b74);
   --rule: light-dark(#cfc0a7, #362c23);
   --rule-soft: light-dark(#ddd1bb, #241e18);
-  --brass: light-dark(#a1742d, #e0a95e);
+  --brass: light-dark(#8a6023, #e0a95e);
   --brass-bright: light-dark(#c9a15e, #f3c98d);
   --oxblood: light-dark(#7a3a2c, #d98d75);
   --sage: light-dark(#4f6a54, #a7c3ab);
@@ -77,6 +77,20 @@ html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
   font-variant-ligatures: no-contextual;
+  /* Room for the bar is always kept, so hiding it at the top of the page does
+   * not move the text sideways by eleven pixels. */
+  scrollbar-gutter: stable;
+}
+
+/* At the top there is nothing to scroll to, and a bar down the side of a title
+ * page is furniture nobody asked for. */
+:root.at-top {
+  scrollbar-width: none;
+}
+
+:root.at-top::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 body {
@@ -85,7 +99,6 @@ body {
   color: var(--ink);
   font: 400 1.0625rem/1.62 var(--serif);
   text-rendering: optimizeLegibility;
-  transition: background-color 240ms ease, color 240ms ease;
 }
 
 /* Where the light falls: a vignette by day, the safelight and the shadow of the
@@ -161,6 +174,36 @@ body::after {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--brass);
+}
+
+/* Text that is furniture rather than reading matter: a selection box dragged
+ * across the navigation or a plate caption looks like a mistake. Prose, tables
+ * of numbers and code stay selectable, because those are what a reader takes
+ * away. */
+.top,
+.brand,
+.aperture-toggle,
+.icon-link,
+.button,
+.eyebrow,
+.frame figcaption,
+.stage .readout,
+.panel h3,
+table.formats thead th,
+.figure,
+.kind,
+article.step .num,
+.api nav,
+.guide aside {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.frame img,
+.stage canvas {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* ------------------------------------------------------------------ type */
@@ -367,7 +410,7 @@ hr {
 
 .aperture-toggle g {
   transform-origin: 12px 12px;
-  transition: opacity 260ms ease, transform 420ms cubic-bezier(0.34, 0.9, 0.3, 1);
+  transition: opacity 500ms ease, transform 500ms cubic-bezier(0.34, 0.9, 0.3, 1);
 }
 
 .aperture-toggle .closed {
@@ -383,6 +426,10 @@ hr {
 :root[data-theme="dark"] .aperture-toggle .closed {
   opacity: 1;
   transform: none;
+}
+
+:root[data-theme="dark"] .top {
+  box-shadow: 0 1px 0 var(--glow);
 }
 
 /* --------------------------------------------------------------- masthead */
@@ -563,6 +610,17 @@ hr {
 
 .band-head h2 {
   margin-right: auto;
+}
+
+.band-head h2::before {
+  content: "";
+  display: inline-block;
+  width: 26px;
+  height: 1px;
+  margin-right: 14px;
+  vertical-align: 0.32em;
+  background: var(--brass);
+  opacity: 0.7;
 }
 
 .band-head p {
@@ -1235,7 +1293,6 @@ footer .mark {
     scroll-behavior: auto;
   }
 
-  body,
   .aperture-toggle,
   .aperture-toggle g,
   .button {
