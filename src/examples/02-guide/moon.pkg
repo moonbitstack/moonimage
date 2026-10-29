@@ -1,0 +1,7 @@
+// The guide's program: every snippet on that page, run in order.
+pkgtype(kind: "executable")
+
+import {
+  "moonbitstack/moonimage",
+  "moonbitstack/moonimage/raster",
+}
