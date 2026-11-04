@@ -26,6 +26,7 @@
 /// The eye resolves brightness far better than hue, so the two colour channels
 /// are stored at half resolution or a quarter, which is where most of JPEG's
 /// size comes from.
+#derive(Eq, Debug)
 pub(all) enum Subsampling {
   /// Full resolution in all three channels.
   Yuv444
@@ -33,7 +34,7 @@ pub(all) enum Subsampling {
   Yuv422
   /// Colour at half resolution both ways, which is what a camera writes.
   Yuv420
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Subsampling with Eq::{equal, not_equal}
@@ -66,6 +67,7 @@ pub fn EncodeOptions::best() -> EncodeOptions {
 ///|
 /// The eight ways a camera says its picture is rotated, numbered the way EXIF
 /// numbers them.
+#derive(Eq, Debug)
 pub(all) enum Orientation {
   /// As stored.
   Normal
@@ -83,7 +85,7 @@ pub(all) enum Orientation {
   Transverse
   /// Turned a quarter anticlockwise.
   Rotate270
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Orientation with Eq::{equal, not_equal}

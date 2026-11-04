@@ -15,6 +15,7 @@
 
 ///|
 /// What a column of pixels was meant to be seen in.
+#derive(Eq, Debug)
 pub(all) enum Intent {
   /// For a picture.
   Perceptual
@@ -24,7 +25,7 @@ pub(all) enum Intent {
   Saturation
   /// For comparing against a proof.
   Absolute
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Intent with Eq::{equal, not_equal}
@@ -61,6 +62,7 @@ pub fn Intent::of(code : Int32) -> Intent? {
 ///
 /// Eight numbers rather than a matrix: this is what a file writes, and a matrix
 /// would be a conversion, which this library does not do.
+#derive(Eq, Debug)
 pub(all) struct Chromaticities {
   white_x : Double
   white_y : Double
@@ -70,7 +72,7 @@ pub(all) struct Chromaticities {
   green_y : Double
   blue_x : Double
   blue_y : Double
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Chromaticities with Eq::{equal, not_equal}
@@ -97,10 +99,11 @@ pub fn Chromaticities::srgb() -> Chromaticities {
 ///|
 /// An embedded ICC profile, kept by name and bytes. Not applied: a caller that
 /// wants colour management hands these bytes to something that does it.
+#derive(Eq, Debug)
 pub(all) struct Icc {
   name : String
   profile : Bytes
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Icc with Eq::{equal, not_equal}
@@ -111,6 +114,7 @@ pub extend Icc with Debug::{to_repr}
 ///|
 /// A text note, in the flavour of the chunk it came from, so that writing the
 /// image back produces the same kind of chunk.
+#derive(Eq, Debug)
 pub(all) enum Text {
   /// `tEXt`: Latin-1, one keyword and one line.
   Latin(keyword~ : String, text~ : String)
@@ -123,7 +127,7 @@ pub(all) enum Text {
     translated~ : String,
     text~ : String
   )
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Text with Eq::{equal, not_equal}
@@ -151,6 +155,7 @@ pub fn Text::text(self : Text) -> String {
 
 ///|
 /// Everything the file said about itself besides its pixels.
+#derive(Eq, Debug)
 pub(all) struct Metadata {
   /// The file gamma: the exponent the samples were encoded with, so that 0.45455
   /// means what sRGB means.
@@ -163,7 +168,7 @@ pub(all) struct Metadata {
   icc : Icc?
   /// The text notes, in the order the file had them.
   texts : Array[Text]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Metadata with Eq::{equal, not_equal}

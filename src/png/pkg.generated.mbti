@@ -29,6 +29,7 @@ pub fn EncodeOptions::best() -> Self
 pub fn EncodeOptions::default() -> Self
 pub fn EncodeOptions::fast() -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Filter {
   Adaptive
   None
@@ -36,7 +37,7 @@ pub(all) enum Filter {
   Up
   Average
   Paeth
-} derive(Eq, @debug.Debug)
+}
 pub fn Filter::equal(Self, Self) -> Bool
 pub fn Filter::not_equal(Self, Self) -> Bool
 pub fn Filter::to_repr(Self) -> @debug.Repr

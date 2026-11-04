@@ -18,6 +18,7 @@
 ///
 /// The names are the usual ones: `Gray8` is one byte per pixel, `Rgba8` four,
 /// `Rgba16` eight with each channel big-endian, `RgbaF32` four floats.
+#derive(Eq, Debug)
 pub(all) enum PixelFormat {
   /// One sample, 8 bits.
   Gray8
@@ -37,7 +38,7 @@ pub(all) enum PixelFormat {
   Rgba16
   /// Four samples as `Float`, 0–1, little-endian.
   RgbaF32
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PixelFormat with Eq::{equal, not_equal}
@@ -138,12 +139,13 @@ pub fn PixelFormat::is_float(self : PixelFormat) -> Bool {
 /// A grey pixel has `r`, `g` and `b` equal, which is why there is no grey
 /// variant: a reader that has to branch on whether a pixel is grey is a reader
 /// that will forget to inflate one of the three channels.
+#derive(Eq, Debug)
 pub(all) struct Pixel {
   r : Double
   g : Double
   b : Double
   a : Double
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Pixel with Eq::{equal, not_equal}

@@ -24,6 +24,7 @@
 /// one whose output has the smallest sum of absolute differences. It costs four
 /// extra passes over each row and usually pays for itself several times over in
 /// what the compressor then has to store.
+#derive(Eq, Debug)
 pub(all) enum Filter {
   /// Pick per row.
   Adaptive
@@ -37,7 +38,7 @@ pub(all) enum Filter {
   Average
   /// Subtract the one the Paeth predictor picks.
   Paeth
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Filter with Eq::{equal, not_equal}

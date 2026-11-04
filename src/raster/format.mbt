@@ -12,6 +12,7 @@
 
 ///|
 /// The formats this library reads and writes.
+#derive(Eq, Debug)
 pub(all) enum Format {
   /// PNG, with APNG for animation.
   Png
@@ -27,7 +28,7 @@ pub(all) enum Format {
   Gif
   /// WebP, lossless, lossy and animated.
   Webp
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Format with Eq::{equal, not_equal}

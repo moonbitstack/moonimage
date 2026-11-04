@@ -16,12 +16,13 @@
 
 ///|
 /// How wide a pixel is written.
+#derive(Eq, Debug)
 pub(all) enum Depth {
   /// Three bytes per pixel. Alpha is dropped.
   Bits24
   /// Four bytes per pixel, alpha last.
   Bits32
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Depth with Eq::{equal, not_equal}

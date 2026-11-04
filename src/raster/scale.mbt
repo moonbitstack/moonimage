@@ -17,6 +17,7 @@
 
 ///|
 /// How a scaler decides what an unknown pixel is worth.
+#derive(Eq, Debug)
 pub(all) enum Sampling {
   /// The nearest pixel, and nothing else: no new colours.
   Nearest
@@ -25,7 +26,7 @@ pub(all) enum Sampling {
   /// A weighted average of the six nearest per axis, weights from the Lanczos
   /// window with a = 3.
   Lanczos
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Sampling with Eq::{equal, not_equal}

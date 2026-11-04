@@ -14,10 +14,11 @@ pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum Depth {
   Bits24
   Bits32
-} derive(Eq, @debug.Debug)
+}
 pub fn Depth::equal(Self, Self) -> Bool
 pub fn Depth::not_equal(Self, Self) -> Bool
 pub fn Depth::to_repr(Self) -> @debug.Repr

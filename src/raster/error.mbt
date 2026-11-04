@@ -16,6 +16,7 @@
 /// kind of file (`Unknown`), is the file damaged (`Unexpected`, `Truncated`,
 /// `Checksum`), or is the caller asking for more than it allowed (`OverLimit`).
 /// `Unsupported` is the fourth: a part of a format this library does not read.
+#derive(Eq, Debug)
 pub(all) suberror Refused {
   /// The bytes at `at` are not allowed here; `want` says what is.
   Unexpected(at~ : Int32, got~ : String, want~ : String)
@@ -29,7 +30,7 @@ pub(all) suberror Refused {
   OverLimit(limit~ : Int32, got~ : Int32)
   /// A checksum that does not match the bytes it covers.
   Checksum(at~ : Int32, got~ : String, want~ : String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Refused with Eq::{equal, not_equal}

@@ -16,6 +16,7 @@
 
 ///|
 /// What to do with the frame's rectangle once the frame has been shown.
+#derive(Eq, Debug)
 pub(all) enum Dispose {
   /// Leave it: the next frame draws over it.
   Keep
@@ -23,7 +24,7 @@ pub(all) enum Dispose {
   Background
   /// Put back whatever was under it before it was drawn.
   Previous
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Dispose with Eq::{equal, not_equal}
@@ -33,12 +34,13 @@ pub extend Dispose with Debug::{to_repr}
 
 ///|
 /// How a frame's pixels meet what is already on the canvas.
+#derive(Eq, Debug)
 pub(all) enum Blend {
   /// Replace, alpha and all.
   Source
   /// Composite, the usual `over`.
   Over
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Blend with Eq::{equal, not_equal}

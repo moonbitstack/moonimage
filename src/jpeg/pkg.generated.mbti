@@ -23,6 +23,7 @@ pub(all) struct EncodeOptions {
 pub fn EncodeOptions::best() -> Self
 pub fn EncodeOptions::default() -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Orientation {
   Normal
   FlipHorizontal
@@ -32,18 +33,19 @@ pub(all) enum Orientation {
   Rotate90
   Transverse
   Rotate270
-} derive(Eq, @debug.Debug)
+}
 pub fn Orientation::code(Self) -> Int32
 pub fn Orientation::equal(Self, Self) -> Bool
 pub fn Orientation::not_equal(Self, Self) -> Bool
 pub fn Orientation::of(Int32) -> Self?
 pub fn Orientation::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Subsampling {
   Yuv444
   Yuv422
   Yuv420
-} derive(Eq, @debug.Debug)
+}
 pub fn Subsampling::equal(Self, Self) -> Bool
 pub fn Subsampling::not_equal(Self, Self) -> Bool
 pub fn Subsampling::to_repr(Self) -> @debug.Repr
