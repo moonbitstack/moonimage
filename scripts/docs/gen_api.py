@@ -84,7 +84,7 @@ def scan_source(package_dir: Path):
             while i < len(lines) and lines[i].startswith("///"):
                 block.append(lines[i])
                 i += 1
-            while i < len(lines) and not lines[i].strip():
+            while i < len(lines) and (not lines[i].strip() or lines[i].startswith("#")):
                 i += 1
             if i >= len(lines):
                 break

@@ -170,7 +170,6 @@ animation without a repeat count means in all three formats.</em></li>
           <li>Jpeg <em>JPEG, baseline and progressive.</em></li>
           <li>Gif <em>GIF, with animation.</em></li>
           <li>Webp <em>WebP, lossless, lossy and animated.</em></li>
-          <li>pub</li>
         </ul>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Format::extension(self : Format) -&gt; String</code>
@@ -401,7 +400,6 @@ means what sRGB means.</em></li>
           <li>Rgb16 <em>Three samples, 16 bits each, big-endian.</em></li>
           <li>Rgba16 <em>Four samples, 16 bits each, big-endian.</em></li>
           <li>RgbaF32 <em>Four samples as <code>Float</code>, 0–1, little-endian.</em></li>
-          <li>pub</li>
         </ul>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> PixelFormat::bits(self : PixelFormat) -&gt; Int32</code>
@@ -443,7 +441,6 @@ means what sRGB means.</em></li>
           <li>Truncated(at~ : Int32, want~ : Int32) <em>The bytes end <code>want</code> short of where the format needs them.</em></li>
           <li>OverLimit(limit~ : Int32, got~ : Int32) <em>A size or a length past what the caller's <code>Limits</code> allow.</em></li>
           <li>Checksum(at~ : Int32, got~ : String, want~ : String) <em>A checksum that does not match the bytes it covers.</em></li>
-          <li>pub</li>
         </ul>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Refused::to_string(Self) -&gt; String</code>
