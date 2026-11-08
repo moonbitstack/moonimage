@@ -106,7 +106,9 @@ inside an animation frame, and comes back as four samples per pixel.
 A TIFF is a directory of tags pointing at data anywhere in the file; this reader
 takes strips rather than tiles, and refuses a tiled file by name instead of
 reading its rows in the wrong order. A DDS is a block grid: four by four pixels
-become eight or sixteen bytes built from two endpoints and an index a pixel.
+become eight or sixteen bytes, and what those bytes hold is a format of its own —
+two endpoints and an index a pixel in BC1 to BC5, a mode number and a table of
+shapes in BC7, and half-precision light in BC6H.
 
 ## The image
 
