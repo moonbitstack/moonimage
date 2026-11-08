@@ -140,6 +140,10 @@ test {
 - **`encode` raises.** A format that cannot be written — DDS is read-only —
   raises `Refused` rather than writing something else. Handle it or declare
   `raise` on the function.
+- **A DDS decodes into the layout the block is**: BC4 grey, BC5 red and green,
+  BC6H float, the rest RGBA. That is right for a texture you are about to sample,
+  and wrong for one you are about to draw; `@moonimage/dds.decode_as` gives the
+  layout you ask for, and costs nothing when the block already means it.
 - **Limits are checked before allocation**, not after. Pass
   `Limits::strict()` for uploads; the default allows a gigabyte of expansion.
 - **Grey in a bit map is inverted.** In PBM a set bit is black; every other

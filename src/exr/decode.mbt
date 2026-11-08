@@ -476,14 +476,21 @@ fn be32(bytes : BytesView, at : Int32) -> Int32 {
 ///|
 /// A half-precision sample as a float.
 ///
-/// The arithmetic is with the pixel formats now, because a block of BC6H is a
-/// picture of halves too; this keeps the name a caller of this package knows.
+/// Half is this format's own sample type — a scanline of an OpenEXR is a run of
+/// them unless it was written as float — so this is the conversion a reader of
+/// this package reaches for, and it is the one `raster` keeps for every format
+/// whose samples are halves. There is one implementation of it, here and there
+/// and in a block of BC6H alike.
 pub fn half_to_float(bits : Int32) -> Float {
   @raster.half_to_float(bits)
 }
 
 ///|
 /// A float as a half-precision sample, rounded to nearest.
+///
+/// The inverse, and the one a writer needs: a sample that does not fit becomes
+/// the nearest half, which is an infinity when it is too large and nought when it
+/// is too small.
 pub fn float_to_half(value : Float) -> Int32 {
   @raster.float_to_half(value)
 }

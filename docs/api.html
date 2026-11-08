@@ -56,7 +56,7 @@
         <a href="#moonimage" title="Every format, one door">moonimage<span>4</span></a>
         <a href="#raster" title="Pictures and pixels">raster<span>77</span></a>
         <a href="#bmp" title="Windows bitmap">bmp<span>5</span></a>
-        <a href="#dds" title="DirectDraw surface">dds<span>2</span></a>
+        <a href="#dds" title="DirectDraw surface">dds<span>3</span></a>
         <a href="#exr" title="OpenEXR">exr<span>9</span></a>
         <a href="#farbfeld" title="farbfeld">farbfeld<span>2</span></a>
         <a href="#hdr" title="Radiance HDR">hdr<span>2</span></a>
@@ -665,6 +665,13 @@ divided.</em></li>
         <div class="doc"><p>The picture in these bytes.</p>
 <p>A texture usually carries a chain of mipmaps after the first surface; this reads the first, which is the only one a caller that wants "the picture" means.</p></div>
       </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode_as(bytes : BytesView, format : @raster.PixelFormat, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The picture in these bytes, in the layout the caller needs rather than the one the block is.</p>
+<p>A block format says what a block holds, not what a picture is drawn with: BC4 is one channel and BC5 is two, and a caller that is about to upload a texture or paint a canvas wants neither. This is that call.</p>
+<p>The formats that mean RGBA already — BC1, BC2, BC3, BC7 — cost nothing here: the decode lands in the layout asked for and no second buffer is made. A BC4 or a BC5 is widened, and a BC6H, which is light rather than colour, is scaled down to eight bits with the rest of the picture; those two are a decode followed by a conversion, so a caller that wants both the native sampling and the display one may prefer to call <code>decode</code> and convert the result itself.</p></div>
+      </div>
     </section>
     <section class="pkg" id="exr">
       <h2>exr <span>OpenEXR</span></h2>
@@ -718,13 +725,14 @@ than a display has, and half the bytes.</em></li>
       <div class="entry">
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> float_to_half(value : Float) -&gt; Int32</code>
-        <div class="doc"><p>A float as a half-precision sample, rounded to nearest.</p></div>
+        <div class="doc"><p>A float as a half-precision sample, rounded to nearest.</p>
+<p>The inverse, and the one a writer needs: a sample that does not fit becomes the nearest half, which is an infinity when it is too large and nought when it is too small.</p></div>
       </div>
       <div class="entry">
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> half_to_float(bits : Int32) -&gt; Float</code>
         <div class="doc"><p>A half-precision sample as a float.</p>
-<p>The arithmetic is with the pixel formats now, because a block of BC6H is a picture of halves too; this keeps the name a caller of this package knows.</p></div>
+<p>Half is this format's own sample type — a scanline of an OpenEXR is a run of them unless it was written as float — so this is the conversion a reader of this package reaches for, and it is the one <code>raster</code> keeps for every format whose samples are halves. There is one implementation of it, here and there and in a block of BC6H alike.</p></div>
       </div>
     </section>
     <section class="pkg" id="farbfeld">

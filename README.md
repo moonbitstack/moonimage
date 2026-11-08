@@ -108,7 +108,9 @@ takes strips rather than tiles, and refuses a tiled file by name instead of
 reading its rows in the wrong order. A DDS is a block grid: four by four pixels
 become eight or sixteen bytes, and what those bytes hold is a format of its own —
 two endpoints and an index a pixel in BC1 to BC5, a mode number and a table of
-shapes in BC7, and half-precision light in BC6H.
+shapes in BC7, and half-precision light in BC6H. `decode` gives the picture in
+the layout the block is; `decode_as` gives the one a caller is drawing with,
+because a block layout is rarely a display layout.
 
 ## The image
 
