@@ -3,10 +3,15 @@ package "moonbitstack/moonimage/raster"
 
 import {
   "moonbitlang/core/debug",
+  "moonbitstack/moonrgba",
 }
 
 // Values
+pub fn float_at(BytesView, Int32) -> Float
+
 pub fn hex(BytesView, Int32, Int32) -> String
+
+pub fn put_float(FixedArray[Byte], Int32, Float) -> Unit
 
 // Errors
 #derive(Eq, @debug.Debug)
@@ -80,9 +85,18 @@ pub(all) enum Format {
   Jpeg
   Gif
   Webp
+  Tiff
+  Ico
+  Cur
+  Pnm
+  Hdr
+  Exr
+  Farbfeld
+  Dds
 }
 pub fn Format::equal(Self, Self) -> Bool
 pub fn Format::extension(Self) -> String
+pub fn Format::is_animated(Self) -> Bool
 pub fn Format::mime(Self) -> String
 pub fn Format::not_equal(Self, Self) -> Bool
 pub fn Format::of(BytesView) -> Self raise Refused
@@ -119,18 +133,28 @@ pub(all) struct Image {
   premultiplied : Bool
   metadata : Metadata
 }
+pub fn Image::blur(Self, Double) -> Self
+pub fn Image::brightness(Self, Double) -> Self
+pub fn Image::composite(Self, Self, x? : Int32, y? : Int32, opacity? : Double) -> Self
+pub fn Image::contrast(Self, Double) -> Self
 pub fn Image::convert(Self, PixelFormat) -> Self
 pub fn Image::crop(Self, Int32, Int32, Int32, Int32) -> Self raise Refused
 pub fn Image::flip_horizontal(Self) -> Self
 pub fn Image::flip_vertical(Self) -> Self
+pub fn Image::hue_rotate(Self, Double) -> Self
+pub fn Image::invert(Self) -> Self
 pub fn Image::new(Int32, Int32, PixelFormat, stride? : Int32, premultiplied? : Bool, metadata? : Metadata) -> Self
 pub fn Image::of(Int32, Int32, PixelFormat, Bytes, stride? : Int32, premultiplied? : Bool, metadata? : Metadata) -> Self raise Refused
+pub fn Image::orient(Self, Int32) -> Self raise Refused
 pub fn Image::pixel(Self, Int32, Int32) -> Pixel raise Refused
 pub fn Image::rotate(Self, quarters? : Int32) -> Self
+pub fn Image::rotate_by(Self, Double, expand? : Bool) -> Self raise Refused
 pub fn Image::row(Self, Int32) -> BytesView raise Refused
 pub fn Image::scale(Self, Int32, Int32, sampling? : Sampling) -> Self raise Refused
 pub fn Image::to_premultiplied(Self) -> Self
 pub fn Image::to_straight(Self) -> Self
+pub fn Image::unsharp_mask(Self, radius? : Double, amount? : Double, threshold? : Int32) -> Self
+pub fn Image::upright(Self, Int32?) -> Self raise Refused
 
 #derive(Eq, @debug.Debug)
 pub(all) enum Intent {
@@ -180,9 +204,12 @@ pub(all) struct Pixel {
 }
 pub fn Pixel::equal(Self, Self) -> Bool
 pub fn Pixel::not_equal(Self, Self) -> Bool
+pub fn Pixel::of_color(@moonrgba.Color) -> Self
 pub fn Pixel::of_rgba8(Int32, Int32, Int32, a? : Int32) -> Self
 pub fn Pixel::rgba16(Self) -> (Int32, Int32, Int32, Int32)
 pub fn Pixel::rgba8(Self) -> (Int32, Int32, Int32, Int32)
+pub fn Pixel::rotate_hue(Self, Double) -> Self
+pub fn Pixel::to_color(Self) -> @moonrgba.Color
 pub fn Pixel::to_repr(Self) -> @debug.Repr
 
 #derive(Eq, @debug.Debug)
@@ -214,6 +241,8 @@ pub impl Show for PixelFormat
 pub(all) enum Sampling {
   Nearest
   Bilinear
+  CatmullRom
+  Gaussian
   Lanczos
 }
 pub fn Sampling::equal(Self, Self) -> Bool

@@ -1,0 +1,47 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/ico"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn decode_all(BytesView, limits? : @raster.Limits) -> Array[Entry] raise @raster.Refused
+
+pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
+
+pub fn encode_entries(Array[Entry], Kind, Array[Int32]) -> Bytes
+
+// Errors
+
+// Types and methods
+pub(all) struct EncodeOptions {
+  kind : Kind
+  sizes : Array[Int32]
+  hot_x : Int32
+  hot_y : Int32
+}
+pub fn EncodeOptions::cursor(Int32, Int32) -> Self
+pub fn EncodeOptions::default() -> Self
+
+pub(all) struct Entry {
+  image : @raster.Image
+  hot_x : Int32
+  hot_y : Int32
+}
+
+#derive(Eq, @debug.Debug)
+pub(all) enum Kind {
+  Icon
+  Cursor
+}
+pub fn Kind::equal(Self, Self) -> Bool
+pub fn Kind::not_equal(Self, Self) -> Bool
+pub fn Kind::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

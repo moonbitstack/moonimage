@@ -1,0 +1,10 @@
+// DirectDraw surfaces, read for their block-compressed pictures.
+//
+// https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx10-format
+import {
+  "moonbitstack/moonimage/raster",
+}
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"

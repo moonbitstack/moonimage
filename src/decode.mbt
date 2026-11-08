@@ -48,6 +48,14 @@ pub fn decode(
     Jpeg => @jpeg.decode(bytes, limits~)
     Gif => @gif.decode(bytes, limits~)
     Webp => @webp.decode(bytes, limits~)
+    Tiff => @tiff.decode(bytes, limits~)
+    Ico => @ico.decode(bytes, limits~)
+    Cur => @ico.decode(bytes, limits~)
+    Pnm => @pnm.decode(bytes, limits~)
+    Hdr => @hdr.decode(bytes, limits~)
+    Exr => @exr.decode(bytes, limits~)
+    Farbfeld => @farbfeld.decode(bytes, limits~)
+    Dds => @dds.decode(bytes, limits~)
   }
 }
 
@@ -56,7 +64,9 @@ pub fn decode(
 ///
 /// A format that does not animate comes back as an animation of one frame over
 /// the whole canvas, so a caller that only draws animations does not need to
-/// branch.
+/// branch. A TIFF comes back as one frame a page, and an icon as one frame a
+/// size, because both are a sequence of pictures that a caller walking a
+/// sequence wants to see.
 pub fn decode_animation(
   bytes : BytesView,
   limits? : @raster.Limits,
@@ -66,6 +76,28 @@ pub fn decode_animation(
     Png => @png.decode_animation(bytes, limits~)
     Gif => @gif.decode_animation(bytes, limits~)
     Webp => @webp.decode_animation(bytes, limits~)
+    Tiff => pages_of(@tiff.decode_pages(bytes, limits~))
+    Ico | Cur => {
+      let entries = @ico.decode_all(bytes, limits~)
+      let frames : Array[@raster.Frame] = []
+      for entry in entries {
+        frames.push(@raster.Frame::new(entry.image, delay=0))
+      }
+      if frames.is_empty() {
+        raise @raster.Unexpected(
+          at=0,
+          got="an icon with no pictures",
+          want="at least one",
+        )
+      }
+      let widest = widest(frames)
+      @raster.Animation::new(
+        widest.0,
+        widest.1,
+        frames,
+        metadata=frames[0].image.metadata,
+      )
+    }
     _ => {
       let image = decode(bytes, limits~)
       @raster.Animation::new(
@@ -79,11 +111,59 @@ pub fn decode_animation(
 }
 
 ///|
+/// Pages as frames over the widest canvas, which is what a viewer of a multi-page
+/// file draws.
+fn pages_of(
+  pages : Array[@raster.Image],
+) -> @raster.Animation raise @raster.Refused {
+  let frames : Array[@raster.Frame] = []
+  for page in pages {
+    frames.push(@raster.Frame::new(page, delay=0))
+  }
+  if frames.is_empty() {
+    raise @raster.Unexpected(
+      at=0,
+      got="a file with no pages",
+      want="at least one",
+    )
+  }
+  let size = widest(frames)
+  @raster.Animation::new(
+    size.0,
+    size.1,
+    frames,
+    metadata=frames[0].image.metadata,
+  )
+}
+
+///|
+/// The largest width and height any frame takes.
+fn widest(frames : Array[@raster.Frame]) -> (Int32, Int32) {
+  let mut width = 0
+  let mut height = 0
+  for frame in frames {
+    if frame.image.width > width {
+      width = frame.image.width
+    }
+    if frame.image.height > height {
+      height = frame.image.height
+    }
+  }
+  (width, height)
+}
+
+///|
 /// The image as bytes of the named format, with that format's defaults.
 ///
 /// A caller that wants to choose how it is written calls the format's own
 /// package, which takes its options record.
-pub fn encode(image : @raster.Image, format : @raster.Format) -> Bytes {
+///
+/// `Dds` is refused: a block-compressed texture is a picture whose blocks were
+/// chosen by a search, and this library reads them rather than guessing them.
+pub fn encode(
+  image : @raster.Image,
+  format : @raster.Format,
+) -> Bytes raise @raster.Refused {
   match format {
     Png => @png.encode(image)
     Qoi => @qoi.encode(image)
@@ -92,6 +172,14 @@ pub fn encode(image : @raster.Image, format : @raster.Format) -> Bytes {
     Jpeg => @jpeg.encode(image)
     Gif => @gif.encode(image)
     Webp => @webp.encode(image)
+    Tiff => @tiff.encode(image)
+    Ico => @ico.encode(image)
+    Cur => @ico.encode(image, options=@ico.EncodeOptions::cursor(0, 0))
+    Pnm => @pnm.encode(image)
+    Hdr => @hdr.encode(image)
+    Exr => @exr.encode(image)
+    Farbfeld => @farbfeld.encode(image)
+    Dds => raise @raster.Unsupported(at=0, got="DDS")
   }
 }
 
@@ -108,6 +196,12 @@ pub fn encode_animation(
     Png => @png.encode_animation(animation)
     Gif => @gif.encode_animation(animation)
     Webp => @webp.encode_animation(animation)
+    Tiff =>
+      @tiff.encode_pages(
+        animation
+        .compose()
+        .map(frame => { ..frame, metadata: animation.metadata, }),
+      )
     _ => {
       if animation.frames.is_empty() {
         raise @raster.Unexpected(

@@ -1,0 +1,12 @@
+// Windows icons and cursors, read and written.
+//
+// https://learn.microsoft.com/en-us/previous-versions/ms997538(v=msdn.10)
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitstack/moonimage/png",
+}
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"

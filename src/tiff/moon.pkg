@@ -1,0 +1,13 @@
+// TIFF, read and written, with its three compressions and its pages.
+//
+// https://developer.adobe.com/content/dam/techdocs/en/photoshop/pdf/tiff6.pdf
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitstack/moonzip/zlib",
+  "moonbitstack/moonzip/deflate",
+}
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"

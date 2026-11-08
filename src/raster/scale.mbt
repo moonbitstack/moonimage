@@ -3,13 +3,23 @@
 
 // Making an image a different size.
 //
-// Three filters, because the three answer different questions. Nearest is what
-// a pixel artist wants: a pixel becomes a square, and no colour that was not in
+// Five filters, because five different questions get asked. Nearest is what a
+// pixel artist wants: a pixel becomes a square, and no colour that was not in
 // the original appears. Bilinear is what a photograph wants when it is being
-// scaled a little: cheap, and smooth enough that the result does not crawl.
-// Lanczos is what it wants when it is being scaled a lot or viewed still: six
-// taps per axis, sharp edges, and a small amount of ringing that is the price of
-// the sharpness.
+// scaled a little: two taps, cheap, and smooth enough that the result does not
+// crawl. Catmull-Rom is what it wants when it is being scaled up a lot and the
+// edge matters more than the ringing; Lanczos is what it wants for a still
+// picture, where six taps of a windowed sinc keep the edge and pay for it with a
+// little ringing; and the Gaussian is the one to reach for when the ringing
+// itself is the problem, because its kernel has none.
+//
+// The four that reach past two taps widen their footprint when the image is
+// being made smaller. A filter sampled at the output rate sees one input pixel
+// in eight and throws the other seven away, which is what aliasing is: widening
+// the footprint so that it covers everything the output pixel stands for is the
+// whole of antialiasing. Bilinear stays at two taps in both directions — it is
+// the cheap filter, and a caller who wants the footprint covered has four
+// others to choose from.
 //
 // Alpha is resampled premultiplied even when the image is not stored that way.
 // A transparent pixel usually has an arbitrary colour behind its alpha, and
@@ -21,8 +31,16 @@
 pub(all) enum Sampling {
   /// The nearest pixel, and nothing else: no new colours.
   Nearest
-  /// A weighted average of the four nearest, weights linear in distance.
+  /// A weighted average of the two nearest, weights linear in distance.
   Bilinear
+  /// A weighted average of the four nearest per axis, weights from the cubic
+  /// with a = −0.5, which is the one that interpolates and does not overshoot
+  /// much.
+  CatmullRom
+  /// A weighted average around the point, weights from a Gaussian with
+  /// σ = 0.5 truncated at three sigma. No ringing at all, at the cost of a
+  /// softer edge than the cubic or the windowed sinc.
+  Gaussian
   /// A weighted average of the six nearest per axis, weights from the Lanczos
   /// window with a = 3.
   Lanczos
@@ -60,6 +78,7 @@ pub fn Image::scale(
   }
   match sampling {
     Nearest => self.scale_nearest(width, height)
+    Bilinear => self.scale_bilinear(width, height)
     _ => self.scale_weighted(width, height, sampling)
   }
 }
@@ -67,16 +86,20 @@ pub fn Image::scale(
 ///|
 /// Nearest neighbour, copied byte by byte: no arithmetic, so a palette stays a
 /// palette.
+///
+/// The source pixel is the one whose centre the output pixel's centre falls in,
+/// which is the same rule every other filter uses and therefore the one that
+/// makes nearest the limit of the others as their footprints shrink.
 fn Image::scale_nearest(self : Image, width : Int32, height : Int32) -> Image {
   let pixel = self.format.bytes()
   let stride = width * pixel
   let buffer : FixedArray[Byte] = FixedArray::make(stride * height, b'\x00')
   for y in 0..<height {
-    let source_y = y * self.height / height
+    let source_y = pick(y, self.height, height)
     let source_row = source_y * self.stride
     let target_row = y * stride
     for x in 0..<width {
-      let source_x = x * self.width / width
+      let source_x = pick(x, self.width, width)
       let from = source_row + source_x * pixel
       let to = target_row + x * pixel
       for k in 0..<pixel {
@@ -95,11 +118,36 @@ fn Image::scale_nearest(self : Image, width : Int32, height : Int32) -> Image {
 }
 
 ///|
-/// Bilinear or Lanczos, one axis at a time.
+/// Which source index an output index reads under the nearest rule.
+fn pick(index : Int32, source : Int32, target : Int32) -> Int32 {
+  let chosen = ((index.to_double() + 0.5) *
+  source.to_double() /
+  target.to_double()).to_int()
+  if chosen < 0 {
+    0
+  } else if chosen >= source {
+    source - 1
+  } else {
+    chosen
+  }
+}
+
+///|
+/// Bilinear: the two samples the output position lands between, weighted by how
+/// far it has gone past the first.
+fn Image::scale_bilinear(self : Image, width : Int32, height : Int32) -> Image {
+  let source = self.working_copy()
+  let across = resample(source, self.width, self.height, width, true, Bilinear)
+  let down = resample(across, width, self.height, height, false, Bilinear)
+  self.collect(down, width, height)
+}
+
+///|
+/// Catmull-Rom, Gaussian or Lanczos, one axis at a time.
 ///
-/// Two passes, because both filters are separable: a two-dimensional Lanczos
-/// over six taps is thirty-six samples per pixel, and two one-dimensional ones
-/// are twelve.
+/// Two passes, because all three filters are separable: a two-dimensional
+/// Lanczos over six taps is thirty-six samples per pixel, and two one-dimensional
+/// ones are twelve.
 ///
 /// The working copy is `Double`, not `Float` and not an eight-bit image. A
 /// filter that averages 200 and 255 lands on 227.5, and 227.5 is exactly the
@@ -114,6 +162,17 @@ fn Image::scale_weighted(
   let source = self.working_copy()
   let across = resample(source, self.width, self.height, width, true, sampling)
   let down = resample(across, width, self.height, height, false, sampling)
+  self.collect(down, width, height)
+}
+
+///|
+/// Four samples per pixel of the result, written back in the image's own format.
+fn Image::collect(
+  self : Image,
+  down : FixedArray[Double],
+  width : Int32,
+  height : Int32,
+) -> Image {
   let pixel = self.format.bytes()
   let stride = width * pixel
   let buffer : FixedArray[Byte] = FixedArray::make(stride * height, b'\x00')
@@ -243,18 +302,34 @@ fn clamp_unit(value : Double) -> Double {
 ///|
 /// The taps each output position reads, and how much of each.
 ///
-/// Positions that fall outside the image are clamped to its edge, and the weights
-/// are renormalised afterwards: a filter that sums to less than one at the
-/// border darkens it, which is the visible edge artefact of a naive scaler.
+/// The footprint is the filter's own support, widened by the ratio when the
+/// image is being made smaller. Positions that fall outside the image are
+/// clamped to its edge, and the weights are renormalised afterwards: a filter
+/// that sums to less than one at the border darkens it, which is the visible
+/// edge artefact of a naive scaler.
 fn axis_weights(
   source : Int32,
   target : Int32,
   sampling : Sampling,
 ) -> Array[Array[(Int32, Double)]] {
   let ratio = source.to_double() / target.to_double()
+  let wide = !(sampling == Bilinear)
+  let filterscale = if wide && ratio > 1.0 { ratio } else { 1.0 }
+  let support = (match sampling {
+      Nearest => 0.5
+      Bilinear => 1.0
+      CatmullRom => 2.0
+      Gaussian => 1.5
+      Lanczos => 3.0
+    }) *
+    filterscale
   let taps : Array[Array[(Int32, Double)]] = []
   for i in 0..<target {
-    let center = (i.to_double() + 0.5) * ratio - 0.5
+    let center = if sampling == Bilinear {
+      (i.to_double() + 0.5) * ratio - 0.5
+    } else {
+      (i.to_double() + 0.5) * ratio
+    }
     let weights : Array[(Int32, Double)] = []
     if sampling == Bilinear {
       let left = center.floor().to_int()
@@ -262,10 +337,14 @@ fn axis_weights(
       push_weight(weights, left, 1.0 - fraction, source)
       push_weight(weights, left + 1, fraction, source)
     } else {
-      let first = center.floor().to_int() - 2
-      for k in 0..<6 {
-        let index = first + k
-        push_weight(weights, index, lanczos(center - index.to_double()), source)
+      let first = (center - support).floor().to_int()
+      let last = (center + support).floor().to_int()
+      for index in first..<=last {
+        let offset = (index.to_double() + 0.5 - center) / filterscale
+        let weight = kernel(sampling, offset)
+        if weight != 0.0 {
+          push_weight(weights, index, weight, source)
+        }
       }
     }
     let total = sum_weights(weights)
@@ -280,20 +359,54 @@ fn axis_weights(
 }
 
 ///|
+/// The filter itself, in one dimension, centred on zero.
+fn kernel(sampling : Sampling, x : Double) -> Double {
+  match sampling {
+    CatmullRom => catmull_rom(x)
+    Gaussian =>
+      // Three sigma of a kernel whose standard deviation is half a pixel: the
+      // narrowest Gaussian that still covers the pixel it is centred on.
+      if x <= -1.5 || x >= 1.5 {
+        0.0
+      } else {
+        @math.exp(-2.0 * x * x)
+      }
+    _ => lanczos(x)
+  }
+}
+
+///|
+/// The cubic with a = −0.5, in one dimension.
+fn catmull_rom(x : Double) -> Double {
+  let distance = if x < 0.0 { -x } else { x }
+  if distance < 1.0 {
+    1.5 * distance * distance * distance - 2.5 * distance * distance + 1.0
+  } else if distance < 2.0 {
+    -0.5 * distance * distance * distance +
+    2.5 * distance * distance -
+    4.0 * distance +
+    2.0
+  } else {
+    0.0
+  }
+}
+
+///|
+/// One tap, kept only if it falls on a sample.
+///
+/// A tap outside the image is dropped rather than folded onto the edge. Folding
+/// is the cheaper mistake and the more visible one: at a strong downscale the
+/// footprint is wider than the picture, and every tap outside it would pile onto
+/// the first column, darkening or brightening the whole border.
 fn push_weight(
   taps : Array[(Int32, Double)],
   index : Int32,
   weight : Double,
   source : Int32,
 ) -> Unit {
-  let clamped = if index < 0 {
-    0
-  } else if index >= source {
-    source - 1
-  } else {
-    index
+  if index >= 0 && index < source {
+    taps.push((index, weight))
   }
-  taps.push((clamped, weight))
 }
 
 ///|

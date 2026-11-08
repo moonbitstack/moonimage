@@ -1,0 +1,38 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/pnm"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
+
+// Errors
+
+// Types and methods
+pub(all) struct EncodeOptions {
+  kind : Kind
+  maxval : Int32
+  ascii : Bool
+}
+pub fn EncodeOptions::compact() -> Self
+pub fn EncodeOptions::default() -> Self
+
+#derive(Eq, @debug.Debug)
+pub(all) enum Kind {
+  Bitmap
+  Gray
+  Rgb
+  Any
+}
+pub fn Kind::equal(Self, Self) -> Bool
+pub fn Kind::not_equal(Self, Self) -> Bool
+pub fn Kind::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

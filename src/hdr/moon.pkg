@@ -1,0 +1,12 @@
+// Radiance HDR: RGBE samples, read and written.
+//
+// https://floyd.lbl.gov/radiance/refer/filefmts.pdf
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitlang/core/encoding/utf8",
+}
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"

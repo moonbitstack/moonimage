@@ -1,0 +1,13 @@
+// OpenEXR, read and written, with its three common compressions.
+//
+// https://openexr.com/en/latest/OpenEXRFileLayout.html
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+  "moonbitstack/moonzip/zlib",
+  "moonbitlang/core/encoding/utf8",
+}
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"

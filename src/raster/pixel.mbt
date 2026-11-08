@@ -288,7 +288,11 @@ fn word_at(data : BytesView, offset : Int32) -> Int32 {
 
 ///|
 /// A little-endian float, the layout a GPU buffer wants.
-fn float_at(data : BytesView, offset : Int32) -> Float {
+///
+/// Public because a format whose samples are not held to nought and one — an
+/// exposure, a depth — builds its image from these bytes directly, and the
+/// float in them is a value rather than a colour.
+pub fn float_at(data : BytesView, offset : Int32) -> Float {
   let bits = data[offset].to_int() +
     data[offset + 1].to_int() * 256 +
     data[offset + 2].to_int() * 65536 +
@@ -353,7 +357,12 @@ fn put_word(data : FixedArray[Byte], offset : Int32, value : Int32) -> Unit {
 }
 
 ///|
-fn put_float(data : FixedArray[Byte], offset : Int32, value : Float) -> Unit {
+/// Store a little-endian float, the inverse of `float_at`.
+pub fn put_float(
+  data : FixedArray[Byte],
+  offset : Int32,
+  value : Float,
+) -> Unit {
   let bits = value.reinterpret_as_uint().reinterpret_as_int()
   data[offset] = (bits & 0xFF).to_byte()
   data[offset + 1] = ((bits >> 8) & 0xFF).to_byte()

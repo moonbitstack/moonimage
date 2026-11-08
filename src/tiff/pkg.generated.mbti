@@ -1,0 +1,46 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/tiff"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+pub fn decode_pages(BytesView, limits? : @raster.Limits) -> Array[@raster.Image] raise @raster.Refused
+
+pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
+
+pub fn encode_pages(Array[@raster.Image], options? : EncodeOptions) -> Bytes
+
+pub fn orientation(BytesView) -> Int32?
+
+// Errors
+
+// Types and methods
+#derive(Eq, @debug.Debug)
+pub(all) enum Compression {
+  None
+  Lzw
+  PackBits
+  Deflate
+}
+pub fn Compression::code(Self) -> Int32
+pub fn Compression::equal(Self, Self) -> Bool
+pub fn Compression::not_equal(Self, Self) -> Bool
+pub fn Compression::of(Int32) -> Self?
+pub fn Compression::to_repr(Self) -> @debug.Repr
+
+pub(all) struct EncodeOptions {
+  compression : Compression
+  rows_per_strip : Int32
+  predictor : Bool
+}
+pub fn EncodeOptions::default() -> Self
+pub fn EncodeOptions::squeezed() -> Self
+
+// Type aliases
+
+// Traits

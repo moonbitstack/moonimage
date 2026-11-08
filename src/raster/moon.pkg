@@ -3,6 +3,10 @@
 // An image here is a rectangle of samples, a layout that says how to read them,
 // and the metadata that travelled with them. Nothing in this package touches a
 // file; the readers live in the packages beside it.
+//
+// Colour spaces are not this package's business: a pixel crosses into
+// `moonrgba` for a hue, a mix or a name, and comes back as samples.
 import {
   "moonbitlang/core/math",
+  "moonbitstack/moonrgba",
 }

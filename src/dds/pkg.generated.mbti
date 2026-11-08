@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonimage/dds"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitstack/moonimage/raster",
+}
+
+// Values
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+
+// Errors
+
+// Types and methods
+#derive(Eq, @debug.Debug)
+pub(all) enum Block {
+  Bc1
+  Bc1Opaque
+  Bc2
+  Bc3
+  Bc4
+  Bc5
+}
+pub fn Block::equal(Self, Self) -> Bool
+pub fn Block::not_equal(Self, Self) -> Bool
+pub fn Block::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

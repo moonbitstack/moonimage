@@ -13,6 +13,13 @@ import {
   "moonbitstack/moonimage/jpeg",
   "moonbitstack/moonimage/gif",
   "moonbitstack/moonimage/webp",
+  "moonbitstack/moonimage/tiff",
+  "moonbitstack/moonimage/ico",
+  "moonbitstack/moonimage/pnm",
+  "moonbitstack/moonimage/hdr",
+  "moonbitstack/moonimage/exr",
+  "moonbitstack/moonimage/farbfeld",
+  "moonbitstack/moonimage/dds",
 }
 
 import {

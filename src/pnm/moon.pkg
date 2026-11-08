@@ -1,0 +1,14 @@
+// The portable anymap family: PBM, PGM, PPM and PAM, read and written.
+//
+// https://netpbm.sourceforge.net/doc/pbm.html
+// https://netpbm.sourceforge.net/doc/pgm.html
+// https://netpbm.sourceforge.net/doc/ppm.html
+// https://netpbm.sourceforge.net/doc/pam.html
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+}
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"
