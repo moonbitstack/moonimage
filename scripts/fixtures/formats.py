@@ -15,6 +15,9 @@ bytes rather than taken from our own decoder.
 The scaling and blurring comparison is separate: Pillow resamples the same
 picture with the same filter, and the page is expected to agree with it to
 within one step of an eight-bit sample.
+
+Run `moon fmt` afterwards: the byte literals this writes are wrapped for reading,
+and the formatter rewraps them, which is what CI compares against.
 """
 
 import io
