@@ -90,6 +90,13 @@ def tiff_samples():
         data = handle.getvalue()
         back = Image.open(io.BytesIO(data))
         out.append((name, data, digest(back)))
+    # A picture big enough that the LZW table grows past nine bits, which is the
+    # only way the early widening is exercised at all.
+    large = picture(72, 72, alpha=False)
+    handle = io.BytesIO()
+    large.save(handle, format="TIFF", compression="tiff_lzw")
+    data = handle.getvalue()
+    out.append(("lzw-large", data, digest(Image.open(io.BytesIO(data)))))
     wide = Image.new("I;16", (7, 5))
     for y in range(5):
         for x in range(7):
