@@ -9,6 +9,10 @@ import {
 // Values
 pub fn float_at(BytesView, Int32) -> Float
 
+pub fn float_to_half(Float) -> Int32
+
+pub fn half_to_float(Int32) -> Float
+
 pub fn hex(BytesView, Int32, Int32) -> String
 
 pub fn put_float(FixedArray[Byte], Int32, Float) -> Unit

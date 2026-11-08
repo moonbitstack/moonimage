@@ -22,8 +22,13 @@ and the formatter rewraps them, which is what CI compares against.
 
 import io
 import math
+import os
+import random
+import shutil
 import struct
+import subprocess
 import sys
+import tempfile
 import zlib
 from pathlib import Path
 
@@ -93,6 +98,14 @@ def tiff_samples():
         data = handle.getvalue()
         back = Image.open(io.BytesIO(data))
         out.append((name, data, digest(back)))
+    for name, extra in [
+        ("lzw-predictor", {"compression": "tiff_lzw"}),
+        ("deflate-predictor", {"compression": "tiff_adobe_deflate"}),
+    ]:
+        handle = io.BytesIO()
+        flat.save(handle, format="TIFF", tiffinfo={317: 2}, **extra)
+        data = handle.getvalue()
+        out.append((name, data, digest(Image.open(io.BytesIO(data)))))
     # A picture big enough that the LZW table grows past nine bits, which is the
     # only way the early widening is exercised at all.
     large = picture(72, 72, alpha=False)
@@ -209,6 +222,13 @@ def pnm_samples():
             "p2-ascii",
             to_ascii(handle.getvalue(), b"P5", b"P2"),
             digest(base.convert("L")),
+        )
+    )
+    out.append(
+        (
+            "p5-maxval15",
+            b"P5\n4 2\n15\n" + bytes([0, 5, 10, 15, 3, 8, 12, 1]),
+            digest(Image.open(io.BytesIO(b"P5\n4 2\n15\n" + bytes([0, 5, 10, 15, 3, 8, 12, 1])))),
         )
     )
     out.append(
@@ -509,30 +529,285 @@ def dds_header(width, height, fourcc):
     return bytes(header)
 
 
+def dds_header10(width: int, height: int, dxgi: int, mips: int = 1) -> bytes:
+    """The header of a texture whose format is named by a DXGI number."""
+    header = bytearray(b"DDS ")
+    header += struct.pack("<i", 124)
+    header += struct.pack("<i", 0x1007)
+    header += struct.pack("<ii", height, width)
+    header += struct.pack("<iii", 0, 0, mips)
+    header += b"\x00" * 44
+    header += struct.pack("<ii", 32, 4) + b"DX10"
+    header += struct.pack("<5i", 0, 0, 0, 0, 0)
+    header += struct.pack("<5i", 0x1000, 0, 0, 0, 0)
+    assert len(header) == 128, len(header)
+    return bytes(header) + struct.pack("<5i", dxgi, 3, 0, 1, 0)
+
+
+DXGI = {"bc1": 71, "bc2": 74, "bc3": 77, "bc4": 80, "bc5": 83}
+
+
+def ffmpeg_pixels(data: bytes, width: int, height: int):
+    """The texture decoded by ffmpeg, as four bytes a pixel.
+
+    ffmpeg's decoder is the only other one on this machine that knows a block
+    format, so the expectations for BC1 to BC5 are its output rather than an
+    opinion of ours. It is asked for a PNG of one frame and the PNG is read back
+    with Pillow, which is a third implementation agreeing with the second.
+    """
+    work = Path(tempfile.mkdtemp(prefix="dds-"))
+    try:
+        (work / "in.dds").write_bytes(data)
+        run = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "dds_pipe", "-i", str(work / "in.dds"),
+                "-update", "1", "-frames:v", "1", str(work / "out.png"),
+            ],
+            capture_output=True,
+        )
+        if run.returncode != 0 or not (work / "out.png").exists():
+            raise RuntimeError("ffmpeg could not decode the sample: " + run.stderr.decode("utf-8", "replace"))
+        image = Image.open(work / "out.png").convert("RGBA")
+        assert image.size == (width, height), image.size
+        return image.tobytes(), image
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def colour_block(first: int, second: int, picks: list[int]) -> bytes:
+    """One BC1 block: two endpoints and two bits a pixel."""
+    indices = 0
+    for index, pick in enumerate(picks):
+        indices |= (pick & 3) << (index * 2)
+    return struct.pack("<HHI", first, second, indices)
+
+
+def alpha_block(first: int, second: int, picks: list[int]) -> bytes:
+    """One block of eight steps: two endpoints and three bits a pixel."""
+    indices = 0
+    for index, pick in enumerate(picks):
+        indices |= (pick & 7) << (index * 3)
+    return bytes([first, second]) + indices.to_bytes(6, "little")
+
+
+def channel_block(first: int, second: int, picks: list[int]) -> bytes:
+    return alpha_block(first, second, picks)
+
+
+def channel_steps(first: int, second: int) -> list[int]:
+    """The eight values a block of one channel can name, in order."""
+    if first > second:
+        steps = [first, second]
+        steps += [((6 - i) * first + (1 + i) * second) // 7 for i in range(6)]
+        return steps
+    steps = [first, second]
+    steps += [((4 - i) * first + (1 + i) * second) // 5 for i in range(4)]
+    return steps + [0, 255]
+
+
 def dds_samples():
     out = []
-    # BC1, four colours, every pixel the first endpoint.
-    first = ((255 >> 3) << 11) | ((0 >> 2) << 5) | (0 >> 3)
-    second = ((0 >> 3) << 11) | ((255 >> 2) << 5) | (0 >> 3)
-    block = struct.pack("<HHI", first, second, 0)
+
+    # BC1 in its four-colour form: the third and fourth entries are two thirds
+    # and one third of the way from the first endpoint to the second.
+    picks = [0, 1, 2, 3] * 4
+    block = colour_block(0xF800, 0x07E0, picks)
+    data = dds_header10(4, 4, DXGI["bc1"]) + block
+    pixels, _ = ffmpeg_pixels(data, 4, 4)
+    out.append(("bc1-four", data, moonbit.digest(pixels)))
+
+    # BC1 in its three-colour form, which is what a cut-out sprite uses: the
+    # fourth entry is transparent black.
+    block = colour_block(0x07E0, 0xF800, picks)
+    data = dds_header10(4, 4, DXGI["bc1"]) + block
+    pixels, _ = ffmpeg_pixels(data, 4, 4)
+    out.append(("bc1-punch", data, moonbit.digest(pixels)))
+
+    # The same bytes read as a texture whose alpha is not wanted.
+    block = colour_block(0x07E0, 0xF800, picks)
     data = dds_header(4, 4, b"DXT1") + block
-    red = bytes([255, 0, 0, 255]) * 16
-    out.append(("bc1-red", data, moonbit.digest(red)))
-    # BC1, the same block with every pixel the second endpoint.
-    picks = 0
-    for i in range(16):
-        picks |= 1 << (i * 2)
-    data = dds_header(4, 4, b"DXT1") + struct.pack("<HHI", first, second, picks)
-    out.append(("bc1-green", data, moonbit.digest(bytes([0, 255, 0, 255]) * 16)))
-    # BC3: alpha from eight steps, colour from BC1.
-    alpha = bytes([255, 0]) + b"\x00" * 6
-    data = dds_header(4, 4, b"DXT5") + alpha + block
-    out.append(("bc3-red-opaque", data, moonbit.digest(red)))
-    # BC4: red only, two endpoints 255 and 0, every index the first of them.
-    packed = (0).to_bytes(6, "little")
-    data = dds_header(4, 4, b"ATI1") + bytes([255, 0]) + packed
-    out.append(("bc4-ramp", data, moonbit.digest(bytes([255, 255, 0, 255]) * 16)))
+    pixels, _ = ffmpeg_pixels(data, 4, 4)
+    out.append(("bc1-dxt1", data, moonbit.digest(pixels)))
+
+    # BC2: four bits of alpha a pixel, then a four-colour block.
+    alpha = bytes([0x0F, 0x37, 0x5B, 0x7F, 0x9D, 0xBE, 0xDC, 0xF8])
+    block = colour_block(0x001F, 0xF800, picks)
+    data = dds_header10(4, 4, DXGI["bc2"]) + alpha + block
+    pixels, _ = ffmpeg_pixels(data, 4, 4)
+    out.append(("bc2", data, moonbit.digest(pixels)))
+
+    # BC3 with the eight-step alpha: the endpoints are ordered.
+    alpha = alpha_block(240, 16, [0, 1, 2, 3, 4, 5, 6, 7] * 2)
+    block = colour_block(0x001F, 0xF800, picks)
+    data = dds_header10(4, 4, DXGI["bc3"]) + alpha + block
+    pixels, _ = ffmpeg_pixels(data, 4, 4)
+    out.append(("bc3-eight", data, moonbit.digest(pixels)))
+
+    # BC3 with the six-step one: the endpoints are the other way round, and the
+    # last two entries are nought and two hundred and fifty-five.
+    alpha = alpha_block(16, 240, [0, 1, 2, 3, 4, 5, 6, 7] * 2)
+    block = colour_block(0x001F, 0xF800, picks)
+    data = dds_header10(4, 4, DXGI["bc3"]) + alpha + block
+    pixels, _ = ffmpeg_pixels(data, 4, 4)
+    out.append(("bc3-six", data, moonbit.digest(pixels)))
+
+    # BC4: one channel, which is a grey picture.
+    block = channel_block(200, 60, [0, 1, 2, 3, 4, 5, 6, 7] * 2)
+    data = dds_header10(4, 4, DXGI["bc4"]) + block
+    pixels, image = ffmpeg_pixels(data, 4, 4)
+    out.append(("bc4", data, moonbit.digest(pixels)))
+    assert len({pixel[:3] for pixel in image.getdata()}) == 8, "eight steps of grey"
+
+    # BC5: two channels. ffmpeg paints blue as a display convention, so the
+    # expectation is worked out here — red and green from the two blocks, blue
+    # at nought — and checked against ffmpeg on the two channels it agrees on.
+    red = channel_block(255, 0, [0, 1, 2, 3, 4, 5, 6, 7] * 2)
+    green = channel_block(0, 255, [7, 6, 5, 4, 3, 2, 1, 0] * 2)
+    data = dds_header10(4, 4, DXGI["bc5"]) + red + green
+    _, image = ffmpeg_pixels(data, 4, 4)
+    red_steps = channel_steps(255, 0)
+    green_steps = channel_steps(0, 255)
+    expected = []
+    for index in range(16):
+        want = (red_steps[index % 8], green_steps[7 - index % 8], 0, 255)
+        got = image.getdata()[index]
+        assert got[:2] == want[:2], (index, got, want)
+        expected.append(bytes(want))
+    out.append(("bc5", data, moonbit.digest(b"".join(expected))))
+
+    # A texture that carries a mipmap chain: only the first surface is the
+    # picture, and the smaller ones must not be read as if they were.
+    block = colour_block(0xF800, 0x07E0, picks)
+    small = colour_block(0x001F, 0xFFE0, [0] * 16)
+    data = dds_header10(8, 8, DXGI["bc1"], mips=2) + block * 4 + small * 1
+    pixels, _ = ffmpeg_pixels(data, 8, 8)
+    out.append(("bc1-mipmapped", data, moonbit.digest(pixels)))
     return out
+
+
+# ---------------------------------------------------------------- block formats
+
+# A reference decoder for the two block formats Pillow and ffmpeg do not know.
+# `bcdec.h` is a single header by Sergii Kudlai, MIT licensed, and it is not
+# committed here: point `BCDEC` at a copy of it, or drop it beside this file.
+REFERENCE_SOURCE = """
+#define BCDEC_IMPLEMENTATION
+#include "bcdec.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(int argc, char** argv)
+{
+    if (argc != 4) { return 2; }
+    FILE* in = fopen(argv[2], "rb");
+    FILE* out = fopen(argv[3], "wb");
+    unsigned char block[16];
+    unsigned char rgba[16 * 4];
+    unsigned short half[48];
+    while (fread(block, 1, 16, in) == 16) {
+        if (strcmp(argv[1], "bc7") == 0) {
+            bcdec_bc7(block, rgba, 16);
+            fwrite(rgba, 1, sizeof(rgba), out);
+        } else {
+            int is_signed = strcmp(argv[1], "bc6h") == 0;
+            /* The pitch is in halves, not bytes: four pixels of three. */
+            bcdec_bc6h_half(block, half, 12, is_signed);
+            fwrite(half, 2, 16 * 3, out);
+        }
+    }
+    fclose(in);
+    fclose(out);
+    return 0;
+}
+"""
+
+
+def reference_blocks(kind: str, blocks: bytes) -> bytes:
+    """Decode blocks with bcdec, which is the only other decoder of them here.
+
+    Returns the decoded bytes, one after another: sixty-four a block for BC7,
+    ninety-six for BC6H. The header is compiled rather than linked because it is
+    a single file and a compiler is easier to require than a build system.
+    """
+    header = Path(os.environ.get("BCDEC", str(Path(__file__).resolve().parent / "bcdec.h")))
+    if not header.exists():
+        raise SystemExit(
+            "the BC7 and BC6H samples need bcdec.h; set BCDEC to its path, or "
+            "leave the generated file alone"
+        )
+    work = Path(tempfile.mkdtemp(prefix="bcdec-"))
+    try:
+        (work / "ref.c").write_text(REFERENCE_SOURCE, encoding="utf-8")
+        shutil.copy(header, work / "bcdec.h")
+        (work / "blocks.bin").write_bytes(blocks)
+        build = subprocess.run(
+            ["gcc", "-O2", "-o", str(work / "ref"), str(work / "ref.c")],
+            capture_output=True,
+        )
+        if build.returncode != 0:
+            raise SystemExit("gcc could not build the reference decoder: " + build.stderr.decode())
+        run = subprocess.run(
+            [str(work / "ref"), kind, str(work / "blocks.bin"), str(work / "out.bin")],
+            capture_output=True,
+        )
+        if run.returncode != 0:
+            raise SystemExit("the reference decoder failed: " + run.stderr.decode())
+        return (work / "out.bin").read_bytes()
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def block_cases():
+    """Blocks whose decoded form is known, and the digests of that form.
+
+    A block format is decided entirely by its sixteen bytes, so a test of one is
+    a test of a pile of them: three blocks per mode, which is what makes every
+    branch of the mode switch run, and eight random ones per format, which is
+    what catches a field read at the wrong offset.
+    """
+    rng = random.Random(20260101)
+
+    def bytes_at(count):
+        return bytes(rng.randrange(256) for _ in range(count))
+
+    bc7 = []
+    for mode in range(8):
+        for _ in range(3):
+            # A unary mode number: `mode` noughts and then a one, and the rest of
+            # the block is whatever the mode makes of it.
+            lead = 1 << mode
+            mask = (1 << (mode + 1)) - 1
+            head = lead | (bytes_at(1)[0] & ~mask & 0xFF)
+            bc7.append(bytes([head]) + bytes_at(15))
+    for _ in range(8):
+        bc7.append(bytes_at(16))
+
+    bc6h = []
+    labelled = [0, 1, 2, 3, 7, 11, 15, 6, 10, 14, 18, 22, 26, 30]
+    for label in labelled:
+        for _ in range(2):
+            low = label & 0x03
+            rest = (label >> 2) & 0x07
+            head = low | (rest << 2) if label > 1 else low
+            bc6h.append(bytes([head]) + bytes_at(15))
+    for _ in range(4):
+        bc6h.append(bytes_at(16))
+
+    return b"".join(bc7), b"".join(bc6h)
+
+
+def block_digests(bc7_blocks: bytes, bc6h_blocks: bytes):
+    bc7_out = reference_blocks("bc7", bc7_blocks)
+    signed = reference_blocks("bc6h", bc6h_blocks)
+    unsigned = reference_blocks("bc6hu", bc6h_blocks)
+    seventh = 64
+    ninth = 96
+    bc7 = [moonbit.digest(bc7_out[i * seventh:(i + 1) * seventh]) for i in range(len(bc7_out) // seventh)]
+    one = [moonbit.digest(signed[i * ninth:(i + 1) * ninth]) for i in range(len(signed) // ninth)]
+    two = [moonbit.digest(unsigned[i * ninth:(i + 1) * ninth]) for i in range(len(unsigned) // ninth)]
+    return bc7, one, two
 
 
 # ---------------------------------------------------------------- scaling
@@ -689,6 +964,38 @@ def main() -> None:
 // DirectDraw surfaces built here, one block each, with the colours worked out by
 // hand from the endpoints in the block.""",
         array_of_samples(dds_samples()),
+    )
+
+    bc7_blocks, bc6h_blocks = block_cases()
+    bc7_digests, signed_digests, unsigned_digests = block_digests(bc7_blocks, bc6h_blocks)
+    body = [
+        "///|",
+        "let bc7_blocks : Bytes = " + moonbit.literal(bc7_blocks),
+        "",
+        "///|",
+        "let bc7_expected : Array[String] = [",
+    ]
+    for value in bc7_digests:
+        body.append('  "%s",' % value)
+    body.append("]")
+    body += ["", "///|", "let bc6h_blocks : Bytes = " + moonbit.literal(bc6h_blocks), ""]
+    body += ["///|", "let bc6h_signed_expected : Array[String] = ["]
+    for value in signed_digests:
+        body.append('  "%s",' % value)
+    body.append("]")
+    body += ["", "///|", "let bc6h_unsigned_expected : Array[String] = ["]
+    for value in unsigned_digests:
+        body.append('  "%s",' % value)
+    body.append("]")
+    emit(
+        ROOT / "src" / "dds" / "block_samples_wbtest.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// Blocks of BC7 and BC6H with a digest of what a reference decoder made of each
+// one. Both formats are decided entirely by their sixteen bytes, so a pile of
+// blocks is the whole of their test: three a mode, so that every branch of the
+// mode switch runs, and a few random ones besides.""",
+        "\n".join(body),
     )
 
     cases = scale_cases()

@@ -20,6 +20,9 @@ pub(all) enum Block {
   Bc3
   Bc4
   Bc5
+  Bc6h
+  Bc6hSigned
+  Bc7
 }
 pub fn Block::equal(Self, Self) -> Bool
 pub fn Block::not_equal(Self, Self) -> Bool

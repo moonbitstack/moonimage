@@ -88,7 +88,7 @@ options record.
 | Radiance HDR | RGBE, the new run-length code and the flat one, all four origins | RGBE with the run-length code | — | `@moonimage/hdr` |
 | OpenEXR | scanlines in half or float, uncompressed, RLE, ZIPS or ZIP | the same three compressions | — | `@moonimage/exr` |
 | farbfeld | the whole format | the whole format | — | `@moonimage/farbfeld` |
-| DDS | BC1, BC2, BC3, BC4, BC5 blocks, and uncompressed surfaces | — | — | `@moonimage/dds` |
+| DDS | BC1 to BC7 blocks, and uncompressed surfaces | — | — | `@moonimage/dds` |
 
 Both halves of WebP are read; the lossless one, VP8L, is also written. VP8 is the
 intra frame of a video codec, so its picture is rebuilt rather than decoded: a
@@ -318,12 +318,6 @@ untrusted files should pass `strict` or a tighter record of its own.
 
 - **AVIF.** Decoding one needs a whole AV1 decoder, which is several times the
   size of this library, so it is not planned.
-- **BC6H and BC7 textures.** A block-compressed texture is a picture whose blocks
-  were chosen by a search; the ones this library reads are the five whose blocks
-  are exact arithmetic on the endpoints. The two greater ones carry partition
-  tables longer than the file that would hold them, and a DDS in either is
-  refused by name rather than decoded into a picture wrong in a way that looks
-  like a bug in the caller.
 - **PIZ, the wavelet compression of OpenEXR.** The three either side of it are
   read and written.
 - **Writing tiled TIFF, writing lossy WebP, writing DDS.**

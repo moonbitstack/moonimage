@@ -13,10 +13,16 @@
 // a quality knob — a different job from coding a picture, and one whose result
 // nobody can check by eye.
 //
-// BC6H and BC7 are refused rather than guessed at: they carry a mode number
-// whose partition tables are longer than this whole file, and a table typed in
-// from memory decodes into a picture that is wrong in a way that looks like a
-// shader bug.
+// A BC4 block is one channel, so it comes back as a grey picture and every
+// operation the library has for grey pictures applies to it. A BC5 block is two,
+// and they come back as red and green with blue at nought, which is what a
+// normal map is. The three colour formats come back as RGBA.
+//
+// BC6H is a picture of light: its samples are halves and it has no alpha, so it
+// comes back as four floats a pixel with alpha at one. BC7 is the newest of the
+// eight-bit formats and the only one that carries a mode number, which is what
+// says how its sixteen bytes are divided between endpoints and indices. Both are
+// read; neither is written, for the reason above.
 
 ///|
 /// Which block format a texture is in.
@@ -35,6 +41,14 @@ pub(all) enum Block {
   Bc4
   /// BC5: two channels, each a BC4 block.
   Bc5
+  /// BC6H: three channels of half-precision light, unsigned.
+  Bc6h
+  /// BC6H with signed samples, which is what a difference between two exposures
+  /// is stored in.
+  Bc6hSigned
+  /// BC7: eight bits a channel, with a mode number that says how the block is
+  /// divided.
+  Bc7
 }
 
 ///|
@@ -92,6 +106,9 @@ pub fn decode(
       76 | 77 => Bc3
       79 | 80 => Bc4
       82 | 83 => Bc5
+      95 => Bc6h
+      96 => Bc6hSigned
+      97 | 98 => Bc7
       _ => raise @raster.Unsupported(at=128, got="a DXGI format of \{dxgi}")
     }
   } else if fourcc.equal_to_bytes(b"DXT1") {
@@ -198,7 +215,11 @@ fn decode_blocks(
     raise @raster.Truncated(at~, want=needed.to_int())
   }
   limits.check_bytes(needed.to_int())
-  let out : FixedArray[Byte] = FixedArray::make(width * height * 4, b'\x00')
+  let format = block_format(block)
+  let out : FixedArray[Byte] = FixedArray::make(
+    width * height * format.bytes(),
+    b'\x00',
+  )
   let mut from = at
   for by in 0..<down {
     for bx in 0..<across {
@@ -209,9 +230,23 @@ fn decode_blocks(
   @raster.Image::of(
     width,
     height,
-    @raster.PixelFormat::Rgba8,
+    format,
     Bytes::from_array(out.clamped_view()),
   )
+}
+
+///|
+/// What a block of this format is a picture of.
+///
+/// One channel is grey; two are red and green, which is what the format was
+/// invented for; three and four are a picture with alpha in it.
+fn block_format(block : Block) -> @raster.PixelFormat {
+  match block {
+    Bc4 => @raster.PixelFormat::Gray8
+    Bc5 => @raster.PixelFormat::Rgb8
+    Bc6h | Bc6hSigned => @raster.PixelFormat::RgbaF32
+    _ => @raster.PixelFormat::Rgba8
+  }
 }
 
 ///|
@@ -234,6 +269,48 @@ fn decode_block(
     Bc2 | Bc3 => at
     _ => at
   }
+  let pixel = block_format(block).bytes()
+  if block == Bc7 {
+    let colours = decode_bc7(bytes, at)
+    for y in 0..<4 {
+      for x in 0..<4 {
+        let px = left + x
+        let py = top + y
+        if px < width && py < height {
+          let to = (py * width + px) * pixel
+          let from = (y * 4 + x) * 4
+          out[to] = colours[from]
+          out[to + 1] = colours[from + 1]
+          out[to + 2] = colours[from + 2]
+          out[to + 3] = colours[from + 3]
+        }
+      }
+    }
+    return
+  }
+  if block == Bc6h || block == Bc6hSigned {
+    let halves = decode_bc6h(bytes, at, block == Bc6hSigned)
+    for y in 0..<4 {
+      for x in 0..<4 {
+        let px = left + x
+        let py = top + y
+        if px < width && py < height {
+          let to = (py * width + px) * pixel
+          let from = (y * 4 + x) * 3
+          for channel in 0..<3 {
+            @raster.put_float(
+              out,
+              to + channel * 4,
+              @raster.half_to_float(halves[from + channel]),
+            )
+          }
+          // The format has no alpha, so a pixel is as opaque as one can be.
+          @raster.put_float(out, to + 12, 1.0)
+        }
+      }
+    }
+    return
+  }
   if block == Bc4 || block == Bc5 {
     let red = channel_block(bytes, alpha_at)
     let green = if block == Bc5 {
@@ -246,19 +323,26 @@ fn decode_block(
         let px = left + x
         let py = top + y
         if px < width && py < height {
-          let to = (py * width + px) * 4
-          let r = red[y * 4 + x]
-          let g = green[y * 4 + x]
-          out[to] = r
-          out[to + 1] = g
-          out[to + 2] = b'\x00'
-          out[to + 3] = b'\xFF'
+          let to = (py * width + px) * pixel
+          out[to] = red[y * 4 + x]
+          if block == Bc5 {
+            out[to + 1] = green[y * 4 + x]
+            out[to + 2] = b'\x00'
+          }
         }
       }
     }
     return
   }
-  let colours = colour_block(bytes, colour_at, block != Bc1Opaque)
+  // Only BC1 has the three-colour form with a transparent entry: a BC2 or BC3
+  // colour block is four colours whatever its endpoints are, because the alpha
+  // is in the block beside it.
+  let colours = colour_block(bytes, colour_at, block == Bc1)
+  let alpha = if block == Bc3 {
+    channel_block(bytes, alpha_at)
+  } else {
+    FixedArray::make(16, b'\xFF')
+  }
   for y in 0..<4 {
     for x in 0..<4 {
       let px = left + x
@@ -271,7 +355,7 @@ fn decode_block(
         out[to + 2] = b
         out[to + 3] = match block {
           Bc2 => alpha_four_bits(bytes, alpha_at, x, y)
-          Bc3 => channel_block(bytes, alpha_at)[y * 4 + x]
+          Bc3 => alpha[y * 4 + x]
           _ => a
         }
       }
@@ -354,11 +438,11 @@ fn channel_block(bytes : BytesView, at : Int32) -> FixedArray[Byte] {
   steps[1] = a1
   if a0 > a1 {
     for i in 0..<6 {
-      steps[2 + i] = ((7 - i) * a0 + (1 + i) * a1) / 7
+      steps[2 + i] = ((6 - i) * a0 + (1 + i) * a1) / 7
     }
   } else {
     for i in 0..<4 {
-      steps[2 + i] = ((5 - i) * a0 + (1 + i) * a1) / 5
+      steps[2 + i] = ((4 - i) * a0 + (1 + i) * a1) / 5
     }
     steps[6] = 0
     steps[7] = 255

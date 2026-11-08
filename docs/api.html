@@ -54,7 +54,7 @@
   <div class="api">
     <nav aria-label="Packages">
         <a href="#moonimage" title="Every format, one door">moonimage<span>4</span></a>
-        <a href="#raster" title="Pictures and pixels">raster<span>75</span></a>
+        <a href="#raster" title="Pictures and pixels">raster<span>77</span></a>
         <a href="#bmp" title="Windows bitmap">bmp<span>5</span></a>
         <a href="#dds" title="DirectDraw surface">dds<span>2</span></a>
         <a href="#exr" title="OpenEXR">exr<span>9</span></a>
@@ -578,6 +578,16 @@ window with a = 3.</em></li>
       </div>
       <div class="entry">
         <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> float_to_half(value : Float) -&gt; Int32</code>
+        <div class="doc"><p>A float as a half-precision sample, rounded to nearest.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> half_to_float(bits : Int32) -&gt; Float</code>
+        <div class="doc"><p>A half-precision sample as a float.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> hex(bytes : BytesView, at : Int32, count : Int32) -&gt; String</code>
         <div class="doc"><p>A few bytes as hexadecimal, for the <code>got</code> field of a refusal.</p></div>
       </div>
@@ -628,7 +638,7 @@ negative height. Windows writes bottom first, which is the default.</em></li>
     </section>
     <section class="pkg" id="dds">
       <h2>dds <span>DirectDraw surface</span></h2>
-      <p>Block-compressed textures from BC1 to BC5, read a block at a time.</p>
+      <p>Block-compressed textures from BC1 to BC7, read a block at a time: eight-bit colour in the first five, and light in halves in BC6H.</p>
       <div class="entry">
         <span class="kind">enum</span>
         <code class="sig"><span class="kw">pub(all) enum</span> Block</code>
@@ -641,6 +651,11 @@ transparent entry in the three-colour form.</em></li>
           <li>Bc3 <em>BC3: interpolated alpha, then a BC1 colour block.</em></li>
           <li>Bc4 <em>BC4: one channel, interpolated from two endpoints.</em></li>
           <li>Bc5 <em>BC5: two channels, each a BC4 block.</em></li>
+          <li>Bc6h <em>BC6H: three channels of half-precision light, unsigned.</em></li>
+          <li>Bc6hSigned <em>BC6H with signed samples, which is what a difference between two exposures
+is stored in.</em></li>
+          <li>Bc7 <em>BC7: eight bits a channel, with a mode number that says how the block is
+divided.</em></li>
         </ul>
       </div>
       <div class="group"><span class="kind">functions</span></div>
@@ -708,7 +723,8 @@ than a display has, and half the bytes.</em></li>
       <div class="entry">
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> half_to_float(bits : Int32) -&gt; Float</code>
-        <div class="doc"><p>A half-precision sample as a float.</p></div>
+        <div class="doc"><p>A half-precision sample as a float.</p>
+<p>The arithmetic is with the pixel formats now, because a block of BC6H is a picture of halves too; this keeps the name a caller of this package knows.</p></div>
       </div>
     </section>
     <section class="pkg" id="farbfeld">

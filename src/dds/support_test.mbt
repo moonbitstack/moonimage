@@ -27,3 +27,10 @@ fn hex_of(value : UInt64) -> String {
   }
   out
 }
+
+///|
+/// FNV-1a over the picture as eight-bit RGBA, which is the common form a block
+/// format and a reference decoder can both be compared in.
+fn digest_of(image : @raster.Image) -> String {
+  digest_bytes(image.convert(@raster.PixelFormat::Rgba8).pixels)
+}
