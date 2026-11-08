@@ -1,0 +1,722 @@
+# Copyright 2026 Leo Cheng
+# SPDX-License-Identifier: Apache-2.0
+
+"""Generating the samples for the formats added after the first release.
+
+    python scripts/fixtures/formats.py
+
+Two kinds again. TIFF, ICO and the portable anymap are written by Pillow, and
+what they should decode to is what Pillow reads back: an independent decoder
+agreeing with ours is the point. Radiance HDR, OpenEXR, farbfeld and DDS are
+built here, byte by byte, because Pillow does not write them; for those the
+expected values are the ones the sample was built from, computed here from the
+bytes rather than taken from our own decoder.
+
+The scaling and blurring comparison is separate: Pillow resamples the same
+picture with the same filter, and the page is expected to agree with it to
+within one step of an eight-bit sample.
+"""
+
+import io
+import math
+import struct
+import sys
+import zlib
+from pathlib import Path
+
+import numpy as np
+from PIL import Image, ImageFilter
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import moonbit
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def picture(width: int, height: int, alpha: bool = True) -> Image.Image:
+    """A picture whose every pixel is different, so a shift cannot pass."""
+    mode = "RGBA" if alpha else "RGB"
+    image = Image.new(mode, (width, height))
+    for y in range(height):
+        for x in range(width):
+            red = (x * 37 + y * 11) % 256
+            green = (x * 5 + y * 61) % 256
+            blue = (x * 97 + y * 3) % 256
+            if alpha:
+                image.putpixel((x, y), (red, green, blue, (x * 29 + y * 43) % 256))
+            else:
+                image.putpixel((x, y), (red, green, blue))
+    return image
+
+
+def digest(image: Image.Image) -> str:
+    return moonbit.digest(image.convert("RGBA").tobytes())
+
+
+def emit(path: Path, header: str, body: str) -> None:
+    moonbit.write(str(path), header, body)
+
+
+def array_of_samples(samples) -> str:
+    out = ["///|", "let samples : Array[(String, Bytes, String)] = ["]
+    for name, data, expected in samples:
+        out.append("  (")
+        out.append('    "%s",' % name)
+        out.append("    %s," % moonbit.literal(data))
+        out.append('    "%s",' % expected)
+        out.append("  ),")
+    out.append("]")
+    return "\n".join(out)
+
+
+# ---------------------------------------------------------------- TIFF
+
+def tiff_samples():
+    out = []
+    base = picture(9, 7)
+    flat = picture(9, 7, alpha=False)
+    grey = base.convert("L")
+    palette = base.convert("P", palette=Image.ADAPTIVE, colors=16)
+    for name, image, extra in [
+        ("none-rgba", base, {}),
+        ("lzw-rgba", base, {"compression": "tiff_lzw"}),
+        ("deflate-rgb", flat, {"compression": "tiff_adobe_deflate"}),
+        ("packbits-rgb", flat, {"compression": "packbits"}),
+        ("lzw-grey", grey, {"compression": "tiff_lzw"}),
+        ("none-palette", palette, {}),
+    ]:
+        handle = io.BytesIO()
+        image.save(handle, format="TIFF", **extra)
+        data = handle.getvalue()
+        back = Image.open(io.BytesIO(data))
+        out.append((name, data, digest(back)))
+    wide = Image.new("I;16", (7, 5))
+    for y in range(5):
+        for x in range(7):
+            wide.putpixel((x, y), (x * 9000 + y * 1300) % 65536)
+    handle = io.BytesIO()
+    wide.save(handle, format="TIFF", compression="tiff_lzw")
+    data = handle.getvalue()
+    back = Image.open(io.BytesIO(data)).convert("I")
+    # Sixteen-bit grey becomes eight-bit by the same rounding this library uses:
+    # the sample over sixty-five thousand five hundred and thirty-five, times
+    # two hundred and fifty-five, rounded.
+    samples = []
+    for value in back.getdata():
+        byte = min(255, int(value * 255 / 65535 + 0.5))
+        samples.append(bytes([byte, byte, byte, 255]))
+    out.append(("lzw-16bit", data, moonbit.digest(b"".join(samples))))
+    return out
+
+
+def tiff_pages():
+    first = picture(6, 4)
+    second = picture(6, 4).rotate(180)
+    third = picture(6, 4).transpose(Image.FLIP_LEFT_RIGHT)
+    handle = io.BytesIO()
+    first.save(
+        handle,
+        format="TIFF",
+        save_all=True,
+        append_images=[second, third],
+        compression="tiff_lzw",
+    )
+    data = handle.getvalue()
+    pages = []
+    with Image.open(io.BytesIO(data)) as opened:
+        for index in range(opened.n_frames):
+            opened.seek(index)
+            pages.append(digest(opened))
+    return data, pages
+
+
+# ---------------------------------------------------------------- ICO
+
+def ico_samples():
+    out = []
+    for name, size in [("icon-16", 16), ("icon-32", 32)]:
+        image = picture(size, size)
+        handle = io.BytesIO()
+        image.save(handle, format="ICO", sizes=[(size, size)])
+        data = handle.getvalue()
+        back = Image.open(io.BytesIO(data))
+        out.append((name, data, digest(back)))
+    return out
+
+
+# ---------------------------------------------------------------- PNM
+
+def pam_bytes(image: Image.Image, depth: int, tuple_type: bytes, top: int) -> bytes:
+    """A PAM header over samples that are already in the order PAM wants."""
+    width, height = image.size
+    header = b"P7\n"
+    header += b"WIDTH %d\nHEIGHT %d\nDEPTH %d\nMAXVAL %d\n" % (
+        width,
+        height,
+        depth,
+        top,
+    )
+    header += b"TUPLTYPE %s\nENDHDR\n" % tuple_type
+    if depth == 4:
+        body = image.convert("RGBA").tobytes()
+    elif depth == 3:
+        body = image.convert("RGB").tobytes()
+    elif depth == 2:
+        body = bytes(
+            byte
+            for y in range(height)
+            for x in range(width)
+            for byte in (
+                image.convert("LA").getpixel((x, y))[0],
+                image.convert("LA").getpixel((x, y))[1],
+            )
+        )
+    else:
+        body = image.convert("L").tobytes()
+    return header + body
+
+
+def pnm_samples():
+    out = []
+    base = picture(9, 7, alpha=False)
+    for name, image, scale in [
+        ("p4-bitmap", base.convert("1"), 1),
+        ("p5-grey", base.convert("L"), 1),
+        ("p6-rgb", base, 1),
+    ]:
+        handle = io.BytesIO()
+        image.save(handle, format="PPM")
+        data = handle.getvalue()
+        back = Image.open(io.BytesIO(data))
+        out.append((name, data, digest(back)))
+    handle = io.BytesIO()
+    base.save(handle, format="PPM")
+    out.append(("p3-ascii", to_ascii(handle.getvalue(), b"P6", b"P3"), digest(base)))
+    handle = io.BytesIO()
+    base.convert("L").save(handle, format="PPM")
+    out.append(
+        (
+            "p2-ascii",
+            to_ascii(handle.getvalue(), b"P5", b"P2"),
+            digest(base.convert("L")),
+        )
+    )
+    out.append(
+        (
+            "p7-rgba",
+            pam_bytes(picture(9, 7), 4, b"RGB_ALPHA", 255),
+            digest(picture(9, 7)),
+        )
+    )
+    out.append(
+        (
+            "p7-gray-alpha",
+            pam_bytes(picture(9, 7).convert("LA"), 2, b"GRAYSCALE_ALPHA", 255),
+            digest(picture(9, 7).convert("LA")),
+        )
+    )
+    return out
+
+
+def to_ascii(data: bytes, raw_magic: bytes, ascii_magic: bytes) -> bytes:
+    """The same picture with the samples as digits rather than bytes."""
+    if not data.startswith(raw_magic):
+        return data
+    at = len(raw_magic)
+    fields = []
+    while len(fields) < 3:
+        while data[at : at + 1].isspace():
+            at += 1
+        if data[at : at + 1] == b"#":
+            while data[at : at + 1] != b"\n":
+                at += 1
+            continue
+        start = at
+        while not data[at : at + 1].isspace():
+            at += 1
+        fields.append(data[start:at])
+    at += 1
+    width, height, top = (int(field) for field in fields)
+    channels = 3 if raw_magic == b"P6" else 1
+    body = data[at : at + width * height * channels]
+    numbers = " ".join(str(byte) for byte in body)
+    return ascii_magic + b"\n" + b" ".join(fields) + b"\n" + numbers.encode() + b"\n"
+
+
+# ---------------------------------------------------------------- farbfeld
+
+def farbfeld_samples():
+    image = picture(5, 4)
+    rows = []
+    for y in range(4):
+        for x in range(5):
+            red, green, blue, alpha = image.getpixel((x, y))
+            rows.append(struct.pack(">HHHH", red * 257, green * 257, blue * 257, alpha * 257))
+    data = b"farbfeld" + struct.pack(">II", 5, 4) + b"".join(rows)
+    return [("plain", data, digest(image))]
+
+
+# ---------------------------------------------------------------- HDR
+
+def rgbe(red: float, green: float, blue: float):
+    brightest = max(red, green, blue)
+    if brightest < 1e-32:
+        return (0, 0, 0, 0)
+    mantissa, exponent = math.frexp(brightest)
+    scale = mantissa * 256.0 / brightest
+    return (
+        max(0, min(255, int(red * scale))),
+        max(0, min(255, int(green * scale))),
+        max(0, min(255, int(blue * scale))),
+        exponent + 128,
+    )
+
+
+def rgbe_to_float(red, green, blue, exponent):
+    if exponent == 0:
+        return (0.0, 0.0, 0.0)
+    scale = 2.0 ** (exponent - 136)
+    return tuple((value + 0.5) * scale for value in (red, green, blue))
+
+
+def float_digest(pixels) -> str:
+    """FNV-1a over the four floats of every pixel, little endian, as stored."""
+    data = b"".join(struct.pack("<4f", *pixel) for pixel in pixels)
+    return moonbit.digest(data)
+
+
+def hdr_samples():
+    width, height = 8, 5
+    pixels = []
+    body = bytearray()
+    for y in range(height):
+        line = bytearray([2, 2, (width >> 8) & 0xFF, width & 0xFF])
+        planes = [bytearray() for _ in range(4)]
+        for x in range(width):
+            red = (x + 1) * 0.25 * (1 + y)
+            green = (y + 1) * 0.5
+            blue = 1.0 + x * 0.125
+            packed = rgbe(red, green, blue)
+            for channel in range(4):
+                planes[channel].append(packed[channel])
+            pixels.append(rgbe_to_float(*packed) + (1.0,))
+        for channel in range(4):
+            values = planes[channel]
+            at = 0
+            while at < width:
+                run = 1
+                while at + run < width and run < 127 and values[at + run] == values[at]:
+                    run += 1
+                if run >= 3:
+                    line += bytes([128 + run, values[at]])
+                    at += run
+                else:
+                    start = at
+                    fresh = 0
+                    while at < width and fresh < 128:
+                        if (
+                            at + 2 < width
+                            and values[at + 1] == values[at]
+                            and values[at + 2] == values[at]
+                        ):
+                            break
+                        at += 1
+                        fresh += 1
+                    line += bytes([fresh]) + bytes(values[start:at])
+        body += line
+    header = b"#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y %d +X %d\n" % (height, width)
+    return [("coded", header + bytes(body), float_digest(pixels))]
+
+
+# ---------------------------------------------------------------- OpenEXR
+
+def half(value: float) -> int:
+    bits = struct.unpack("<I", struct.pack("<f", value))[0]
+    sign = (bits >> 16) & 0x8000
+    exponent = (bits >> 23) & 0xFF
+    mantissa = bits & 0x7FFFFF
+    if exponent == 0xFF:
+        return sign | 0x7C00 | (0x200 if mantissa else 0)
+    shifted = exponent - 127 + 15
+    if shifted >= 0x1F:
+        return sign | 0x7C00
+    if shifted <= 0:
+        if shifted < -10:
+            return sign
+        mant = (mantissa | 0x800000) >> (14 - shifted)
+        return sign | ((mant + 1) >> 1)
+    mant = (mantissa + 0x1000) >> 13
+    if mant >= 0x400:
+        return sign | ((shifted + 1) << 10)
+    return sign | (shifted << 10) | mant
+
+
+def half_to_float(bits: int) -> float:
+    sign = -1.0 if bits & 0x8000 else 1.0
+    exponent = (bits >> 10) & 0x1F
+    mantissa = bits & 0x3FF
+    if exponent == 0:
+        return sign * mantissa * 2.0 ** -24
+    if exponent == 31:
+        return sign * float("inf")
+    return sign * (1 + mantissa / 1024.0) * 2.0 ** (exponent - 15)
+
+
+def attribute(name: bytes, kind: bytes, body: bytes) -> bytes:
+    return name + b"\x00" + kind + b"\x00" + struct.pack("<i", len(body)) + body
+
+
+def exr_file(width, height, channels, compression, lines_per_chunk, payload):
+    head = b""
+    chlist = b""
+    for name, kind in channels:
+        chlist += name + b"\x00" + struct.pack("<i", kind) + b"\x00\x00\x00\x00"
+        chlist += struct.pack("<ii", 1, 1)
+    chlist += b"\x00"
+    head += attribute(b"channels", b"chlist", chlist)
+    head += attribute(b"compression", b"compression", bytes([compression]))
+    box = struct.pack("<4i", 0, 0, width - 1, height - 1)
+    head += attribute(b"dataWindow", b"box2i", box)
+    head += attribute(b"displayWindow", b"box2i", box)
+    head += attribute(b"lineOrder", b"lineOrder", b"\x00")
+    head += attribute(b"pixelAspectRatio", b"float", struct.pack("<f", 1.0))
+    head += attribute(b"screenWindowCenter", b"v2f", struct.pack("<2f", 0.0, 0.0))
+    head += attribute(b"screenWindowWidth", b"float", struct.pack("<f", 1.0))
+    head += b"\x00"
+    chunks = payload
+    table_at = 8 + len(head)
+    body = b""
+    offsets = []
+    for first, data in chunks:
+        offsets.append(table_at + len(chunks) * 8 + len(body))
+        body += struct.pack("<ii", first, len(data)) + data
+    table = b"".join(struct.pack("<Q", offset) for offset in offsets)
+    return b"\x76\x2f\x31\x01" + struct.pack("<i", 2) + head + table + body
+
+
+def exr_predict(raw: bytes) -> bytes:
+    half = (len(raw) + 1) // 2
+    differenced = bytearray(len(raw))
+    differenced[0] = raw[0]
+    for i in range(1, len(raw)):
+        differenced[i] = (raw[i] - raw[i - 1] + 128) & 0xFF
+    split = bytearray(len(raw))
+    for i, value in enumerate(differenced):
+        if i % 2 == 0:
+            split[i // 2] = value
+        else:
+            split[half + i // 2] = value
+    return bytes(split)
+
+
+def exr_samples():
+    width, height = 6, 5
+    values = []
+    for y in range(height):
+        for x in range(width):
+            values.append(
+                (
+                    0.25 + x * 0.125,
+                    0.5 + y * 0.0625,
+                    0.75 + (x + y) * 0.03125,
+                    1.0 if (x + y) % 3 else 0.5,
+                )
+            )
+    out = []
+    for name, kind, compression, per_chunk in [
+        ("none", 1, 0, 16),
+        ("rle", 1, 1, 1),
+        ("zip", 1, 3, 16),
+        ("zips", 1, 2, 1),
+        ("float-zip", 2, 3, 16),
+    ]:
+        channels = [(b"A", kind), (b"B", kind), (b"G", kind), (b"R", kind)]
+        chunks = []
+        for first in range(0, height, per_chunk):
+            lines = min(per_chunk, height - first)
+            raw = bytearray()
+            for line in range(lines):
+                for index in range(len(channels)):
+                    for x in range(width):
+                        sample = values[(first + line) * width + x][3 - index]
+                        if kind == 1:
+                            raw += struct.pack(">H", half(sample))
+                        else:
+                            raw += struct.pack(">f", sample)
+            if compression == 0:
+                data = bytes(raw)
+            else:
+                predicted = exr_predict(bytes(raw))
+                if compression == 1:
+                    data = rle(predicted)
+                else:
+                    data = zlib.compress(predicted, 6)
+            chunks.append((first, data))
+        data = exr_file(width, height, channels, compression, per_chunk, chunks)
+        out.append((name, data, float_digest(values)))
+    return out
+
+
+def rle(data: bytes) -> bytes:
+    out = bytearray()
+    at = 0
+    while at < len(data):
+        run = 1
+        while at + run < len(data) and run < 127 and data[at + run] == data[at]:
+            run += 1
+        if run >= 3:
+            out += bytes([256 - run, data[at]])
+            at += run
+        else:
+            start = at
+            fresh = 0
+            while at < len(data) and fresh < 127:
+                if at + 2 < len(data) and data[at + 1] == data[at] and data[at + 2] == data[at]:
+                    break
+                at += 1
+                fresh += 1
+            out += bytes([fresh - 1]) + data[start:at]
+    return bytes(out)
+
+
+# ---------------------------------------------------------------- DDS
+
+def dds_header(width, height, fourcc):
+    header = bytearray(b"DDS ")
+    header += struct.pack("<i", 124)
+    header += struct.pack("<i", 0x1007)
+    header += struct.pack("<ii", height, width)
+    header += struct.pack("<i", 0)
+    header += struct.pack("<i", 0)
+    header += struct.pack("<i", 0)
+    header += b"\x00" * 44
+    header += struct.pack("<i", 32)
+    header += struct.pack("<i", 4)
+    header += fourcc
+    header += struct.pack("<5i", 0, 0, 0, 0, 0)
+    header += struct.pack("<5i", 0x1000, 0, 0, 0, 0)
+    assert len(header) == 128, len(header)
+    return bytes(header)
+
+
+def dds_samples():
+    out = []
+    # BC1, four colours, every pixel the first endpoint.
+    first = ((255 >> 3) << 11) | ((0 >> 2) << 5) | (0 >> 3)
+    second = ((0 >> 3) << 11) | ((255 >> 2) << 5) | (0 >> 3)
+    block = struct.pack("<HHI", first, second, 0)
+    data = dds_header(4, 4, b"DXT1") + block
+    red = bytes([255, 0, 0, 255]) * 16
+    out.append(("bc1-red", data, moonbit.digest(red)))
+    # BC1, the same block with every pixel the second endpoint.
+    picks = 0
+    for i in range(16):
+        picks |= 1 << (i * 2)
+    data = dds_header(4, 4, b"DXT1") + struct.pack("<HHI", first, second, picks)
+    out.append(("bc1-green", data, moonbit.digest(bytes([0, 255, 0, 255]) * 16)))
+    # BC3: alpha from eight steps, colour from BC1.
+    alpha = bytes([255, 0]) + b"\x00" * 6
+    data = dds_header(4, 4, b"DXT5") + alpha + block
+    out.append(("bc3-red-opaque", data, moonbit.digest(red)))
+    # BC4: red only, two endpoints 255 and 0, every index the first of them.
+    packed = (0).to_bytes(6, "little")
+    data = dds_header(4, 4, b"ATI1") + bytes([255, 0]) + packed
+    out.append(("bc4-ramp", data, moonbit.digest(bytes([255, 255, 0, 255]) * 16)))
+    return out
+
+
+# ---------------------------------------------------------------- scaling
+
+def scale_cases():
+    source = picture(13, 9, alpha=False)
+    cases = []
+    for name, pil_filter, code in [
+        ("nearest", Image.Resampling.NEAREST, 0),
+        ("bilinear", Image.Resampling.BILINEAR, 1),
+        ("catmull-rom", Image.Resampling.BICUBIC, 2),
+        ("lanczos", Image.Resampling.LANCZOS, 4),
+    ]:
+        for width, height in [(7, 5), (26, 18), (13, 4)]:
+            if name == "bilinear" and (width < 13 or height < 9):
+                # Bilinear does not widen its footprint when shrinking, and
+                # Pillow does; the downscale comparison is the other filters'.
+                continue
+            scaled = source.resize((width, height), pil_filter)
+            cases.append(
+                (
+                    "%s-%dx%d" % (name, width, height),
+                    width,
+                    height,
+                    code,
+                    source.convert("RGBA").tobytes(),
+                    scaled.convert("RGBA").tobytes(),
+                )
+            )
+    return cases
+
+
+def blur_cases():
+    """Pillow's blur and the kernel itself, side by side.
+
+    Pillow approximates a Gaussian with three box blurs, which is fast and close
+    enough to look at; this library convolves with the kernel. So the case
+    carries both: the analytic result, computed here from the definition, is what
+    the library is held to, and Pillow's is what a reader can compare against
+    when asking why the two pictures are not identical.
+    """
+    source = picture(13, 9, alpha=False)
+    pixels = np.array(source).astype(float)
+    cases = []
+    for radius in (0.8, 1.5, 3.0):
+        blurred = source.filter(ImageFilter.GaussianBlur(radius))
+        cases.append(
+            (
+                "gaussian-%.1f" % radius,
+                radius,
+                source.convert("RGBA").tobytes(),
+                blurred.convert("RGBA").tobytes(),
+                gaussian_of(pixels, radius),
+            )
+        )
+    return cases
+
+
+def gaussian_of(pixels, radius):
+    """The definition, convolved along each axis with the kernel truncated at
+    three sigma and renormalised, edges read from the edge."""
+    reach = int(math.ceil(3.0 * radius))
+    weights = [math.exp(-(i - reach) ** 2 / (2.0 * radius * radius)) for i in range(reach * 2 + 1)]
+    total = sum(weights)
+    weights = [weight / total for weight in weights]
+    out = pixels
+    for axis in (1, 0):
+        shaped = np.zeros_like(out)
+        length = out.shape[axis]
+        for index in range(length):
+            acc = np.zeros(out.shape[:axis] + out.shape[axis + 1 :])
+            for offset, weight in enumerate(weights):
+                taken = min(max(index + offset - reach, 0), length - 1)
+                acc = acc + np.take(out, taken, axis=axis) * weight
+            sl = [slice(None)] * out.ndim
+            sl[axis] = index
+            shaped[tuple(sl)] = acc
+        out = shaped
+    out = np.clip(np.round(out), 0, 255).astype(np.uint8)
+    return b"".join(
+        bytes([int(red), int(green), int(blue), 255])
+        for red, green, blue in out.reshape(-1, 3)
+    )
+
+
+def main() -> None:
+    emit(
+        ROOT / "src" / "tiff" / "samples_test.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// TIFF files Pillow wrote, each with a digest of the pixels it reads back from
+// the same bytes. The pixel data inside them was compressed by libtiff, which is
+// the implementation every other one is measured against.""",
+        array_of_samples(tiff_samples()),
+    )
+    data, pages = tiff_pages()
+    body = [
+        "///|",
+        "let pages : Bytes = " + moonbit.literal(data),
+        "",
+        "///|",
+        "let page_digests : Array[String] = [",
+    ]
+    for page in pages:
+        body.append('  "%s",' % page)
+    body.append("]")
+    with open(ROOT / "src" / "tiff" / "samples_test.mbt", "a", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n" + "\n".join(body) + "\n")
+    emit(
+        ROOT / "src" / "ico" / "samples_test.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// Icons Pillow wrote as PNG-carrying entries, which is what everything writes
+// now, with the pixels it reads back from them.""",
+        array_of_samples(ico_samples()),
+    )
+    emit(
+        ROOT / "src" / "pnm" / "samples_test.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// The four portable shapes, in both spellings, with the pixels Pillow reads
+// back from the same bytes.""",
+        array_of_samples(pnm_samples()),
+    )
+    emit(
+        ROOT / "src" / "farbfeld" / "samples_test.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// A farbfeld built here, since nothing else writes one, with the digest of the
+// samples it was built from.""",
+        array_of_samples(farbfeld_samples()),
+    )
+    emit(
+        ROOT / "src" / "hdr" / "samples_test.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// A Radiance file built here with the run-length code, and the digest of the
+// floats each RGBE triplet stands for, computed from the formula rather than
+// from this library.""",
+        array_of_samples(hdr_samples()),
+    )
+    emit(
+        ROOT / "src" / "exr" / "samples_test.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// OpenEXR files built here in each compression the reader supports, with the
+// digest of the samples they were built from.""",
+        array_of_samples(exr_samples()),
+    )
+    emit(
+        ROOT / "src" / "dds" / "samples_test.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// DirectDraw surfaces built here, one block each, with the colours worked out by
+// hand from the endpoints in the block.""",
+        array_of_samples(dds_samples()),
+    )
+
+    cases = scale_cases()
+    body = ["///|", "let cases : Array[(String, Int32, Int32, Int32, Bytes, Bytes)] = ["]
+    for name, width, height, code, source, expected in cases:
+        body.append("  (")
+        body.append('    "%s",' % name)
+        body.append("    %d," % width)
+        body.append("    %d," % height)
+        body.append("    %d," % code)
+        body.append("    %s," % moonbit.literal(source))
+        body.append("    %s," % moonbit.literal(expected))
+        body.append("  ),")
+    body.append("]")
+    blur = blur_cases()
+    body += [
+        "",
+        "///|",
+        "let blur_cases : Array[(String, Double, Bytes, Bytes, Bytes)] = [",
+    ]
+    for name, radius, source, pillow, analytic in blur:
+        body.append("  (")
+        body.append('    "%s",' % name)
+        body.append("    %.2f," % radius)
+        body.append("    %s," % moonbit.literal(source))
+        body.append("    %s," % moonbit.literal(pillow))
+        body.append("    %s," % moonbit.literal(analytic))
+        body.append("  ),")
+    body.append("]")
+    emit(
+        ROOT / "src" / "raster" / "pillow_test.mbt",
+        """// Generated by scripts/fixtures/formats.py. Do not edit.
+//
+// The same picture resampled and blurred by Pillow, so that the filters here can
+// be measured against an implementation nobody in this repository wrote.""",
+        "\n".join(body),
+    )
+
+
+if __name__ == "__main__":
+    main()
