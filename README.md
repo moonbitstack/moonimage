@@ -109,8 +109,8 @@ reading its rows in the wrong order. A DDS is a block grid: four by four pixels
 become eight or sixteen bytes, and what those bytes hold is a format of its own —
 two endpoints and an index a pixel in BC1 to BC5, a mode number and a table of
 shapes in BC7, and half-precision light in BC6H. `decode` gives the picture in
-the layout the block is; `decode_as` gives the one a caller is drawing with,
-because a block layout is rarely a display layout.
+the layout the block is, and `decode` takes a format for the one a caller is
+drawing with, because a block layout is rarely a display layout.
 
 ## The image
 
@@ -330,7 +330,7 @@ untrusted files should pass `strict` or a tighter record of its own.
 
 | Call | What it does |
 |:--|:--|
-| `decode(bytes, limits?)` | read an image, whichever format the bytes are |
+| `decode(bytes, format?, limits?)` | read an image, whichever format the bytes are, in the layout asked for or the one the file holds |
 | `decode_animation(bytes, limits?)` | read every frame; a still image is one frame |
 | `encode(image, format)` | write an image, with that format's defaults |
 | `encode_animation(animation, format)` | write the frames, or the first one where the format has no animation |

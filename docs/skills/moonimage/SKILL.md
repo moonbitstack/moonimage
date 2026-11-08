@@ -142,8 +142,9 @@ test {
   `raise` on the function.
 - **A DDS decodes into the layout the block is**: BC4 grey, BC5 red and green,
   BC6H float, the rest RGBA. That is right for a texture you are about to sample,
-  and wrong for one you are about to draw; `@moonimage/dds.decode_as` gives the
-  layout you ask for, and costs nothing when the block already means it.
+  and wrong for one you are about to draw; pass `format=` to `decode` — or to
+  `decode_animation` — and it comes back in the layout you asked for, at no cost
+  when the file already holds it.
 - **Limits are checked before allocation**, not after. Pass
   `Limits::strict()` for uploads; the default allows a gigabyte of expansion.
 - **Grey in a bit map is inverted.** In PBM a set bit is black; every other

@@ -6,9 +6,9 @@ import {
 }
 
 // Values
-pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
+pub fn decode(BytesView, format? : @raster.PixelFormat, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
 
-pub fn decode_animation(BytesView, limits? : @raster.Limits) -> @raster.Animation raise @raster.Refused
+pub fn decode_animation(BytesView, format? : @raster.PixelFormat, limits? : @raster.Limits) -> @raster.Animation raise @raster.Refused
 
 pub fn encode(@raster.Image, @raster.Format) -> Bytes raise @raster.Refused
 

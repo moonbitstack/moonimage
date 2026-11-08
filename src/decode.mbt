@@ -33,14 +33,22 @@ pub using @raster {
 ///|
 /// The image in these bytes, whichever format they are.
 ///
+/// Without `format` the picture comes back in the layout the file itself holds,
+/// which is what a second decode or a comparison against the original wants.
+/// With it, the picture comes back in the layout a caller is drawing with: a
+/// canvas wants `Rgba8`, a GPU upload of a normal map wants `Rgb8`, and a block
+/// texture's own layout is neither. That is one conversion, and none at all when
+/// the file already holds the format asked for.
+///
 /// The limits default to `Limits::default()`; a caller reading untrusted files
 /// should pass `Limits::strict()` or a tighter record.
 pub fn decode(
   bytes : BytesView,
+  format? : @raster.PixelFormat,
   limits? : @raster.Limits,
 ) -> @raster.Image raise @raster.Refused {
   let limits = limits.unwrap_or(@raster.Limits::default())
-  match @raster.Format::of(bytes) {
+  let image = match @raster.Format::of(bytes) {
     Png => @png.decode(bytes, limits~)
     Qoi => @qoi.decode(bytes, limits~)
     Bmp => @bmp.decode(bytes, limits~)
@@ -57,6 +65,10 @@ pub fn decode(
     Farbfeld => @farbfeld.decode(bytes, limits~)
     Dds => @dds.decode(bytes, limits~)
   }
+  match format {
+    Some(target) => image.convert(target)
+    None => image
+  }
 }
 
 ///|
@@ -64,15 +76,17 @@ pub fn decode(
 ///
 /// A format that does not animate comes back as an animation of one frame over
 /// the whole canvas, so a caller that only draws animations does not need to
-/// branch. A TIFF comes back as one frame a page, and an icon as one frame a
+/// branch. `format` is applied to every frame, for the same reason it exists on
+/// `decode`: a canvas draws in one layout and a file may hold several. A TIFF comes back as one frame a page, and an icon as one frame a
 /// size, because both are a sequence of pictures that a caller walking a
 /// sequence wants to see.
 pub fn decode_animation(
   bytes : BytesView,
+  format? : @raster.PixelFormat,
   limits? : @raster.Limits,
 ) -> @raster.Animation raise @raster.Refused {
   let limits = limits.unwrap_or(@raster.Limits::default())
-  match @raster.Format::of(bytes) {
+  let animation = match @raster.Format::of(bytes) {
     Png => @png.decode_animation(bytes, limits~)
     Gif => @gif.decode_animation(bytes, limits~)
     Webp => @webp.decode_animation(bytes, limits~)
@@ -107,6 +121,17 @@ pub fn decode_animation(
         metadata=image.metadata,
       )
     }
+  }
+  match format {
+    Some(target) =>
+      {
+        ..animation,
+        frames: animation.frames.map(frame => {
+          ..frame,
+          image: frame.image.convert(target),
+        }),
+      }
+    None => animation
   }
 }
 

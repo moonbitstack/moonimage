@@ -135,28 +135,6 @@ pub fn decode(
 }
 
 ///|
-/// The picture in these bytes, in the layout the caller needs rather than the one
-/// the block is.
-///
-/// A block format says what a block holds, not what a picture is drawn with: BC4
-/// is one channel and BC5 is two, and a caller that is about to upload a texture
-/// or paint a canvas wants neither. This is that call.
-///
-/// The formats that mean RGBA already — BC1, BC2, BC3, BC7 — cost nothing here:
-/// the decode lands in the layout asked for and no second buffer is made. A BC4
-/// or a BC5 is widened, and a BC6H, which is light rather than colour, is scaled
-/// down to eight bits with the rest of the picture; those two are a decode
-/// followed by a conversion, so a caller that wants both the native sampling and
-/// the display one may prefer to call `decode` and convert the result itself.
-pub fn decode_as(
-  bytes : BytesView,
-  format : @raster.PixelFormat,
-  limits? : @raster.Limits,
-) -> @raster.Image raise @raster.Refused {
-  decode(bytes, limits?).convert(format)
-}
-
-///|
 /// The textures that are stored as plain samples, which is what a DDS of a
 /// mask or a height field usually is.
 fn decode_plain(

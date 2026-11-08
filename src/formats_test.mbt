@@ -69,6 +69,55 @@ test "each new format round trips through the entry point" {
 }
 
 ///|
+test "a decode can ask for the layout it is going to be drawn with" {
+  // The file holds what it holds; a canvas draws RGBA. This is the call that
+  // says so once, whichever format the bytes turned out to be.
+  let image = plate()
+  let file = @moonimage.encode(image, @moonimage.Format::Farbfeld) catch {
+    error => abort("the plate encodes: \{error}")
+  }
+  let native = @moonimage.decode(file) catch {
+    error => abort("the plate decodes: \{error}")
+  }
+  assert_eq(native.format, @moonimage.PixelFormat::Rgba16)
+  let asked = @moonimage.decode(file, format=@moonimage.PixelFormat::Rgba8) catch {
+    error => abort("the plate decodes: \{error}")
+  }
+  assert_eq(asked.format, @moonimage.PixelFormat::Rgba8)
+  // Sixteen bits a channel and back is exact for eight-bit samples, so the
+  // conversion is the only thing that happened.
+  assert_eq(asked.pixels, image.pixels)
+  // Asking for the layout the file already holds costs nothing: same picture.
+  let same = @moonimage.decode(file, format=@moonimage.PixelFormat::Rgba16) catch {
+    error => abort("the plate decodes: \{error}")
+  }
+  assert_eq(same.pixels, native.pixels)
+}
+
+///|
+test "an animation takes the layout for every frame at once" {
+  let image = plate()
+  let file = @moonimage.encode_animation(
+    @moonimage.Animation::new(image.width, image.height, [
+      @moonimage.Frame::new(image),
+    ]),
+    @moonimage.Format::Webp,
+  ) catch {
+    error => abort("the animation encodes: \{error}")
+  }
+  let animation = @moonimage.decode_animation(
+    file,
+    format=@moonimage.PixelFormat::Rgba8,
+  ) catch {
+    error => abort("the animation decodes: \{error}")
+  }
+  assert_true(animation.frames.length() > 0)
+  for frame in animation.frames {
+    assert_eq(frame.image.format, @moonimage.PixelFormat::Rgba8)
+  }
+}
+
+///|
 test "a read-only format is refused when it is asked to be written" {
   let refused = try {
     ignore(@moonimage.encode(plate(), @moonimage.Format::Dds))

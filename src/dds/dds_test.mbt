@@ -245,48 +245,35 @@ test "a DXGI format above BC7 is still refused by name" {
 }
 
 ///|
-test "a grey block and a block of light both reach RGBA in one call" {
-  // A block format says what a block holds, not what a caller has to work with.
-  // `decode` gives the layout the block is; `decode_as` gives the one asked for,
-  // and the difference between them is a call, not a branch at the call site.
-  let file = header(4, 4, b"ATI1") + b"\xff\x00" + le48(0)
-  let native = @dds.decode(file) catch {
+test "each block format comes back as what it holds" {
+  // A block format says what a block holds. A texture sampler wants exactly
+  // that, so this is what `decode` gives; a caller that is drawing with the
+  // picture asks the entry point for the layout it wants instead.
+  let grey = @dds.decode(header(4, 4, b"ATI1") + b"\xff\x00" + le48(0)) catch {
     error => abort("the texture decodes: \{error}")
   }
-  assert_eq(native.format, @raster.PixelFormat::Gray8)
-  let widened = @dds.decode_as(file, @raster.PixelFormat::Rgba8) catch {
-    error => abort("the texture decodes: \{error}")
-  }
-  assert_eq(widened.format, @raster.PixelFormat::Rgba8)
-  // One channel is three channels of the same value, and an alpha that does not
-  // make the pixel see-through.
-  assert_eq(widened.pixel(1, 2).rgba8(), (255, 255, 255, 255))
+  assert_eq(grey.format, @raster.PixelFormat::Gray8)
 
-  let light = header10(4, 4, 95) +
-    Bytes::from_array(FixedArray::make(16, b'\x00').clamped_view())
-  let native_light = @dds.decode(light) catch {
+  let normal = @dds.decode(
+    header(4, 4, b"ATI2") + b"\xff\x00" + le48(0) + b"\x00\xff" + le48(0),
+  ) catch {
     error => abort("the texture decodes: \{error}")
   }
-  assert_eq(native_light.format, @raster.PixelFormat::RgbaF32)
-  let toned = @dds.decode_as(light, @raster.PixelFormat::Rgba8) catch {
-    error => abort("the texture decodes: \{error}")
-  }
-  assert_eq(toned.pixel(2, 3).rgba8(), (0, 0, 0, 255))
-}
+  assert_eq(normal.format, @raster.PixelFormat::Rgb8)
 
-///|
-test "asking a colour block for the layout it already is costs nothing" {
-  // BC1 means RGBA, so `decode_as` is the decode: same picture, and no second
-  // buffer to make it in.
-  let file = header(4, 4, b"DXT1") +
-    le16(0xF800) +
-    le16(0x001F) +
-    le32(-1431655766)
-  let native = @dds.decode(file) catch {
+  let light = @dds.decode(
+    header10(4, 4, 95) +
+    Bytes::from_array(FixedArray::make(16, b'\x00').clamped_view()),
+  ) catch {
     error => abort("the texture decodes: \{error}")
   }
-  let asked = @dds.decode_as(file, @raster.PixelFormat::Rgba8) catch {
+  assert_eq(light.format, @raster.PixelFormat::RgbaF32)
+
+  let colour = @dds.decode(
+    header10(4, 4, 98) +
+    Bytes::from_array(FixedArray::make(16, b'\x08').clamped_view()),
+  ) catch {
     error => abort("the texture decodes: \{error}")
   }
-  assert_eq(asked.pixels, native.pixels)
+  assert_eq(colour.format, @raster.PixelFormat::Rgba8)
 }

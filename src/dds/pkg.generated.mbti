@@ -9,8 +9,6 @@ import {
 // Values
 pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
 
-pub fn decode_as(BytesView, @raster.PixelFormat, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
-
 // Errors
 
 // Types and methods
