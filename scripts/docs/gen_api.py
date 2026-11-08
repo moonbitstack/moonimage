@@ -27,13 +27,20 @@ OUT = ROOT / "docs" / "api.html"
 # formats by name. `anchor` is what the other pages link to.
 PACKAGES = [
     ("moonimage", "Every format, one door", "Format detection, decoding, encoding and animation, all of it delegating to the packages below."),
-    ("raster", "Pictures and pixels", "The picture itself: layouts, conversion, geometry, scaling, animation frames, metadata, limits and the one error type."),
+    ("raster", "Pictures and pixels", "The picture itself: layouts, conversion, geometry, turning, scaling, blurring, sharpening, colour adjustments, compositing, animation frames, metadata, limits and the one error type."),
     ("bmp", "Windows bitmap", "Every header version, one to thirty-two bits a pixel, the two run-length encodings and both row orders."),
+    ("dds", "DirectDraw surface", "Block-compressed textures from BC1 to BC5, read a block at a time."),
+    ("exr", "OpenEXR", "Scanline pictures in half or float samples, uncompressed or under RLE, ZIPS or ZIP, with the half-precision conversion the format turns on."),
+    ("farbfeld", "farbfeld", "A signature, two sizes and the samples: the simplest format there is."),
+    ("hdr", "Radiance HDR", "RGBE samples that are not clamped to a display, with the format's own run-length code and all four origins."),
+    ("ico", "Windows icons and cursors", "One picture at several sizes, as PNG entries or as bitmaps with their one-bit mask."),
     ("gif", "GIF", "Palettes, transparency, interlacing, the LZW stream, and animation with its disposal rules."),
     ("jpeg", "JPEG", "Baseline and progressive files, every subsampling, restart markers, and EXIF orientation."),
     ("png", "PNG", "Every colour type and bit depth, Adam7, the five filters, text and colour chunks, and APNG."),
+    ("pnm", "The portable anymap", "PBM, PGM, PPM and PAM, in both spellings, at any maximum the format allows."),
     ("qoi", "Quite OK Image", "Six opcodes and a run-length code: the smallest complete codec in the package."),
     ("tga", "Truevision TGA", "Paletted, true colour and grey, optional run-length, and both row orders."),
+    ("tiff", "TIFF", "Strips in LZW, PackBits, deflate or nothing, every photometric a picture is stored with, and as many pages as the file has."),
     ("webp", "WebP", "Lossless and lossy pictures, the alpha chunk that travels beside a lossy one, and animation."),
 ]
 
@@ -439,6 +446,7 @@ def main():
   <nav>
     <a class="brand" href="index.html"><b>moonimage</b><span>image codecs</span></a>
     <a class="link" href="guide.html">Guide</a>
+    <a class="link" href="showcase.html">Workbench</a>
     <a class="link" href="api.html" aria-current="page">API</a>
     <a class="icon-link" href="https://github.com/moonbitstack/moonimage" aria-label="The repository" title="github.com/moonbitstack/moonimage">
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
@@ -473,6 +481,7 @@ def main():
     <span class="mark">moonimage</span>
     <a href="index.html">Home</a>
     <a href="guide.html">Guide</a>
+    <a href="showcase.html">Workbench</a>
     <a href="https://github.com/moonbitstack/moonimage">Repository</a>
     <a href="https://mooncakes.io/docs/#/moonbitstack/moonimage/">mooncakes</a>
     <span>Apache-2.0</span>

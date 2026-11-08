@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+
+<title>moonimage — the workbench</title>
+<meta name="description" content="Every format this library writes, and every operation it can perform, run in the browser on one picture.">
+<script>
+  (() => {
+    let stored = null;
+    try {
+      stored = localStorage.getItem("moonimage-theme");
+    } catch {}
+    const theme = stored === "light" || stored === "dark"
+      ? stored
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.dataset.theme = theme;
+  })();
+</script>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <nav>
+    <a class="brand" href="index.html"><b>moonimage</b><span>image codecs</span></a>
+    <a class="link" href="guide.html">Guide</a>
+    <a class="link" href="showcase.html" aria-current="page">Workbench</a>
+    <a class="link" href="api.html">API</a>
+    <a class="icon-link" href="https://github.com/moonbitstack/moonimage" aria-label="The repository" title="github.com/moonbitstack/moonimage">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+    </a>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">The workbench</p>
+        <h1>Thirteen formats, one picture.</h1>
+        <p class="lede">
+          The plate is read once, then written in every format this library can
+          write and read straight back. Below it, the arithmetic: crop, turn,
+          scale, blur, sharpen, brighten, turn the hue. Every number and every
+          pixel on this page came out of the library compiled to JavaScript.
+        </p>
+        <p class="actions">
+          <a class="button" href="#formats">Formats</a>
+          <a class="button ghost" href="#arithmetic">The arithmetic</a>
+        </p>
+      </div>
+
+      <figure class="frame">
+        <span class="corner" aria-hidden="true"></span>
+        <img src="plate.png" width="1200" height="800" alt="A lens test plate: a Siemens star, a colour strip, a sixteen-step grey wedge and four rulings, printed on warm paper.">
+        <figcaption><span>Test plate 07</span><span>1200 × 800</span></figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <section class="band" id="formats">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>Written back, format by format</h2>
+        <p>encoded, decoded, and compared with the pixels that went in</p>
+      </div>
+
+      <div class="workbench">
+        <div class="panel">
+          <h3>Round trip</h3>
+          <table class="formats" id="roundtrip">
+            <thead>
+              <tr><th>Format</th><th>Bytes</th><th>Reads back as</th><th>Pixels</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4">reading the plate…</td></tr>
+            </tbody>
+          </table>
+          <p class="note" id="roundtrip-note">
+            <em>Exact</em> means every sample came back identical. <em>Within a
+            step</em> means the format stores the colour at a coarser resolution
+            than eight bits — Radiance shares one exponent between three
+            mantissas, OpenEXR rounds to a half — and <em>lossy</em> means it
+            threw colours away on purpose.
+          </p>
+        </div>
+
+        <div class="stage" aria-live="polite">
+          <canvas id="plate-canvas" width="1200" height="800"></canvas>
+          <div class="readout">
+            <span>format <b id="r-format">—</b></span>
+            <span>size <b id="r-size">—</b></span>
+            <span>layout <b id="r-layout">—</b></span>
+            <span>bytes <b id="r-bytes">—</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="arithmetic">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>The arithmetic</h2>
+        <p>each button runs one operation on the plate, in this tab</p>
+      </div>
+
+      <div class="workbench">
+        <div class="stage" aria-live="polite">
+          <canvas id="op-canvas" width="1200" height="800"></canvas>
+          <div class="readout">
+            <span>operation <b id="o-name">—</b></span>
+            <span>size <b id="o-size">—</b></span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Geometry</h3>
+          <p class="chips" id="geometry">
+            <button class="chip" data-op="flip-horizontal">Mirror across</button>
+            <button class="chip" data-op="flip-vertical">Mirror down</button>
+            <button class="chip" data-op="rotate-quarter">Quarter turn</button>
+            <button class="chip" data-op="rotate-half">Half turn</button>
+            <button class="chip" data-op="crop" data-amount="0.6">Crop to 60%</button>
+            <button class="chip" data-op="scale" data-amount="0.5">Scale to half</button>
+          </p>
+
+          <h3>Filters</h3>
+          <p class="chips" id="filters">
+            <button class="chip" data-op="blur" data-amount="2">Blur, radius 2</button>
+            <button class="chip" data-op="unsharp" data-amount="1.5">Sharpen</button>
+          </p>
+
+          <h3>Colour</h3>
+          <p class="chips" id="colour">
+            <button class="chip" data-op="brightness" data-amount="0.7">Dim</button>
+            <button class="chip" data-op="contrast" data-amount="1.6">More contrast</button>
+            <button class="chip" data-op="hue" data-amount="120">Turn the hue</button>
+            <button class="chip" data-op="invert">Invert</button>
+            <button class="chip" data-op="grey">Grey</button>
+          </p>
+
+          <h3>An angle that is not a right one</h3>
+          <p class="slider">
+            <label for="angle">Degrees</label>
+            <input id="angle" type="range" min="-180" max="180" value="7" step="1">
+            <output id="angle-out">7°</output>
+          </p>
+          <p class="note">
+            A quarter turn is a permutation and costs nothing; any other angle
+            resamples, because the source of an output pixel almost never lands on
+            a sample. The canvas grows to hold what comes out.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <span class="mark">moonimage</span>
+    <a href="index.html">Home</a>
+    <a href="guide.html">Guide</a>
+    <a href="api.html">API</a>
+    <a href="https://github.com/moonbitstack/moonimage">Repository</a>
+    <a href="https://mooncakes.io/docs/#/moonbitstack/moonimage/">mooncakes</a>
+    <span>Apache-2.0</span>
+  </div>
+</footer>
+
+<script src="demo.js" defer></script>
+<script src="showcase.js" defer></script>
+<script src="theme.js" defer></script>
+</body>
+</html>

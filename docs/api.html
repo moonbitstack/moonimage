@@ -32,6 +32,7 @@
   <nav>
     <a class="brand" href="index.html"><b>moonimage</b><span>image codecs</span></a>
     <a class="link" href="guide.html">Guide</a>
+    <a class="link" href="showcase.html">Workbench</a>
     <a class="link" href="api.html" aria-current="page">API</a>
     <a class="icon-link" href="https://github.com/moonbitstack/moonimage" aria-label="The repository" title="github.com/moonbitstack/moonimage">
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
@@ -53,13 +54,20 @@
   <div class="api">
     <nav aria-label="Packages">
         <a href="#moonimage" title="Every format, one door">moonimage<span>4</span></a>
-        <a href="#raster" title="Pictures and pixels">raster<span>59</span></a>
+        <a href="#raster" title="Pictures and pixels">raster<span>75</span></a>
         <a href="#bmp" title="Windows bitmap">bmp<span>5</span></a>
+        <a href="#dds" title="DirectDraw surface">dds<span>2</span></a>
+        <a href="#exr" title="OpenEXR">exr<span>9</span></a>
+        <a href="#farbfeld" title="farbfeld">farbfeld<span>2</span></a>
+        <a href="#hdr" title="Radiance HDR">hdr<span>2</span></a>
+        <a href="#ico" title="Windows icons and cursors">ico<span>9</span></a>
         <a href="#gif" title="GIF">gif<span>6</span></a>
         <a href="#jpeg" title="JPEG">jpeg<span>10</span></a>
         <a href="#png" title="PNG">png<span>9</span></a>
+        <a href="#pnm" title="The portable anymap">pnm<span>6</span></a>
         <a href="#qoi" title="Quite OK Image">qoi<span>2</span></a>
         <a href="#tga" title="Truevision TGA">tga<span>5</span></a>
+        <a href="#tiff" title="TIFF">tiff<span>11</span></a>
         <a href="#webp" title="WebP">webp<span>9</span></a>
     </nav>
     <div>
@@ -78,13 +86,14 @@
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> decode_animation(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Animation raise @raster.Refused</code>
         <div class="doc"><p>Every frame in these bytes, whichever format they are.</p>
-<p>A format that does not animate comes back as an animation of one frame over the whole canvas, so a caller that only draws animations does not need to branch.</p></div>
+<p>A format that does not animate comes back as an animation of one frame over the whole canvas, so a caller that only draws animations does not need to branch. A TIFF comes back as one frame a page, and an icon as one frame a size, because both are a sequence of pictures that a caller walking a sequence wants to see.</p></div>
       </div>
       <div class="entry">
         <span class="kind">function</span>
-        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, format : @raster.Format) -&gt; Bytes</code>
+        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, format : @raster.Format) -&gt; Bytes raise @raster.Refused</code>
         <div class="doc"><p>The image as bytes of the named format, with that format's defaults.</p>
-<p>A caller that wants to choose how it is written calls the format's own package, which takes its options record.</p></div>
+<p>A caller that wants to choose how it is written calls the format's own package, which takes its options record.</p>
+<p><code>Dds</code> is refused: a block-compressed texture is a picture whose blocks were chosen by a search, and this library reads them rather than guessing them.</p></div>
       </div>
       <div class="entry">
         <span class="kind">function</span>
@@ -95,7 +104,7 @@
     </section>
     <section class="pkg" id="raster">
       <h2>raster <span>Pictures and pixels</span></h2>
-      <p>The picture itself: layouts, conversion, geometry, scaling, animation frames, metadata, limits and the one error type.</p>
+      <p>The picture itself: layouts, conversion, geometry, turning, scaling, blurring, sharpening, colour adjustments, compositing, animation frames, metadata, limits and the one error type.</p>
       <div class="entry">
         <span class="kind">struct</span>
         <code class="sig"><span class="kw">pub(all) struct</span> Animation</code>
@@ -170,10 +179,23 @@ animation without a repeat count means in all three formats.</em></li>
           <li>Jpeg <em>JPEG, baseline and progressive.</em></li>
           <li>Gif <em>GIF, with animation.</em></li>
           <li>Webp <em>WebP, lossless, lossy and animated.</em></li>
+          <li>Tiff <em>TIFF, with pages.</em></li>
+          <li>Ico <em>Windows icon, which holds the same picture at several sizes.</em></li>
+          <li>Cur <em>Windows cursor, which is an icon with a hot spot.</em></li>
+          <li>Pnm <em>The portable anymap family: PBM, PGM, PPM and PAM.</em></li>
+          <li>Hdr <em>Radiance HDR, whose samples are a shared exponent and three mantissas.</em></li>
+          <li>Exr <em>OpenEXR, for pictures that are not yet clamped to a display.</em></li>
+          <li>Farbfeld <em>Farbfeld: a header and the samples, and nothing else.</em></li>
+          <li>Dds <em>DirectDraw surface, read for the block-compressed pictures it carries.</em></li>
         </ul>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Format::extension(self : Format) -&gt; String</code>
           <div class="doc"><p>The extension a file of this format usually has, without the dot.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Format::is_animated(self : Format) -&gt; Bool</code>
+          <div class="doc"><p>Whether the format can hold more than one picture.</p>
+<p>An animated format holds frames over one canvas; TIFF holds pages that are each a picture of its own. Both come out of <code>decode_animation</code>, because a caller walking pictures does not care which of the two it was handed.</p></div>
         </div>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Format::mime(self : Format) -&gt; String</code>
@@ -229,6 +251,27 @@ the last row is tight.</em></li>
           <li><b>metadata</b><span>Metadata</span> <em>What the file said about itself.</em></li>
         </ul>
         <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::blur(self : Image, radius : Double) -&gt; Image</code>
+          <div class="doc"><p>The image blurred with a Gaussian of standard deviation <code>radius</code>.</p>
+<p>A radius of zero or less is the image itself, so a caller that computes the radius from a size does not have to check for the case.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::brightness(self : Image, factor : Double) -&gt; Image</code>
+          <div class="doc"><p>The image with every colour channel multiplied by <code>factor</code>.</p>
+<p>One is unchanged, zero is black, and two doubles: this is the linear part of exposure, done on the encoded samples rather than on light, which is what a brightness slider in an editor does.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::composite(self : Image, source : Image, x? : Int32, y? : Int32, opacity? : Double) -&gt; Image</code>
+          <div class="doc"><p>This image with <code>source</code> laid over it, its top-left corner at (<code>x</code>, <code>y</code>).</p>
+<p>A source larger than the destination is clipped rather than refused: a watermark is usually placed by a corner rule, and a corner rule that lands one pixel outside is not an error.</p>
+<p><code>opacity</code> scales the source's alpha before it is laid down, which is how a watermark is made faint without being re-encoded.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::contrast(self : Image, factor : Double) -&gt; Image</code>
+          <div class="doc"><p>The image with its contrast scaled about mid-grey.</p>
+<p>One is unchanged, zero is flat grey, and above one pushes the samples away from the middle: <code>(sample − 0.5) × factor + 0.5</code>, clamped.</p></div>
+        </div>
+        <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Image::convert(self : Image, format : PixelFormat) -&gt; Image</code>
           <div class="doc"><p>The same image, in another sample format.</p>
 <p>Colour is preserved as far as the target can hold it: a grey image becomes grey, an image without alpha becomes opaque, and narrowing rounds to nearest.</p></div>
@@ -247,6 +290,16 @@ the last row is tight.</em></li>
           <div class="doc"><p>The image reflected top to bottom.</p></div>
         </div>
         <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::hue_rotate(self : Image, degrees : Double) -&gt; Image</code>
+          <div class="doc"><p>The image with every hue turned by <code>degrees</code>, clockwise.</p>
+<p>Saturation and lightness survive, which is what makes this different from swapping channels; a grey pixel has no hue and comes back as it was.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::invert(self : Image) -&gt; Image</code>
+          <div class="doc"><p>The image with every sample replaced by one minus itself.</p>
+<p>Alpha is left alone, so inverting a transparent picture keeps it transparent.</p></div>
+        </div>
+        <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Image::new(width : Int32, height : Int32, format : PixelFormat, stride? : Int32, premultiplied? : Bool, metadata? : Metadata) -&gt; Image</code>
           <div class="doc"><p>A black image of this shape, with tight rows.</p>
 <p><code>stride</code> is only needed when the rows must be padded; leave it out and the rows are as wide as the pixels.</p></div>
@@ -257,6 +310,11 @@ the last row is tight.</em></li>
 <p>Raises when the bytes cannot hold the shape: a stride narrower than a row, or fewer bytes than the last row needs.</p></div>
         </div>
         <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::orient(self : Image, code : Int32) -&gt; Image raise Refused</code>
+          <div class="doc"><p>The image turned the way EXIF orientation <code>code</code> says.</p>
+<p>One is the picture as stored and comes back unchanged. A number outside one to eight is refused rather than guessed at: a caller that got the tag wrong wants to hear about it.</p></div>
+        </div>
+        <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Image::pixel(self : Image, x : Int32, y : Int32) -&gt; Pixel raise Refused</code>
           <div class="doc"><p>The pixel at a coordinate, in the units every operation works in.</p>
 <p>Straight alpha, as stored: an image that says it is premultiplied returns premultiplied samples, because pretending otherwise would be a conversion the caller did not ask for.</p></div>
@@ -265,6 +323,12 @@ the last row is tight.</em></li>
           <code class="sig"><span class="kw">pub fn</span> Image::rotate(self : Image, quarters? : Int32) -&gt; Image</code>
           <div class="doc"><p>The image turned a quarter turn clockwise, <code>quarters</code> times.</p>
 <p>Negative counts turn anticlockwise, and anything beyond four wraps: this is a total function because a rotation is.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::rotate_by(self : Image, degrees : Double, expand? : Bool) -&gt; Image raise Refused</code>
+          <div class="doc"><p>The image turned clockwise by <code>degrees</code>.</p>
+<p><code>expand</code> grows the canvas to the rectangle the turned picture needs, which is what a caller rotating a photograph wants; without it the picture is turned inside the canvas it already had, and the corners are cut off, which is what a caller animating a rotation wants.</p>
+<p>A multiple of ninety degrees is exact and is handed to <code>rotate</code>; nothing is resampled and no sample changes.</p></div>
         </div>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Image::row(self : Image, y : Int32) -&gt; BytesView raise Refused</code>
@@ -284,6 +348,16 @@ the last row is tight.</em></li>
           <code class="sig"><span class="kw">pub fn</span> Image::to_straight(self : Image) -&gt; Image</code>
           <div class="doc"><p>The same image with alpha divided back out.</p>
 <p>The inverse of <code>to_premultiplied</code> up to rounding, which is why a round trip is only exact for images whose colour is already premultiplied.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::unsharp_mask(self : Image, radius? : Double, amount? : Double, threshold? : Int32) -&gt; Image</code>
+          <div class="doc"><p>The image sharpened by subtracting a blurred copy of itself.</p>
+<p><code>amount</code> is a percentage, a hundred being the difference added once: an edge that the blur softened is pushed back out by the same distance it lost. <code>threshold</code> is how much of a difference, in eight-bit steps, is worth sharpening at all, so that the grain of a photograph is not sharpened into noise. Sharpen with radius 1, amount 150 and threshold 3 is the usual starting point.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Image::upright(self : Image, code : Int32?) -&gt; Image raise Refused</code>
+          <div class="doc"><p>The image the right way up, given the orientation tag a file carried.</p>
+<p><code>None</code> is a file that said nothing, which is the same as saying one: a picture without a tag is a picture as stored.</p></div>
         </div>
       </div>
       <div class="entry">
@@ -373,6 +447,11 @@ means what sRGB means.</em></li>
           <li><b>a</b><span>Double</span></li>
         </ul>
         <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Pixel::of_color(color : @moonrgba.Color) -&gt; Pixel</code>
+          <div class="doc"><p>The colour as a pixel, converted to sRGB first.</p>
+<p>A colour outside sRGB is brought into it rather than clipped in whatever space it arrived in, and the conversion keeps the alpha it was given.</p></div>
+        </div>
+        <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Pixel::of_rgba8(r : Int32, g : Int32, b : Int32, a? : Int32) -&gt; Pixel</code>
           <div class="doc"><p>A pixel from the eight-bit values an editor shows.</p></div>
         </div>
@@ -383,6 +462,15 @@ means what sRGB means.</em></li>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Pixel::rgba8(self : Pixel) -&gt; (Int32, Int32, Int32, Int32)</code>
           <div class="doc"><p>The pixel as bytes an editor shows: rounded, clamped, alpha last.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Pixel::rotate_hue(self : Pixel, degrees : Double) -&gt; Pixel</code>
+          <div class="doc"><p>The pixel with its hue turned, in degrees.</p>
+<p>Done in HSL so that the hue is what moves: lightness and saturation come out as they went in, which is not true of a hue rotation done by mixing channel matrices. A grey pixel has no hue to turn and comes back unchanged.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Pixel::to_color(self : Pixel) -&gt; @moonrgba.Color</code>
+          <div class="doc"><p>The pixel as a colour in sRGB, alpha included.</p></div>
         </div>
       </div>
       <div class="entry">
@@ -452,7 +540,13 @@ means what sRGB means.</em></li>
         <div class="doc"><p>How a scaler decides what an unknown pixel is worth.</p></div>
         <ul class="variants">
           <li>Nearest <em>The nearest pixel, and nothing else: no new colours.</em></li>
-          <li>Bilinear <em>A weighted average of the four nearest, weights linear in distance.</em></li>
+          <li>Bilinear <em>A weighted average of the two nearest, weights linear in distance.</em></li>
+          <li>CatmullRom <em>A weighted average of the four nearest per axis, weights from the cubic
+with a = −0.5, which is the one that interpolates and does not overshoot
+much.</em></li>
+          <li>Gaussian <em>A weighted average around the point, weights from a Gaussian with
+σ = 0.5 truncated at three sigma. No ringing at all, at the cost of a
+softer edge than the cubic or the windowed sinc.</em></li>
           <li>Lanczos <em>A weighted average of the six nearest per axis, weights from the Lanczos
 window with a = 3.</em></li>
         </ul>
@@ -478,8 +572,19 @@ window with a = 3.</em></li>
       <div class="group"><span class="kind">functions</span></div>
       <div class="entry">
         <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> float_at(data : BytesView, offset : Int32) -&gt; Float</code>
+        <div class="doc"><p>A little-endian float, the layout a GPU buffer wants.</p>
+<p>Public because a format whose samples are not held to nought and one — an exposure, a depth — builds its image from these bytes directly, and the float in them is a value rather than a colour.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> hex(bytes : BytesView, at : Int32, count : Int32) -&gt; String</code>
         <div class="doc"><p>A few bytes as hexadecimal, for the <code>got</code> field of a refusal.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> put_float(data : FixedArray[Byte], offset : Int32, value : Float) -&gt; Unit</code>
+        <div class="doc"><p>Store a little-endian float, the inverse of <code>float_at</code>.</p></div>
       </div>
     </section>
     <section class="pkg" id="bmp">
@@ -519,6 +624,190 @@ negative height. Windows writes bottom first, which is the default.</em></li>
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, options? : EncodeOptions) -&gt; Bytes</code>
         <div class="doc"><p>The image as a BMP file.</p></div>
+      </div>
+    </section>
+    <section class="pkg" id="dds">
+      <h2>dds <span>DirectDraw surface</span></h2>
+      <p>Block-compressed textures from BC1 to BC5, read a block at a time.</p>
+      <div class="entry">
+        <span class="kind">enum</span>
+        <code class="sig"><span class="kw">pub(all) enum</span> Block</code>
+        <div class="doc"><p>Which block format a texture is in.</p></div>
+        <ul class="variants">
+          <li>Bc1 <em>BC1: two colours and two thirds of the way between them, with a
+transparent entry in the three-colour form.</em></li>
+          <li>Bc1Opaque <em>BC1 with alpha treated as opaque, which is how a normal map is stored.</em></li>
+          <li>Bc2 <em>BC2: four bits of alpha a pixel, then a BC1 colour block.</em></li>
+          <li>Bc3 <em>BC3: interpolated alpha, then a BC1 colour block.</em></li>
+          <li>Bc4 <em>BC4: one channel, interpolated from two endpoints.</em></li>
+          <li>Bc5 <em>BC5: two channels, each a BC4 block.</em></li>
+        </ul>
+      </div>
+      <div class="group"><span class="kind">functions</span></div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The picture in these bytes.</p>
+<p>A texture usually carries a chain of mipmaps after the first surface; this reads the first, which is the only one a caller that wants "the picture" means.</p></div>
+      </div>
+    </section>
+    <section class="pkg" id="exr">
+      <h2>exr <span>OpenEXR</span></h2>
+      <p>Scanline pictures in half or float samples, uncompressed or under RLE, ZIPS or ZIP, with the half-precision conversion the format turns on.</p>
+      <div class="entry">
+        <span class="kind">enum</span>
+        <code class="sig"><span class="kw">pub(all) enum</span> Compression</code>
+        <div class="doc"><p>How a chunk of scanlines was packed.</p></div>
+        <ul class="variants">
+          <li>None <em>As they are.</em></li>
+          <li>Rle <em>A byte-oriented run-length code.</em></li>
+          <li>Zips <em>Deflate, one scanline to a chunk.</em></li>
+          <li>Zip <em>Deflate, sixteen scanlines to a chunk.</em></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Compression::code(self : Compression) -&gt; Int32</code>
+          <div class="doc"><p>The number a file writes for this compression.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Compression::of(code : Int32) -&gt; Compression?</code>
+          <div class="doc"><p>The compression a number stands for, or <code>None</code> for one this library does not read.</p></div>
+        </div>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> EncodeOptions</code>
+        <div class="doc"><p>How to write the file.</p></div>
+        <ul class="fields">
+          <li><b>compression</b><span>Compression</span> <em>The compression to use.</em></li>
+          <li><b>half</b><span>Bool</span> <em>Whether the samples are halves rather than floats. A half is what a
+picture of light is usually stored as: eleven bits of mantissa is more
+than a display has, and half the bytes.</em></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> EncodeOptions::default() -&gt; EncodeOptions</code>
+          <div class="doc"><p>ZIP, halves: sixteen scanlines to a chunk, and half the size.</p></div>
+        </div>
+      </div>
+      <div class="group"><span class="kind">functions</span></div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The image in these bytes.</p>
+<p>Every channel of the file is read; the result is an <code>RgbaF32</code> image, with the channels that were not there filled in — grey becomes equal parts red, green and blue, and a missing alpha becomes one.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, options? : EncodeOptions) -&gt; Bytes</code>
+        <div class="doc"><p>The image as OpenEXR bytes.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> float_to_half(value : Float) -&gt; Int32</code>
+        <div class="doc"><p>A float as a half-precision sample, rounded to nearest.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> half_to_float(bits : Int32) -&gt; Float</code>
+        <div class="doc"><p>A half-precision sample as a float.</p></div>
+      </div>
+    </section>
+    <section class="pkg" id="farbfeld">
+      <h2>farbfeld <span>farbfeld</span></h2>
+      <p>A signature, two sizes and the samples: the simplest format there is.</p>
+      <div class="group"><span class="kind">functions</span></div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The image in these bytes.</p>
+<p>The format has no metadata, no animation and no options, so there is nothing to configure and nothing to refuse beyond a header that is not one and a file that stops in the middle of the samples.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image) -&gt; Bytes</code>
+        <div class="doc"><p>The image as farbfeld bytes.</p>
+<p>Sixteen bits per channel whatever the image was: an eight-bit picture widens, and the widening is exact, so a round trip through farbfeld is the identity for every picture the library can write.</p></div>
+      </div>
+    </section>
+    <section class="pkg" id="hdr">
+      <h2>hdr <span>Radiance HDR</span></h2>
+      <p>RGBE samples that are not clamped to a display, with the format&#x27;s own run-length code and all four origins.</p>
+      <div class="group"><span class="kind">functions</span></div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The image in these bytes.</p>
+<p>The result is <code>RgbaF32</code>, with alpha one: the format carries no transparency.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image) -&gt; Bytes</code>
+        <div class="doc"><p>The image as Radiance HDR bytes.</p>
+<p>The picture is converted to floats first, so an eight-bit source keeps its values exactly and a float source keeps its range.</p></div>
+      </div>
+    </section>
+    <section class="pkg" id="ico">
+      <h2>ico <span>Windows icons and cursors</span></h2>
+      <p>One picture at several sizes, as PNG entries or as bitmaps with their one-bit mask.</p>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> EncodeOptions</code>
+        <div class="doc"><p>How to write the file.</p></div>
+        <ul class="fields">
+          <li><b>kind</b><span>Kind</span> <em>Icons or cursors.</em></li>
+          <li><b>sizes</b><span>Array[Int32]</span> <em>The sizes to store, in pixels. Empty means the image's own size.</em></li>
+          <li><b>hot_x</b><span>Int32</span> <em>Where the pointer points, for a cursor.</em></li>
+          <li><b>hot_y</b><span>Int32</span> <em>Where the pointer points, for a cursor.</em></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> EncodeOptions::cursor(hot_x : Int32, hot_y : Int32) -&gt; EncodeOptions</code>
+          <div class="doc"><p>The same, for a cursor, with the hot spot the caller names.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> EncodeOptions::default() -&gt; EncodeOptions</code>
+          <div class="doc"><p>One entry at the image's own size, as an icon.</p></div>
+        </div>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Entry</code>
+        <div class="doc"><p>One picture of an icon, and where the pointer sits on it when it is a cursor.</p></div>
+        <ul class="fields">
+          <li><b>image</b><span>@raster.Image</span> <em>The picture.</em></li>
+          <li><b>hot_x</b><span>Int32</span> <em>The column the pointer points at. Zero for an icon.</em></li>
+          <li><b>hot_y</b><span>Int32</span> <em>The row the pointer points at. Zero for an icon.</em></li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="kind">enum</span>
+        <code class="sig"><span class="kw">pub(all) enum</span> Kind</code>
+        <div class="doc"><p>Whether this file holds icons or cursors.</p></div>
+        <ul class="variants">
+          <li>Icon <em>An icon.</em></li>
+          <li>Cursor <em>A cursor, which is an icon with a hot spot.</em></li>
+        </ul>
+      </div>
+      <div class="group"><span class="kind">functions</span></div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The largest picture in the file, which is the one a caller that asked for "the icon" meant.</p>
+<p>The largest is chosen by area rather than by order, because the directory is allowed to be in any order and usually is.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode_all(bytes : BytesView, limits? : @raster.Limits) -&gt; Array[Entry] raise @raster.Refused</code>
+        <div class="doc"><p>Every picture in the file, in the order the directory lists them.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, options? : EncodeOptions) -&gt; Bytes</code>
+        <div class="doc"><p>The image as an icon or a cursor.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode_entries(entries : Array[Entry], kind : Kind, sizes : Array[Int32]) -&gt; Bytes</code>
+        <div class="doc"><p>Several pictures in one file, at whatever sizes the caller names.</p>
+<p>The sizes are applied to every entry, so a caller handing in a sixteen-pixel picture and a two-hundred-and-fifty-six-pixel one gets both again at every size it asked for rather than a file full of duplicates — a caller that wants exactly what it handed in leaves the list empty.</p></div>
       </div>
     </section>
     <section class="pkg" id="gif">
@@ -703,6 +992,51 @@ the difference between a sprite and a photograph in one flag.</em></li>
         <div class="doc"><p>The animation as an APNG.</p></div>
       </div>
     </section>
+    <section class="pkg" id="pnm">
+      <h2>pnm <span>The portable anymap</span></h2>
+      <p>PBM, PGM, PPM and PAM, in both spellings, at any maximum the format allows.</p>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> EncodeOptions</code>
+        <div class="doc"><p>How to write the file.</p></div>
+        <ul class="fields">
+          <li><b>kind</b><span>Kind</span> <em>Which of the four shapes.</em></li>
+          <li><b>maxval</b><span>Int32</span> <em>The largest sample, one to 65535.</em></li>
+          <li><b>ascii</b><span>Bool</span> <em>Whether the samples are decimal digits rather than bytes. PAM has no
+digits, so <code>Any</code> ignores this.</em></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> EncodeOptions::compact() -&gt; EncodeOptions</code>
+          <div class="doc"><p>The plainest file the picture allows: a bit map where one bit is enough.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> EncodeOptions::default() -&gt; EncodeOptions</code>
+          <div class="doc"><p>The shape the image asks for, at the full range of its layout.</p></div>
+        </div>
+      </div>
+      <div class="entry">
+        <span class="kind">enum</span>
+        <code class="sig"><span class="kw">pub(all) enum</span> Kind</code>
+        <div class="doc"><p>Which of the family to write.</p></div>
+        <ul class="variants">
+          <li>Bitmap <em>PBM: one bit per pixel, and no greys at all.</em></li>
+          <li>Gray <em>PGM: one sample per pixel.</em></li>
+          <li>Rgb <em>PPM: three samples per pixel.</em></li>
+          <li>Any <em>PAM: a header, then one to four samples, so alpha survives.</em></li>
+        </ul>
+      </div>
+      <div class="group"><span class="kind">functions</span></div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The image in these bytes.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, options? : EncodeOptions) -&gt; Bytes</code>
+        <div class="doc"><p>The image as a portable anymap.</p></div>
+      </div>
+    </section>
     <section class="pkg" id="qoi">
       <h2>qoi <span>Quite OK Image</span></h2>
       <p>Six opcodes and a run-length code: the smallest complete codec in the package.</p>
@@ -757,6 +1091,76 @@ areas of one colour and never much larger.</em></li>
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, options? : EncodeOptions) -&gt; Bytes</code>
         <div class="doc"><p>The image as a TGA file.</p></div>
+      </div>
+    </section>
+    <section class="pkg" id="tiff">
+      <h2>tiff <span>TIFF</span></h2>
+      <p>Strips in LZW, PackBits, deflate or nothing, every photometric a picture is stored with, and as many pages as the file has.</p>
+      <div class="entry">
+        <span class="kind">enum</span>
+        <code class="sig"><span class="kw">pub(all) enum</span> Compression</code>
+        <div class="doc"><p>How the samples of a strip are packed.</p></div>
+        <ul class="variants">
+          <li>None <em>Stored as they are.</em></li>
+          <li>Lzw <em>LZW, with the code width growing one code early, which is what the
+specification's appendix asks for.</em></li>
+          <li>PackBits <em>PackBits: a signed count, then that many bytes or that many repeats.</em></li>
+          <li>Deflate <em>Deflate, as a zlib stream or as a bare one; both appear in the wild.</em></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Compression::code(self : Compression) -&gt; Int32</code>
+          <div class="doc"><p>The number a file writes for this compression.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Compression::of(code : Int32) -&gt; Compression?</code>
+          <div class="doc"><p>The compression a number stands for, or <code>None</code> for one this library does not read.</p></div>
+        </div>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> EncodeOptions</code>
+        <div class="doc"><p>How to write the file.</p></div>
+        <ul class="fields">
+          <li><b>compression</b><span>Compression</span> <em>The compression to use.</em></li>
+          <li><b>rows_per_strip</b><span>Int32</span> <em>How many rows go into a strip. Zero means all of them, which is what a
+picture that is going to be read whole wants.</em></li>
+          <li><b>predictor</b><span>Bool</span> <em>Whether the samples are differenced along each row before compression,
+which makes a photograph compress better at the cost of one pass.</em></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> EncodeOptions::default() -&gt; EncodeOptions</code>
+          <div class="doc"><p>One strip per page, uncompressed: the file any reader opens.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> EncodeOptions::squeezed() -&gt; EncodeOptions</code>
+          <div class="doc"><p>Deflate with the predictor on, which is what a photograph should be stored as: the difference between neighbours is a small number, and deflate is very good at small numbers.</p></div>
+        </div>
+      </div>
+      <div class="group"><span class="kind">functions</span></div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The first page in these bytes.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode_pages(bytes : BytesView, limits? : @raster.Limits) -&gt; Array[@raster.Image] raise @raster.Refused</code>
+        <div class="doc"><p>Every page, in the order the directories chain.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, options? : EncodeOptions) -&gt; Bytes</code>
+        <div class="doc"><p>The image as a TIFF with one page.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode_pages(images : Array[@raster.Image], options? : EncodeOptions) -&gt; Bytes</code>
+        <div class="doc"><p>Several images as the pages of one file.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> orientation(bytes : BytesView) -&gt; Int32?</code>
+        <div class="doc"><p>The orientation tag of the first page, which is the same eight numbers a JPEG writes in its EXIF block.</p></div>
       </div>
     </section>
     <section class="pkg" id="webp">
@@ -823,6 +1227,7 @@ areas of one colour and never much larger.</em></li>
     <span class="mark">moonimage</span>
     <a href="index.html">Home</a>
     <a href="guide.html">Guide</a>
+    <a href="showcase.html">Workbench</a>
     <a href="https://github.com/moonbitstack/moonimage">Repository</a>
     <a href="https://mooncakes.io/docs/#/moonbitstack/moonimage/">mooncakes</a>
     <span>Apache-2.0</span>

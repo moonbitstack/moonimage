@@ -33,6 +33,7 @@
   <nav>
     <a class="brand" href="index.html"><b>moonimage</b><span>image codecs</span></a>
     <a class="link" href="guide.html" aria-current="page">Guide</a>
+    <a class="link" href="showcase.html">Workbench</a>
     <a class="link" href="api.html">API</a>
     <a class="icon-link" href="https://github.com/moonbitstack/moonimage" aria-label="The repository" title="github.com/moonbitstack/moonimage">
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
@@ -190,8 +191,8 @@ println(<span class="tok-str">"as grey: \{grey.format}, \{eighth(shade.r)}"</spa
         <p class="num">07</p>
         <h2>Write every format</h2>
         <p>
-          The same four-by-three picture, written seven ways. The sizes differ
-          by an order of magnitude and none of them is wrong.
+          The same four-by-three picture, written thirteen ways. The sizes
+          differ by an order of magnitude and none of them is wrong.
         </p>
 <pre><code><span class="tok-kw">for</span> entry <span class="tok-kw">in</span> formats {
   <span class="tok-kw">let</span> (format, name) = entry
@@ -204,12 +205,22 @@ bmp: 170 bytes
 tga: 67 bytes
 jpeg: 729 bytes
 gif: 65 bytes
-webp: 102 bytes</code></pre>
+webp: 102 bytes
+tiff: 202 bytes
+ico: 138 bytes
+pnm: 113 bytes
+farbfeld: 112 bytes
+hdr: 93 bytes
+exr: 444 bytes</code></pre>
         <p>
           BMP is uncompressed, so it is the size of the pixels plus a header;
           JPEG carries its tables in every file, which for a picture this small
           costs more than it saves. WebP is written lossless — the half of the
-          format that can be exact.
+          format that can be exact. farbfeld is a signature, two sizes and the
+          samples, and nothing else; HDR is smaller still because a shared
+          exponent is one byte where farbfeld spends four; OpenEXR is larger
+          because every sample is a half or a float and the header lists its
+          channels by name.
         </p>
         <p>
           Formats with options take them as a record with a default:
@@ -279,6 +290,48 @@ println(<span class="tok-str">"two by two limit: \{capped}"</span>)</code></pre>
           <code>Unsupported</code>, <code>Truncated</code>,
           <code>OverLimit</code>, <code>Unexpected</code> and
           <code>Checksum</code>, each carrying the offset it happened at.
+        </p>
+      </article>
+
+      <article class="step" id="filters">
+        <p class="num">10</p>
+        <h2>Soft, crisp, and the four colour knobs</h2>
+        <p>
+          Blurring is a separable Gaussian of the radius you give it;
+          sharpening is the difference between a picture and its own blur,
+          scaled and held back where the difference is too small to be an edge.
+          Both work on premultiplied samples, so a transparent pixel's colour
+          does not bleed into what is beside it.
+        </p>
+<pre><code><span class="tok-kw">let</span> soft = back.blur(<span class="tok-num">1.0</span>)
+<span class="tok-kw">let</span> crisp = soft.unsharp_mask(radius=<span class="tok-num">1.0</span>, amount=<span class="tok-num">150.0</span>, threshold=<span class="tok-num">0</span>)
+<span class="tok-kw">let</span> dim = back.brightness(<span class="tok-num">0.5</span>).contrast(<span class="tok-num">1.4</span>).hue_rotate(<span class="tok-num">90.0</span>)
+<span class="tok-kw">let</span> tilted = back.rotate_by(<span class="tok-num">30.0</span>, expand=<span class="tok-kw">true</span>)</code></pre>
+<pre class="output"><code>blurred 4 x 3, sharpened to Rgba8, dimmed to Rgba8, turned 5 x 5</code></pre>
+        <p>
+          A quarter turn is a permutation and costs nothing; any other angle
+          resamples, and <code>expand</code> grows the canvas to hold what comes
+          out. The hue rotation goes through the colour package rather than
+          through a matrix of its own, which is why a grey pixel comes back the
+          grey it was.
+        </p>
+      </article>
+
+      <article class="step" id="composite">
+        <p class="num">11</p>
+        <h2>One picture over another</h2>
+        <p>
+          Compositing is source over, with the source converted to the
+          destination's format and its alpha scaled by the opacity you ask for.
+          A source larger than the canvas is clipped rather than refused, which
+          is what a corner rule needs.
+        </p>
+<pre><code><span class="tok-kw">let</span> stamp = <span class="tok-fn">@moonimage.Image</span>::<span class="tok-fn">new</span>(<span class="tok-num">2</span>, <span class="tok-num">2</span>, <span class="tok-fn">@moonimage.PixelFormat</span>::Rgba8)
+<span class="tok-kw">let</span> marked = back.composite(stamp, x=<span class="tok-num">1</span>, y=<span class="tok-num">1</span>, opacity=<span class="tok-num">0.5</span>)</code></pre>
+<pre class="output"><code>composited 4 x 3 at (214, 178, 92, 255)</code></pre>
+        <p>
+          The same formula draws a frame of an animation onto its canvas, which
+          is why <code>compose</code> and <code>composite</code> agree.
         </p>
       </article>
 

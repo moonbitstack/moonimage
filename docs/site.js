@@ -17,6 +17,12 @@ const FORMATS = [
   { key: "jpeg", name: "JPEG" },
   { key: "gif", name: "GIF" },
   { key: "webp", name: "WebP" },
+  { key: "tiff", name: "TIFF" },
+  { key: "ico", name: "ICO" },
+  { key: "pnm", name: "PNM" },
+  { key: "farbfeld", name: "farbfeld" },
+  { key: "hdr", name: "HDR" },
+  { key: "exr", name: "OpenEXR" },
 ];
 
 const stage = document.getElementById("stage");

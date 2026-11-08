@@ -52,7 +52,7 @@ fn small_copy(file : Bytes) -> Bytes raise @moonimage.Refused {
 }
 
 ///|
-fn main {
+fn main raise {
   // A picture, and what it says about itself.
   let image = picture() catch {
     error => abort("the picture is well formed: \{error}")
@@ -115,12 +115,37 @@ fn main {
     (@moonimage.Format::Jpeg, "jpeg"),
     (@moonimage.Format::Gif, "gif"),
     (@moonimage.Format::Webp, "webp"),
+    (@moonimage.Format::Tiff, "tiff"),
+    (@moonimage.Format::Ico, "ico"),
+    (@moonimage.Format::Pnm, "pnm"),
+    (@moonimage.Format::Farbfeld, "farbfeld"),
+    (@moonimage.Format::Hdr, "hdr"),
+    (@moonimage.Format::Exr, "exr"),
   ]
   for entry in formats {
     let (format, name) = entry
     let written = @moonimage.encode(back, format)
     println("\{name}: \{written.length()} bytes")
   }
+
+  // The filters and the four colour knobs, each one call.
+  let soft = back.blur(1.0)
+  let crisp = soft.unsharp_mask(radius=1.0, amount=150.0, threshold=0)
+  let dim = back.brightness(0.5).contrast(1.4).hue_rotate(90.0)
+  let tilted = back.rotate_by(30.0, expand=true) catch {
+    error => abort("the angle is legal: \{error}")
+  }
+  println(
+    "blurred \{soft.width} x \{soft.height}, sharpened to \{crisp.format}, dimmed to \{dim.format}, turned \{tilted.width} x \{tilted.height}",
+  )
+
+  // One picture laid over another, at half opacity, from a corner.
+  let stamp = @moonimage.Image::new(2, 2, @moonimage.PixelFormat::Rgba8)
+  let marked = back.composite(stamp, x=1, y=1, opacity=0.5)
+  let (red, green, blue, alpha) = marked.pixel(1, 1).rgba8()
+  println(
+    "composited \{marked.width} x \{marked.height} at (\{red}, \{green}, \{blue}, \{alpha})",
+  )
 
   // Two frames, written as an animated GIF and read back.
   let animation = @moonimage.Animation::new(

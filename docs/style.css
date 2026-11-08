@@ -1301,3 +1301,59 @@ footer .mark {
 /* Grid items give way to their scrolling code and tables instead of widening the page. */
 .guide > *, .workbench > * { min-width: 0; }
 .panel:has(> table.formats) { overflow-x: auto; }
+
+/* The workbench's controls: one row of buttons that run an operation, and a
+   slider for the angle that is not a right one. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.chip {
+  padding: 7px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.chip:hover {
+  border-color: var(--ink);
+}
+
+.chip[aria-current="true"] {
+  border-color: var(--oxblood);
+  color: var(--oxblood);
+}
+
+.slider {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 3.5ch;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.slider label {
+  font-size: 0.9rem;
+  color: var(--ink-soft, var(--ink));
+}
+
+.slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--oxblood);
+}
+
+.slider output {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* The round trip table has four columns; the header keeps them narrow. */
+table.formats th:nth-child(3) { white-space: normal; }

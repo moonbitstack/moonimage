@@ -1,12 +1,15 @@
 // Copyright 2026 Leo Cheng
 // SPDX-License-Identifier: Apache-2.0
 
-// What the homepage asks of the library, in three calls.
+// What the pages ask of the library, in four calls.
 //
 // A page cannot hold a `Refused` and cannot see a `PixelFormat`, so everything
 // crossing back is either bytes the browser can draw or a JSON string it can
 // read. The report is written by hand rather than through a JSON encoder
 // because there is one shape and eight fields.
+//
+// The fourth call is the arithmetic: it takes a file, the name of an operation
+// and one number, and leaves the result where the page can find it.
 
 ///|
 /// The name a pixel layout goes by on the page.
@@ -36,6 +39,12 @@ fn named(name : String) -> @raster.Format? {
     "jpeg" => Some(@raster.Format::Jpeg)
     "gif" => Some(@raster.Format::Gif)
     "webp" => Some(@raster.Format::Webp)
+    "tiff" => Some(@raster.Format::Tiff)
+    "ico" => Some(@raster.Format::Ico)
+    "pnm" => Some(@raster.Format::Pnm)
+    "farbfeld" => Some(@raster.Format::Farbfeld)
+    "hdr" => Some(@raster.Format::Hdr)
+    "exr" => Some(@raster.Format::Exr)
     _ => None
   }
 }
@@ -109,5 +118,63 @@ fn convert(file : Bytes, format : String) -> Bytes {
 
 ///|
 fn main {
-  publish(describe, preview, convert)
+  publish(describe, preview, convert, operate)
+}
+
+///|
+/// One operation on a picture, by the name the page uses for it.
+///
+/// Every branch returns a picture of its own; the ones that can refuse — a crop
+/// that reaches outside, a rotation past the limits — fall back to the picture
+/// as it arrived rather than to nothing, because a page that shows a stale
+/// picture for one bad slider position is better than one that goes blank.
+fn apply(
+  image : @raster.Image,
+  operation : String,
+  amount : Double,
+) -> @raster.Image {
+  match operation {
+    "flip-horizontal" => image.flip_horizontal()
+    "flip-vertical" => image.flip_vertical()
+    "rotate-quarter" => image.rotate(quarters=1)
+    "rotate-half" => image.rotate(quarters=2)
+    "rotate-angle" => image.rotate_by(amount, expand=true) catch { _ => image }
+    "crop" => {
+      let width = (image.width.to_double() * amount).to_int()
+      let height = (image.height.to_double() * amount).to_int()
+      let x = (image.width - width) / 2
+      let y = (image.height - height) / 2
+      image.crop(x, y, width, height) catch {
+        _ => image
+      }
+    }
+    "scale" => {
+      let width = (image.width.to_double() * amount).to_int()
+      let height = (image.height.to_double() * amount).to_int()
+      image.scale(width, height, sampling=@raster.Sampling::Lanczos) catch {
+        _ => image
+      }
+    }
+    "blur" => image.blur(amount)
+    "unsharp" => image.unsharp_mask(radius=amount, amount=160.0)
+    "brightness" => image.brightness(amount)
+    "contrast" => image.contrast(amount)
+    "hue" => image.hue_rotate(amount)
+    "invert" => image.invert()
+    "grey" => image.convert(@raster.PixelFormat::Gray8)
+    "orient" => image.orient(amount.to_int()) catch { _ => image }
+    _ => image
+  }
+}
+
+///|
+/// Apply an operation and leave the pixels where the page can pick them up.
+fn operate(file : Bytes, operation : String, amount : Double) -> Unit {
+  let image = @moonimage.decode(file) catch { _ => return }
+  let result = apply(image, operation, amount)
+  show(
+    result.convert(@raster.PixelFormat::Rgba8).pixels,
+    result.width,
+    result.height,
+  )
 }
