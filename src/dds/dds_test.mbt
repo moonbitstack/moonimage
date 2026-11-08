@@ -243,3 +243,30 @@ test "a DXGI format above BC7 is still refused by name" {
   }
   assert_true(refused)
 }
+
+///|
+test "a grey block and a block of light both reach RGBA in one call" {
+  // A block format says what a block holds, not what a caller has to work with:
+  // the picture that comes back is the format the block is, and one conversion
+  // takes it anywhere. So a BC4 texture is grey and becomes RGBA by being asked
+  // to, and a BC6H one is float and does the same.
+  let grey = @dds.decode(header(4, 4, b"ATI1") + b"\xff\x00" + le48(0)) catch {
+    error => abort("the texture decodes: \{error}")
+  }
+  assert_eq(grey.format, @raster.PixelFormat::Gray8)
+  let widened = grey.convert(@raster.PixelFormat::Rgba8)
+  assert_eq(widened.format, @raster.PixelFormat::Rgba8)
+  // One channel is three channels of the same value, and an alpha that does not
+  // make the pixel see-through.
+  assert_eq(widened.pixel(1, 2).rgba8(), (255, 255, 255, 255))
+
+  let light = @dds.decode(
+    header10(4, 4, 95) +
+    Bytes::from_array(FixedArray::make(16, b'\x00').clamped_view()),
+  ) catch {
+    error => abort("the texture decodes: \{error}")
+  }
+  assert_eq(light.format, @raster.PixelFormat::RgbaF32)
+  let toned = light.convert(@raster.PixelFormat::Rgba8)
+  assert_eq(toned.pixel(2, 3).rgba8(), (0, 0, 0, 255))
+}
