@@ -400,7 +400,17 @@ fn unpack_lzw(
       }
     }
     if code == next {
-      stack[depth] = suffix[walk].to_byte()
+      // The entry is `old` followed by its own first byte, and the stack holds
+      // it reversed — so the extra byte belongs at the bottom of the stack, not
+      // on top of it. Putting it on top reads back as a picture whose every
+      // repeated run starts one sample late.
+      let extra = suffix[walk].to_byte()
+      let mut slot = depth
+      while slot > 0 {
+        stack[slot] = stack[slot - 1]
+        slot = slot - 1
+      }
+      stack[0] = extra
       depth = depth + 1
     }
     for i in 0..<depth {

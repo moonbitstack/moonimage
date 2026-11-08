@@ -44,6 +44,9 @@ let samples : Array[(String, Bytes, String)] = [
     "77a10d558c5c5616",
   ),
   (
+    "p5-maxval15", b"P5\x0a4 2\x0a15\x0a\x00\x05\x0a\x0f\x03\x08\x0c\x01", "efbf2f12bf976843",
+  ),
+  (
     "p7-rgba",
     b"P7\x0aWIDTH 9\x0aHEIGHT 7\x0aDEPTH 4\x0aMAXVAL 255\x0aTUPLTYPE RGB_ALPHA\x0aENDHDR\x0a\x00\x00" +
     b"\x00\x00%\x05a\x1dJ\x0a\xc2:o\x0f#W\x94\x14\x84t\xb9\x19\xe5\x91\xde\x1eF\xae\x03#\xa7\xcb((\x08" +
