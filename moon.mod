@@ -1,6 +1,6 @@
 name = "moonbitstack/moonimage"
 
-version = "0.1.2"
+version = "0.1.3"
 
 readme = "README.md"
 
@@ -91,6 +91,6 @@ description = "Image codecs for MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TI
 source = "src"
 
 import {
-  "moonbitstack/moonzip@0.3.2",
-  "moonbitstack/moonrgba@0.1.2",
+  "moonbitstack/moonzip@0.3.8",
+  "moonbitstack/moonrgba@0.1.3",
 }
