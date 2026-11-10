@@ -10,13 +10,14 @@
 // of scanlines was packed.
 //
 // A chunk holds a whole number of scanlines — one for RLE and ZIPS, sixteen for
-// ZIP — and inside it the channels come one after another, each contributing one
-// row of samples per scanline. Before compressing, the bytes are split into two
-// halves and differenced, which is what makes a photograph of a lit surface
-// compress at all: neighbouring samples differ by a little, and a little is
-// mostly zero in the high byte.
+// ZIP, thirty-two for PIZ — and inside it the channels come one after another,
+// each contributing one row of samples per scanline. Before compressing, the
+// bytes are split into two halves and differenced, which is what makes a
+// photograph of a lit surface compress at all: neighbouring samples differ by a
+// little, and a little is mostly zero in the high byte.
 //
-// PIZ, the wavelet one, is refused rather than misread; see the README.
+// PIZ does something else again: it hides inside the wavelet in `piz.mbt`, which
+// looks at the picture rather than at the bytes.
 //
 // https://openexr.com/en/latest/OpenEXRFileLayout.html
 
@@ -32,6 +33,8 @@ pub(all) enum Compression {
   Zips
   /// Deflate, sixteen scanlines to a chunk.
   Zip
+  /// A bitmap of the words used, a wavelet, and a Huffman code.
+  Piz
 }
 
 ///|
@@ -48,6 +51,7 @@ pub fn Compression::code(self : Compression) -> Int32 {
     Rle => 1
     Zips => 2
     Zip => 3
+    Piz => 4
   }
 }
 
@@ -60,6 +64,7 @@ pub fn Compression::of(code : Int32) -> Compression? {
     1 => Some(Rle)
     2 => Some(Zips)
     3 => Some(Zip)
+    4 => Some(Piz)
     _ => None
   }
 }
@@ -68,7 +73,11 @@ pub fn Compression::of(code : Int32) -> Compression? {
 /// How many scanlines a chunk of this compression holds.
 fn lines_per_chunk(compression : Compression) -> Int32 {
   match compression {
-    Rle | Zips => 1
+    // A chunk of one scanline: the three that do not look across scanlines have
+    // nothing to gain from holding more, and a reader that stumbles on damage
+    // loses one line rather than sixteen.
+    None | Rle | Zips => 1
+    Piz => 32
     _ => 16
   }
 }
@@ -154,15 +163,23 @@ pub fn decode(
       per_chunk
     }
     let want = row_bytes * lines
-    let data = match compression {
-      None => {
-        if body.length() < want {
-          raise @raster.Truncated(at=offset, want=want - body.length())
-        }
-        body
+    // A chunk that did not get smaller is stored as it came, whichever
+    // compression the file names: a reader tells the two apart by the length,
+    // because a compressed chunk is always shorter than the pixels it holds.
+    let data = if body.length() >= want {
+      // PIZ stores its words little-endian even when it stores them as they
+      // came, so its uncompressed chunks still need turning over.
+      match compression {
+        Piz => piz_plain(body, want, channels, width, lines)
+        _ => Bytes::from_array(body.to_array())
       }
-      Rle => unpack_rle(body, want)
-      _ => inflate(body, want, compression)
+    } else {
+      match compression {
+        None => Bytes::from_array(body.to_array())
+        Rle => unpack_rle(body, want)
+        Piz => piz_unpack(body, want, channels, width, lines)
+        _ => inflate(body, want, compression)
+      }
     }
     for line in 0..<lines {
       let y = top + first + line - top
@@ -222,13 +239,13 @@ fn row_size(channels : Array[Channel], width : Int32) -> Int32 {
 ///|
 fn sample_of(data : BytesView, at : Int32, size : Int32) -> Float {
   if size == 2 {
-    half_to_float(be16(data, at))
+    half_to_float(le16(data, at))
   } else if size == 4 {
-    Float::reinterpret_from_uint(be32(data, at).reinterpret_as_uint())
+    Float::reinterpret_from_uint(le32(data, at).reinterpret_as_uint())
   } else {
     // A thirty-two-bit unsigned sample is a mask or an index rather than a
     // colour; it is scaled into the range a sample lives in.
-    Float::from_double(be32(data, at).to_double() / 4294967295.0)
+    Float::from_double(le32(data, at).to_double() / 4294967295.0)
   }
 }
 
@@ -376,22 +393,30 @@ fn inflate(
 }
 
 ///|
-/// Undo the split into two halves and the difference between neighbours.
-fn reorder(packed : Bytes, want : Int32) -> Bytes {
+/// Undo the difference between neighbours and the split into two halves.
+///
+/// The order is the writer's, reversed: RLE and deflate both work on a buffer
+/// whose even bytes come first and whose odd bytes follow, and on which
+/// neighbour differences were taken afterwards.
+fn reorder(packed : BytesView, want : Int32) -> Bytes {
   let half = (want + 1) / 2
+  let spread : FixedArray[Byte] = FixedArray::make(want, b'\x00')
+  for i in 0..<want {
+    spread[i] = if i < packed.length() { packed[i] } else { b'\x00' }
+  }
+  for i in 1..<want {
+    let value = spread[i].to_int() + spread[i - 1].to_int() - 128
+    spread[i] = (value & 0xFF).to_byte()
+  }
   let out : FixedArray[Byte] = FixedArray::make(want, b'\x00')
   for i in 0..<want {
     out[i] = if i % 2 == 0 {
-      packed[i / 2]
-    } else if half + i / 2 < packed.length() {
-      packed[half + i / 2]
+      spread[i / 2]
+    } else if half + i / 2 < want {
+      spread[half + i / 2]
     } else {
       b'\x00'
     }
-  }
-  for i in 1..<want {
-    let value = out[i].to_int() + out[i - 1].to_int() - 128
-    out[i] = (value & 0xFF).to_byte()
   }
   Bytes::from_array(out.clamped_view())
 }
@@ -409,20 +434,8 @@ fn expand(body : BytesView, want : Int32) -> Bytes raise @raster.Refused {
     at = at + 1
     let signed = if count > 127 { count - 256 } else { count }
     if signed < 0 {
+      // A negative count is a literal run of that many bytes.
       let run = -signed
-      if at >= body.length() {
-        raise @raster.Truncated(at~, want=1)
-      }
-      let value = body[at]
-      at = at + 1
-      for _ in 0..<run {
-        if produced < want {
-          out[produced] = value
-          produced = produced + 1
-        }
-      }
-    } else {
-      let run = signed + 1
       if at + run > body.length() {
         raise @raster.Truncated(at~, want=run)
       }
@@ -433,6 +446,19 @@ fn expand(body : BytesView, want : Int32) -> Bytes raise @raster.Refused {
         }
       }
       at = at + run
+    } else {
+      // A count of n is n + 1 copies of the byte after it.
+      if at >= body.length() {
+        raise @raster.Truncated(at~, want=1)
+      }
+      let value = body[at]
+      at = at + 1
+      for _ in 0..<=signed {
+        if produced < want {
+          out[produced] = value
+          produced = produced + 1
+        }
+      }
     }
   }
   Bytes::from_array(out.clamped_view())
@@ -461,17 +487,15 @@ fn le64(bytes : BytesView, at : Int32) -> Int32 {
 }
 
 ///|
-fn be16(bytes : BytesView, at : Int32) -> Int32 {
-  (bytes[at].to_int() << 8) | bytes[at + 1].to_int()
+
+///|
+/// A sixteen-bit sample of the file, which is little-endian like every other
+/// number in it.
+fn le16(bytes : BytesView, at : Int32) -> Int32 {
+  bytes[at].to_int() | (bytes[at + 1].to_int() << 8)
 }
 
 ///|
-fn be32(bytes : BytesView, at : Int32) -> Int32 {
-  (bytes[at].to_int() << 24) |
-  (bytes[at + 1].to_int() << 16) |
-  (bytes[at + 2].to_int() << 8) |
-  bytes[at + 3].to_int()
-}
 
 ///|
 /// A half-precision sample as a float.

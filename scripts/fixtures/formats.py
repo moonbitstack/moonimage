@@ -16,6 +16,9 @@ The scaling and blurring comparison is separate: Pillow resamples the same
 picture with the same filter, and the page is expected to agree with it to
 within one step of an eight-bit sample.
 
+OpenEXR has a generator of its own, `exr.py` beside this one: a file of that
+format is written by the library that defines it, not here.
+
 Run `moon fmt` afterwards: the byte literals this writes are wrapped for reading,
 and the formatter rewraps them, which is what CI compares against.
 """
@@ -358,7 +361,7 @@ def hdr_samples():
     return [("coded", header + bytes(body), float_digest(pixels))]
 
 
-# ---------------------------------------------------------------- OpenEXR
+# ---------------------------------------------------------------- halves
 
 def half(value: float) -> int:
     bits = struct.unpack("<I", struct.pack("<f", value))[0]
@@ -391,125 +394,6 @@ def half_to_float(bits: int) -> float:
         return sign * float("inf")
     return sign * (1 + mantissa / 1024.0) * 2.0 ** (exponent - 15)
 
-
-def attribute(name: bytes, kind: bytes, body: bytes) -> bytes:
-    return name + b"\x00" + kind + b"\x00" + struct.pack("<i", len(body)) + body
-
-
-def exr_file(width, height, channels, compression, lines_per_chunk, payload):
-    head = b""
-    chlist = b""
-    for name, kind in channels:
-        chlist += name + b"\x00" + struct.pack("<i", kind) + b"\x00\x00\x00\x00"
-        chlist += struct.pack("<ii", 1, 1)
-    chlist += b"\x00"
-    head += attribute(b"channels", b"chlist", chlist)
-    head += attribute(b"compression", b"compression", bytes([compression]))
-    box = struct.pack("<4i", 0, 0, width - 1, height - 1)
-    head += attribute(b"dataWindow", b"box2i", box)
-    head += attribute(b"displayWindow", b"box2i", box)
-    head += attribute(b"lineOrder", b"lineOrder", b"\x00")
-    head += attribute(b"pixelAspectRatio", b"float", struct.pack("<f", 1.0))
-    head += attribute(b"screenWindowCenter", b"v2f", struct.pack("<2f", 0.0, 0.0))
-    head += attribute(b"screenWindowWidth", b"float", struct.pack("<f", 1.0))
-    head += b"\x00"
-    chunks = payload
-    table_at = 8 + len(head)
-    body = b""
-    offsets = []
-    for first, data in chunks:
-        offsets.append(table_at + len(chunks) * 8 + len(body))
-        body += struct.pack("<ii", first, len(data)) + data
-    table = b"".join(struct.pack("<Q", offset) for offset in offsets)
-    return b"\x76\x2f\x31\x01" + struct.pack("<i", 2) + head + table + body
-
-
-def exr_predict(raw: bytes) -> bytes:
-    half = (len(raw) + 1) // 2
-    differenced = bytearray(len(raw))
-    differenced[0] = raw[0]
-    for i in range(1, len(raw)):
-        differenced[i] = (raw[i] - raw[i - 1] + 128) & 0xFF
-    split = bytearray(len(raw))
-    for i, value in enumerate(differenced):
-        if i % 2 == 0:
-            split[i // 2] = value
-        else:
-            split[half + i // 2] = value
-    return bytes(split)
-
-
-def exr_samples():
-    width, height = 6, 5
-    values = []
-    for y in range(height):
-        for x in range(width):
-            values.append(
-                (
-                    0.25 + x * 0.125,
-                    0.5 + y * 0.0625,
-                    0.75 + (x + y) * 0.03125,
-                    1.0 if (x + y) % 3 else 0.5,
-                )
-            )
-    out = []
-    for name, kind, compression, per_chunk in [
-        ("none", 1, 0, 16),
-        ("rle", 1, 1, 1),
-        ("zip", 1, 3, 16),
-        ("zips", 1, 2, 1),
-        ("float-zip", 2, 3, 16),
-    ]:
-        channels = [(b"A", kind), (b"B", kind), (b"G", kind), (b"R", kind)]
-        chunks = []
-        for first in range(0, height, per_chunk):
-            lines = min(per_chunk, height - first)
-            raw = bytearray()
-            for line in range(lines):
-                for index in range(len(channels)):
-                    for x in range(width):
-                        sample = values[(first + line) * width + x][3 - index]
-                        if kind == 1:
-                            raw += struct.pack(">H", half(sample))
-                        else:
-                            raw += struct.pack(">f", sample)
-            if compression == 0:
-                data = bytes(raw)
-            else:
-                predicted = exr_predict(bytes(raw))
-                if compression == 1:
-                    data = rle(predicted)
-                else:
-                    data = zlib.compress(predicted, 6)
-            chunks.append((first, data))
-        data = exr_file(width, height, channels, compression, per_chunk, chunks)
-        out.append((name, data, float_digest(values)))
-    return out
-
-
-def rle(data: bytes) -> bytes:
-    out = bytearray()
-    at = 0
-    while at < len(data):
-        run = 1
-        while at + run < len(data) and run < 127 and data[at + run] == data[at]:
-            run += 1
-        if run >= 3:
-            out += bytes([256 - run, data[at]])
-            at += run
-        else:
-            start = at
-            fresh = 0
-            while at < len(data) and fresh < 127:
-                if at + 2 < len(data) and data[at + 1] == data[at] and data[at + 2] == data[at]:
-                    break
-                at += 1
-                fresh += 1
-            out += bytes([fresh - 1]) + data[start:at]
-    return bytes(out)
-
-
-# ---------------------------------------------------------------- DDS
 
 def dds_header(width, height, fourcc):
     header = bytearray(b"DDS ")
@@ -948,14 +832,6 @@ def main() -> None:
 // floats each RGBE triplet stands for, computed from the formula rather than
 // from this library.""",
         array_of_samples(hdr_samples()),
-    )
-    emit(
-        ROOT / "src" / "exr" / "samples_test.mbt",
-        """// Generated by scripts/fixtures/formats.py. Do not edit.
-//
-// OpenEXR files built here in each compression the reader supports, with the
-// digest of the samples they were built from.""",
-        array_of_samples(exr_samples()),
     )
     emit(
         ROOT / "src" / "dds" / "samples_test.mbt",

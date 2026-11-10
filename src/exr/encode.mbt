@@ -96,22 +96,31 @@ pub fn encode(image : @raster.Image, options? : EncodeOptions) -> Bytes {
             floats.pixels,
             (first + line) * floats.stride + x * 16 + give * 4,
           )
+          // Every number in the file is little-endian, samples included.
           if sample == 2 {
             let bits = float_to_half(value)
-            raw[at] = ((bits >> 8) & 0xFF).to_byte()
-            raw[at + 1] = (bits & 0xFF).to_byte()
+            raw[at] = (bits & 0xFF).to_byte()
+            raw[at + 1] = ((bits >> 8) & 0xFF).to_byte()
           } else {
             let bits = value.reinterpret_as_uint().reinterpret_as_int()
-            raw[at] = ((bits >> 24) & 0xFF).to_byte()
-            raw[at + 1] = ((bits >> 16) & 0xFF).to_byte()
-            raw[at + 2] = ((bits >> 8) & 0xFF).to_byte()
-            raw[at + 3] = (bits & 0xFF).to_byte()
+            raw[at] = (bits & 0xFF).to_byte()
+            raw[at + 1] = ((bits >> 8) & 0xFF).to_byte()
+            raw[at + 2] = ((bits >> 16) & 0xFF).to_byte()
+            raw[at + 3] = ((bits >> 24) & 0xFF).to_byte()
           }
           at = at + sample
         }
       }
     }
-    let packed = pack(raw, row_bytes * lines, options.compression)
+    let packed = pack(
+      raw,
+      row_bytes * lines,
+      options.compression,
+      names.length(),
+      width,
+      lines,
+      sample,
+    )
     let here = writer.length()
     // The offset table was reserved before the first chunk, so its entry is
     // filled in by rewriting the eight bytes in place.
@@ -202,62 +211,103 @@ fn pack(
   raw : FixedArray[Byte],
   want : Int32,
   compression : Compression,
+  channel_count : Int32,
+  width : Int32,
+  lines : Int32,
+  sample : Int32,
 ) -> Bytes {
+  let bytes = Bytes::from_array(raw.clamped_view())
   if compression == None {
-    return Bytes::from_array(raw.clamped_view())
+    return bytes
   }
-  let half = (want + 1) / 2
-  let differenced : FixedArray[Byte] = FixedArray::make(want, b'\x00')
-  differenced[0] = raw[0]
-  for i in 1..<want {
-    let value = raw[i].to_int() - raw[i - 1].to_int() + 128
-    differenced[i] = (value & 0xFF).to_byte()
-  }
-  let split : FixedArray[Byte] = FixedArray::make(want, b'\x00')
-  for i in 0..<want {
-    if i % 2 == 0 {
-      split[i / 2] = differenced[i]
-    } else {
-      split[half + i / 2] = differenced[i]
+  if compression == Piz {
+    // The wavelet reads the chunk by channel rather than by row, and it does its
+    // own packing; nothing in front of it.
+    let channels : Array[Channel] = []
+    for _ in 0..<channel_count {
+      channels.push({ name: "", sample, })
     }
+    return piz_pack(bytes, channels, width, lines)
   }
-  let packed = Bytes::from_array(split.clamped_view())
-  if compression == Rle {
+  let packed = scramble(raw, want)
+  let shorter = if compression == Rle {
     run_length(packed)
   } else {
     @zlib.zlib(packed)
   }
+  // A chunk that did not get smaller is written as it came: a reader tells the
+  // two apart by the length.
+  if shorter.length() >= want {
+    bytes
+  } else {
+    shorter
+  }
+}
+
+///|
+/// The chunk as RLE and deflate both see it: the even bytes first, the odd ones
+/// after them, and then the difference from the byte before, offset by the
+/// middle of the range so that a small difference is a small number either way.
+fn scramble(raw : FixedArray[Byte], want : Int32) -> Bytes {
+  let half = (want + 1) / 2
+  let split : FixedArray[Byte] = FixedArray::make(want, b'\x00')
+  for i in 0..<want {
+    if i % 2 == 0 {
+      split[i / 2] = raw[i]
+    } else if half + i / 2 < want {
+      split[half + i / 2] = raw[i]
+    }
+  }
+  let out : FixedArray[Byte] = FixedArray::make(want, b'\x00')
+  out[0] = split[0]
+  for i in 1..<want {
+    let value = split[i].to_int() - split[i - 1].to_int() + 128
+    out[i] = (value & 0xFF).to_byte()
+  }
+  Bytes::from_array(out.clamped_view())
 }
 
 ///|
 fn run_length(data : BytesView) -> Bytes {
   let writer = @wire.Writer::new()
-  let mut at = 0
-  while at < data.length() {
-    let mut run = 1
-    while at + run < data.length() && run < 127 && data[at + run] == data[at] {
-      run = run + 1
+  let end = data.length()
+  let mut runs = 0
+  while runs < end {
+    let mut rune = runs + 1
+    let mut repeats = 0
+    while rune < end && data[rune] == data[runs] && repeats < 127 {
+      rune = rune + 1
+      repeats = repeats + 1
     }
-    if run >= 3 {
-      writer.u8(256 - run)
-      writer.u8(data[at].to_int())
-      at = at + run
+    if repeats >= 2 {
+      // Three of a kind or more: a count of the repeats after the first, then
+      // the byte itself.
+      writer.u8(repeats)
+      writer.u8(data[runs].to_int())
+      runs = rune
     } else {
-      let start = at
-      let mut fresh = 0
-      while at < data.length() && fresh < 127 {
-        if at + 2 < data.length() &&
-          data[at + 1] == data[at] &&
-          data[at + 2] == data[at] {
-          break
-        }
-        at = at + 1
+      let mut fresh = repeats + 1
+      while rune < end &&
+            (
+              rune + 1 >= end ||
+              data[rune] != data[rune + 1] ||
+              rune + 2 >= end ||
+              data[rune + 1] != data[rune + 2]
+            ) &&
+            fresh < 127 {
         fresh = fresh + 1
+        rune = rune + 1
       }
-      writer.u8(fresh - 1)
-      for i in start..<at {
-        writer.u8(data[i].to_int())
+      // A literal run: the count negated, then the bytes.
+      writer.u8(256 - fresh)
+      while runs < rune {
+        writer.u8(data[runs].to_int())
+        runs = runs + 1
       }
+    }
+    rune = rune + 1
+    if runs < rune - 1 {
+      runs = rune - 1
     }
   }
   writer.to_bytes()

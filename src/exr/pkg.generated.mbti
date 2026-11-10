@@ -24,6 +24,7 @@ pub(all) enum Compression {
   Rle
   Zips
   Zip
+  Piz
 }
 pub fn Compression::code(Self) -> Int32
 pub fn Compression::equal(Self, Self) -> Bool

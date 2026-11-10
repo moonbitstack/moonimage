@@ -1,0 +1,14 @@
+// The conformance harness: it writes files for another implementation to read,
+// and lays the pixels of a file it read out on disk. It is part of the tests, not
+// of the library, and nothing imports it.
+
+pkgtype(kind: "executable")
+
+import {
+  "moonbitstack/moonimage",
+  "moonbitstack/moonimage/exr",
+  "moonbitstack/moonimage/farbfeld",
+  "moonbitlang/x/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/debug",
+}

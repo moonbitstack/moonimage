@@ -93,4 +93,5 @@ source = "src"
 import {
   "moonbitstack/moonzip@0.3.8",
   "moonbitstack/moonrgba@0.1.3",
+  "moonbitlang/x@0.5.7",
 }
