@@ -358,15 +358,18 @@ fn assemble_page(
     raise @raster.Unsupported(at=0, got="a photometric of \{photometric}")
   }
   let has_alpha = samples == 2 || samples == 4
-  let format = match (gray, has_alpha, bits) {
-    (true, false, 8) => @raster.PixelFormat::Gray8
-    (true, true, 8) => @raster.PixelFormat::GrayAlpha8
-    (true, false, 16) => @raster.PixelFormat::Gray16
-    (true, true, 16) => @raster.PixelFormat::GrayAlpha16
-    (false, false, 8) => @raster.PixelFormat::Rgb8
-    (false, true, 8) => @raster.PixelFormat::Rgba8
-    (false, false, 16) => @raster.PixelFormat::Rgb16
-    _ => @raster.PixelFormat::Rgba16
+  // One, two and four bits a sample are widened to eight on the way out, the way
+  // a one-bit photograph is: the file packs them, the picture is still a picture.
+  let eight = bits <= 8
+  let format = match (gray, has_alpha, eight) {
+    (true, false, true) => @raster.PixelFormat::Gray8
+    (true, true, true) => @raster.PixelFormat::GrayAlpha8
+    (true, false, false) => @raster.PixelFormat::Gray16
+    (true, true, false) => @raster.PixelFormat::GrayAlpha16
+    (false, false, true) => @raster.PixelFormat::Rgb8
+    (false, true, true) => @raster.PixelFormat::Rgba8
+    (false, false, false) => @raster.PixelFormat::Rgb16
+    (false, true, false) => @raster.PixelFormat::Rgba16
   }
   let channels = format.channels()
   let sample_bytes = format.bytes() / channels

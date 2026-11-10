@@ -927,8 +927,9 @@ fn assemble(
 ///
 /// The triangle filter the reference decoder uses: a sample is worth three
 /// quarters and its neighbour one, which keeps a colour edge from turning into a
-/// staircase of blocks. The two axes are separable, so it is a horizontal pass
-/// and then a vertical one.
+/// staircase of blocks. With both axes doubled the two dimensions are worked out
+/// together and rounded once, because two passes round twice and the last sample
+/// of every row and column comes out a step away from the reference.
 fn upsample(
   plane : FixedArray[Byte],
   plane_width : Int32,
@@ -938,36 +939,88 @@ fn upsample(
   hx : Int32,
   vy : Int32,
 ) -> FixedArray[Byte] {
+  if hx == 2 && vy == 2 {
+    let out : FixedArray[Byte] = FixedArray::make(width * height, b'\x00')
+    for y in 0..<height {
+      let near_row = clamp_index(y / 2, plane_height)
+      let far_row = if y % 2 == 0 {
+        clamp_index(y / 2 - 1, plane_height)
+      } else {
+        clamp_index(y / 2 + 1, plane_height)
+      }
+      for x in 0..<width {
+        let near_column = x / 2
+        let far_column = if x % 2 == 0 {
+          clamp_index(near_column - 1, plane_width)
+        } else {
+          clamp_index(near_column + 1, plane_width)
+        }
+        let here = plane[near_row * plane_width + near_column].to_int() * 3 +
+          plane[far_row * plane_width + near_column].to_int()
+        let there = plane[near_row * plane_width + far_column].to_int() * 3 +
+          plane[far_row * plane_width + far_column].to_int()
+        let bias = if x % 2 == 0 { 8 } else { 7 }
+        out[y * width + x] = ((here * 3 + there + bias) >> 4).to_byte()
+      }
+    }
+    return out
+  }
   let wide : FixedArray[Byte] = FixedArray::make(width * plane_height, b'\x00')
   for y in 0..<plane_height {
     for x in 0..<width {
-      let source_x = x / hx
-      if hx == 1 || x == 0 || x == width - 1 {
-        wide[y * width + x] = plane[y * plane_width + source_x]
+      if hx != 2 {
+        // A factor other than two has no filter of the reference decoder's to
+        // imitate, so the sample the position falls in is the sample it gets.
+        wide[y * width + x] = plane[y * plane_width +
+          clamp_index(x / hx, plane_width)]
       } else {
-        let neighbour = if x % 2 == 0 { source_x - 1 } else { source_x + 1 }
-        let clamped = clamp_index(neighbour, plane_width)
-        let base = plane[y * plane_width + source_x].to_int()
-        let near = plane[y * plane_width + clamped].to_int()
-        let bias = if x % 2 == 0 { 1 } else { 2 }
-        wide[y * width + x] = ((base * 3 + near + bias) >> 2).to_byte()
+        // Two samples to one: three quarters of the one it stands on and one
+        // quarter of the neighbour it leans towards, which for an even position
+        // is the one before it and for an odd one the one after.
+        let leans_left = x % 2 == 0
+        let near = x / 2
+        let far = if leans_left {
+          clamp_index(near - 1, plane_width)
+        } else {
+          clamp_index(near + 1, plane_width)
+        }
+        let bias = if leans_left { 1 } else { 2 }
+        wide[y * width + x] = ((
+          plane[y * plane_width + near].to_int() * 3 +
+          plane[y * plane_width + far].to_int() +
+          bias
+        ) >>
+        2).to_byte()
       }
     }
   }
+  if vy != 2 {
+    let out : FixedArray[Byte] = FixedArray::make(width * height, b'\x00')
+    for y in 0..<height {
+      let row = clamp_index(y / vy, plane_height)
+      for x in 0..<width {
+        out[y * width + x] = wide[row * width + x]
+      }
+    }
+    return out
+  }
   let out : FixedArray[Byte] = FixedArray::make(width * height, b'\x00')
   for y in 0..<height {
-    let source_y = y / vy
+    let leans_up = y % 2 == 0
+    let near = y / 2
+    let far = if leans_up {
+      clamp_index(near - 1, plane_height)
+    } else {
+      clamp_index(near + 1, plane_height)
+    }
+    let bias = if leans_up { 1 } else { 2 }
     for x in 0..<width {
-      if vy == 1 || y == 0 || y == height - 1 {
-        out[y * width + x] = wide[source_y * width + x]
-      } else {
-        let neighbour = if y % 2 == 0 { source_y - 1 } else { source_y + 1 }
-        let clamped = clamp_index(neighbour, plane_height)
-        let base = wide[source_y * width + x].to_int()
-        let near = wide[clamped * width + x].to_int()
-        let bias = if y % 2 == 0 { 1 } else { 2 }
-        out[y * width + x] = ((base * 3 + near + bias) >> 2).to_byte()
-      }
+      out[y * width + x] = ((
+        wide[near * width + x].to_int() * 3 +
+        wide[far * width + x].to_int() +
+        bias
+      ) >>
+      2).to_byte()
     }
   }
   out
