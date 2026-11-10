@@ -26,6 +26,7 @@ fn main {
     "write" => write(arguments[2], arguments[3])
     "decode" => decode(arguments[2], arguments[3], false)
     "decode32" => decode(arguments[2], arguments[3], true)
+    "decode16" => decode(arguments[2], arguments[3], false, sixteen=true)
     _ => Err("no such command: \{arguments[1]}")
   }
   match outcome {
@@ -42,6 +43,7 @@ fn usage() -> String {
   "usage: samples write <format> <path>\n" +
   "       samples decode <path> <out>\n" +
   "       samples decode32 <path> <out>\n" +
+  "       samples decode16 <path> <out>\n" +
   "formats: " +
   formats().map(fn(one) { one.0 }).join(", ")
 }
@@ -108,6 +110,14 @@ fn write(format : String, path : String) -> Result[String, String] {
   let image = picture()
   let bytes = if format == "farbfeld" {
     @farbfeld.encode(image)
+  } else if format == "pnm" {
+    // PPM rather than the PAM a picture with alpha would otherwise get, because
+    // PAM is the one shape of the four that other readers do not all know.
+    @pnm.encode(image, options=@pnm.EncodeOptions::{
+      kind: @pnm.Kind::Rgb,
+      maxval: 0,
+      ascii: false,
+    })
   } else if format == "exr-piz" {
     @exr.encode(image, options=@exr.EncodeOptions::{
       compression: @exr.Compression::Piz,
@@ -116,6 +126,11 @@ fn write(format : String, path : String) -> Result[String, String] {
   } else if format == "exr-piz-float" {
     @exr.encode(image, options=@exr.EncodeOptions::{
       compression: @exr.Compression::Piz,
+      half: false,
+    })
+  } else if format == "exr-pxr24" {
+    @exr.encode(image, options=@exr.EncodeOptions::{
+      compression: @exr.Compression::Pxr24,
       half: false,
     })
   } else if format == "exr-rle" {
@@ -139,7 +154,12 @@ fn write(format : String, path : String) -> Result[String, String] {
 }
 
 ///|
-fn decode(path : String, out : String, floats : Bool) -> Result[String, String] {
+fn decode(
+  path : String,
+  out : String,
+  floats : Bool,
+  sixteen~ : Bool = false,
+) -> Result[String, String] {
   let bytes = @fs.read_file_to_bytes(path) catch {
     error => return Err("reading \{path}: \{@debug.Debug::to_repr(error)}")
   }
@@ -148,6 +168,8 @@ fn decode(path : String, out : String, floats : Bool) -> Result[String, String] 
   }
   let pixels = if floats {
     image.convert(@moonimage.PixelFormat::RgbaF32).pixels
+  } else if sixteen {
+    image.convert(@moonimage.PixelFormat::Rgba16).pixels
   } else {
     image.convert(@moonimage.PixelFormat::Rgba8).pixels
   }

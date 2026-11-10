@@ -76,3 +76,57 @@ jobs:
       - name: the code in the docs compiles
         if: runner.os == 'Linux'
         run: python3 scripts/check_snippets.py
+
+  # Three implementations, one picture: the formats this library writes have to be
+  # read back by Pillow and by the `image` crate to the same samples, and the
+  # official samples of libtiff, openexr-images and Netpbm have to decode to what
+  # those readers decode them to. Linux only: the two references are wheels and a
+  # crate, and the corpora are fetched once per commit.
+  samples:
+    permissions:
+      contents: read
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: install-unix
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: post install
+        run: |
+          moon version --all
+          moon update
+
+      # A virtual environment, because a distribution Python refuses a plain
+      # install now, and because the samples script reads whichever python3 is
+      # first on the path.
+      - name: the two references
+        run: |
+          python3 -m venv "$RUNNER_TEMP/references"
+          "$RUNNER_TEMP/references/bin/pip" install --quiet pillow numpy OpenEXR
+          echo "$RUNNER_TEMP/references/bin" >> $GITHUB_PATH
+
+      - name: the pictures
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/moonimage-samples
+          key: samples-${{ hashFiles('scripts/samples/fetch.py') }}
+
+      - name: the crate that reads them
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            scripts/samples/read_image/target
+          key: reader-${{ hashFiles('scripts/samples/read_image/Cargo.toml') }}
+
+      - name: fetch
+        run: python3 scripts/samples/fetch.py
+
+      - name: check
+        run: python3 scripts/samples/check.py

@@ -1,0 +1,24 @@
+[package]
+name = "read_image"
+version = "0.1.0"
+edition = "2021"
+description = "Reads a picture with the `image` crate and lays its pixels out for the conformance run."
+publish = false
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "jpeg",
+  "gif",
+  "webp",
+  "bmp",
+  "ico",
+  "tiff",
+  "tga",
+  "pnm",
+  "hdr",
+  "exr",
+  "qoi",
+  "ff",
+  "dds",
+] }

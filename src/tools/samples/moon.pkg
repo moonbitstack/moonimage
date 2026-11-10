@@ -8,6 +8,7 @@ import {
   "moonbitstack/moonimage",
   "moonbitstack/moonimage/exr",
   "moonbitstack/moonimage/farbfeld",
+  "moonbitstack/moonimage/pnm",
   "moonbitlang/x/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/debug",
