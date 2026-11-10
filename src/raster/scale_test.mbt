@@ -61,11 +61,22 @@ test "every filter leaves a flat image flat" {
 }
 
 ///|
-test "bilinear takes the average of the two it lands between" {
+test "bilinear widens what it reads when the picture is made smaller" {
   let ramp = image_of(4, 1, @raster.PixelFormat::Gray8, b"\x00\x64\xc8\xff")
   let half = scaled(ramp, 2, 1, @raster.Sampling::Bilinear)
-  // 0 and 100 average to 50; 200 and 255 average to 227.5, which rounds to 228.
-  assert_eq(bytes_of(half), b"\x32\xe4")
+  // Halving the width means every output pixel stands for two input ones, so
+  // the filter is widened to the pair beside them: the first is 3/7 of 0, 3/7
+  // of 100 and 1/7 of 200, and the last mirrors it into 255.
+  assert_eq(bytes_of(half), b"\x47\xd1")
+}
+
+///|
+test "bilinear still reads two samples when the picture is made larger" {
+  let ramp = image_of(2, 1, @raster.PixelFormat::Gray8, b"\x00\xff")
+  let wide = scaled(ramp, 4, 1, @raster.Sampling::Bilinear)
+  // Four out of two: the two inner pixels are the only ones between samples,
+  // and they are a quarter and three quarters of the way across.
+  assert_eq(bytes_of(wide), b"\x00\x40\xbf\xff")
 }
 
 ///|

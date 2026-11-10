@@ -137,7 +137,7 @@ pub(all) struct Image {
   premultiplied : Bool
   metadata : Metadata
 }
-pub fn Image::blur(Self, Double) -> Self
+pub fn Image::blur(Self, Double, kernel? : Kernel) -> Self
 pub fn Image::brightness(Self, Double) -> Self
 pub fn Image::composite(Self, Self, x? : Int32, y? : Int32, opacity? : Double) -> Self
 pub fn Image::contrast(Self, Double) -> Self
@@ -172,6 +172,15 @@ pub fn Intent::equal(Self, Self) -> Bool
 pub fn Intent::not_equal(Self, Self) -> Bool
 pub fn Intent::of(Int32) -> Self?
 pub fn Intent::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) enum Kernel {
+  Exact
+  Boxes
+}
+pub fn Kernel::equal(Self, Self) -> Bool
+pub fn Kernel::not_equal(Self, Self) -> Bool
+pub fn Kernel::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Limits {
   width : Int32

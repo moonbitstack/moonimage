@@ -77,3 +77,16 @@ test "and is as close to Pillow as an approximate Gaussian can be" {
     }
   }
 }
+
+///|
+test "the box passes agree with Pillow to within one step of a sample" {
+  for case in box_cases {
+    let (name, radius, source, expected) = case
+    let image = image_of(13, 9, @raster.PixelFormat::Rgba8, source)
+    let blurred = image.blur(radius, kernel=@raster.Kernel::Boxes)
+    let gap = widest_gap(rgba8_of(blurred), expected)
+    if gap > 1 {
+      abort("\{name}: differs from Pillow by \{gap}")
+    }
+  }
+}

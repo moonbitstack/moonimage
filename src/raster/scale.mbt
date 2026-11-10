@@ -13,13 +13,12 @@
 // little ringing; and the Gaussian is the one to reach for when the ringing
 // itself is the problem, because its kernel has none.
 //
-// The four that reach past two taps widen their footprint when the image is
-// being made smaller. A filter sampled at the output rate sees one input pixel
-// in eight and throws the other seven away, which is what aliasing is: widening
-// the footprint so that it covers everything the output pixel stands for is the
-// whole of antialiasing. Bilinear stays at two taps in both directions — it is
-// the cheap filter, and a caller who wants the footprint covered has four
-// others to choose from.
+// Every filter widens its footprint when the image is being made smaller. A
+// filter sampled at the output rate sees one input pixel in eight and throws the
+// other seven away, which is what aliasing is: widening the footprint so that it
+// covers everything the output pixel stands for is the whole of antialiasing.
+// Bilinear is the cheapest of them at two taps when scaling up, and at any
+// downscale it covers what it stands for like the rest.
 //
 // Alpha is resampled premultiplied even when the image is not stored that way.
 // A transparent pixel usually has an arbitrary colour behind its alpha, and
@@ -313,8 +312,7 @@ fn axis_weights(
   sampling : Sampling,
 ) -> Array[Array[(Int32, Double)]] {
   let ratio = source.to_double() / target.to_double()
-  let wide = !(sampling == Bilinear)
-  let filterscale = if wide && ratio > 1.0 { ratio } else { 1.0 }
+  let filterscale = if ratio > 1.0 { ratio } else { 1.0 }
   let support = (match sampling {
       Nearest => 0.5
       Bilinear => 1.0
@@ -325,26 +323,19 @@ fn axis_weights(
     filterscale
   let taps : Array[Array[(Int32, Double)]] = []
   for i in 0..<target {
-    let center = if sampling == Bilinear {
-      (i.to_double() + 0.5) * ratio - 0.5
-    } else {
-      (i.to_double() + 0.5) * ratio
-    }
+    // Where the centre of the output pixel falls in the input, in samples.
+    let center = (i.to_double() + 0.5) * ratio
     let weights : Array[(Int32, Double)] = []
-    if sampling == Bilinear {
-      let left = center.floor().to_int()
-      let fraction = center - left.to_double()
-      push_weight(weights, left, 1.0 - fraction, source)
-      push_weight(weights, left + 1, fraction, source)
-    } else {
-      let first = (center - support).floor().to_int()
-      let last = (center + support).floor().to_int()
-      for index in first..<=last {
-        let offset = (index.to_double() + 0.5 - center) / filterscale
-        let weight = kernel(sampling, offset)
-        if weight != 0.0 {
-          push_weight(weights, index, weight, source)
-        }
+    // The samples whose centres the footprint reaches, rounded outwards the way
+    // every implementation of this indirection rounds: the first sample is
+    // floor(from + half), and the last is one before floor(to + half).
+    let first = (center - support + 0.5).floor().to_int()
+    let last = (center + support + 0.5).floor().to_int() - 1
+    for index in first..<=last {
+      let offset = (index.to_double() + 0.5 - center) / filterscale
+      let weight = kernel(sampling, offset)
+      if weight != 0.0 {
+        push_weight(weights, index, weight, source)
       }
     }
     let total = sum_weights(weights)
@@ -362,6 +353,14 @@ fn axis_weights(
 /// The filter itself, in one dimension, centred on zero.
 fn kernel(sampling : Sampling, x : Double) -> Double {
   match sampling {
+    Bilinear => {
+      let distance = if x < 0.0 { -x } else { x }
+      if distance < 1.0 {
+        1.0 - distance
+      } else {
+        0.0
+      }
+    }
     CatmullRom => catmull_rom(x)
     Gaussian =>
       // Three sigma of a kernel whose standard deviation is half a pixel: the
