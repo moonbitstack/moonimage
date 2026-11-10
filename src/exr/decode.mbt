@@ -35,6 +35,8 @@ pub(all) enum Compression {
   Zip
   /// A bitmap of the words used, a wavelet, and a Huffman code.
   Piz
+  /// Twenty-four bits of every sample, split by significance and differenced.
+  Pxr24
 }
 
 ///|
@@ -52,6 +54,7 @@ pub fn Compression::code(self : Compression) -> Int32 {
     Zips => 2
     Zip => 3
     Piz => 4
+    Pxr24 => 5
   }
 }
 
@@ -65,6 +68,7 @@ pub fn Compression::of(code : Int32) -> Compression? {
     2 => Some(Zips)
     3 => Some(Zip)
     4 => Some(Piz)
+    5 => Some(Pxr24)
     _ => None
   }
 }
@@ -87,7 +91,11 @@ fn lines_per_chunk(compression : Compression) -> Int32 {
 /// are to be read.
 priv struct Channel {
   name : String
+  /// How wide a sample is, in bytes.
   sample : Int32
+  /// What a sample is: nought for an unsigned integer, one for a half, two for
+  /// a float. PXR24 stores each of the three differently.
+  kind : Int32
 }
 
 ///|
@@ -178,6 +186,7 @@ pub fn decode(
         None => Bytes::from_array(body.to_array())
         Rle => unpack_rle(body, want)
         Piz => piz_unpack(body, want, channels, width, lines)
+        Pxr24 => pxr24_unpack(body, want, channels, width, lines)
         _ => inflate(body, want, compression)
       }
     }
@@ -191,7 +200,13 @@ pub fn decode(
         for x in 0..<width {
           let value = sample_of(data, at, channel.sample)
           at = at + channel.sample
-          if give >= 0 {
+          if give == 4 {
+            // A luminance channel is the picture in grey, so it fills all three
+            // of red, green and blue.
+            @raster.put_float(out, row + x * 16, value)
+            @raster.put_float(out, row + x * 16 + 4, value)
+            @raster.put_float(out, row + x * 16 + 8, value)
+          } else if give >= 0 {
             @raster.put_float(out, row + x * 16 + give * 4, value)
           }
         }
@@ -334,7 +349,7 @@ fn read_channels(body : BytesView) -> Array[Channel] raise @raster.Refused {
       2 => 4
       _ => raise @raster.Unsupported(at~, got="a sample type of \{kind}")
     }
-    channels.push({ name: name.0, sample, })
+    channels.push({ name: name.0, sample, kind, })
     at = at + 16
   }
   channels

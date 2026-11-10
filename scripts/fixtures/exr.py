@@ -37,6 +37,7 @@ COMPRESSIONS = {
     "zips": OpenEXR.ZIPS_COMPRESSION,
     "zip": OpenEXR.ZIP_COMPRESSION,
     "piz": OpenEXR.PIZ_COMPRESSION,
+    "pxr24": OpenEXR.PXR24_COMPRESSION,
 }
 
 
@@ -98,7 +99,7 @@ def cases():
         ("float", np.float32, 41, 23, True),
     ]
     for kind, dtype, width, height, alpha in plans:
-        for compression in ["none", "rle", "zips", "zip", "piz"]:
+        for compression in ["none", "rle", "zips", "zip", "piz", "pxr24"]:
             if kind == "float" and compression in ("rle", "zips"):
                 continue
             name = "%s-%dx%d-%s" % (kind, width, height, compression)

@@ -206,6 +206,17 @@ fn write_channels(
 }
 
 ///|
+/// What a sample of this width is, as far as a compression that looks inside it
+/// is concerned.
+fn kind_of(sample : Int32) -> Int32 {
+  if sample == 2 {
+    1
+  } else {
+    2
+  }
+}
+
+///|
 /// A chunk, split into two halves and differenced, then compressed.
 fn pack(
   raw : FixedArray[Byte],
@@ -220,14 +231,17 @@ fn pack(
   if compression == None {
     return bytes
   }
-  if compression == Piz {
-    // The wavelet reads the chunk by channel rather than by row, and it does its
-    // own packing; nothing in front of it.
+  if compression == Piz || compression == Pxr24 {
+    // Both read the chunk by channel rather than by row, and both do their own
+    // packing; nothing in front of them.
     let channels : Array[Channel] = []
     for _ in 0..<channel_count {
-      channels.push({ name: "", sample, })
+      channels.push({ name: "", sample, kind: kind_of(sample), })
     }
-    return piz_pack(bytes, channels, width, lines)
+    if compression == Piz {
+      return piz_pack(bytes, channels, width, lines)
+    }
+    return pxr24_pack(bytes, channels, width, lines)
   }
   let packed = scramble(raw, want)
   let shorter = if compression == Rle {
