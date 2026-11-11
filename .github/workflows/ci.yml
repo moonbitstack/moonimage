@@ -107,7 +107,7 @@ jobs:
       - name: the two references
         run: |
           python3 -m venv "$RUNNER_TEMP/references"
-          "$RUNNER_TEMP/references/bin/pip" install --quiet pillow numpy OpenEXR
+          "$RUNNER_TEMP/references/bin/pip" install --quiet pillow numpy OpenEXR tifffile
           echo "$RUNNER_TEMP/references/bin" >> $GITHUB_PATH
 
       - name: the pictures
@@ -126,6 +126,8 @@ jobs:
           key: reader-${{ hashFiles('scripts/samples/read_image/Cargo.toml') }}
 
       - name: fetch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/samples/fetch.py
 
       - name: check

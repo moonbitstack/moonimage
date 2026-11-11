@@ -138,6 +138,16 @@ fn write(format : String, path : String) -> Result[String, String] {
       compression: @exr.Compression::Rle,
       half: true,
     })
+  } else if format == "exr-zips" {
+    @exr.encode(image, options=@exr.EncodeOptions::{
+      compression: @exr.Compression::Zips,
+      half: true,
+    })
+  } else if format == "exr-none" {
+    @exr.encode(image, options=@exr.EncodeOptions::{
+      compression: @exr.Compression::None,
+      half: true,
+    })
   } else {
     let named = match name_of(format) {
       Some(found) => found

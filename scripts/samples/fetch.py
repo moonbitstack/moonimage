@@ -80,13 +80,17 @@ def download(repository: str, commit: str, path: str) -> bytes:
         path,
         commit,
     )
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/vnd.github.raw",
-            "User-Agent": "moonimage-conformance",
-        },
-    )
+    headers = {
+        "Accept": "application/vnd.github.raw",
+        "User-Agent": "moonimage-conformance",
+    }
+    # A continuous-integration run carries the job's own token, which lifts the
+    # anonymous limit of sixty requests an hour off a shared runner address. A
+    # run on a machine without one still works at the lower limit.
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    request = urllib.request.Request(url, headers=headers)
     # A picture of a megabyte over a slow link is a read that times out rather
     # than fails, so a run tries again before it gives up.
     last = None

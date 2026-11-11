@@ -9,9 +9,12 @@ Two questions, both answered by reading bytes somebody else wrote:
 
 1. Can this library read what the world writes? Every picture of the three
    corpora `fetch.py` downloads — libtiff's test images, openexr-images and
-   Netpbm's samples — is decoded here, by Pillow and by the `image` crate, and
-   the three results have to agree. A file this library refuses has to be
-   refused on purpose, which is what `REFUSED` below records.
+   Netpbm's samples — is decoded here, by Pillow, by the `image` crate, by
+   `tifffile` for TIFF and by OpenEXR's own library for EXR, and the results
+   have to agree. Every file has to be held against at least one reader that is
+   not this library. A file this library refuses has to be refused on purpose,
+   which is what `REFUSED` below records; `PILLOW_MISREADS` records a shape a
+   reference reader is known to get wrong.
 
 2. Can the world read what this library writes? Every format the writer produces
    is written once, then read back by all three. The pictures have to agree with
@@ -46,6 +49,15 @@ REFUSED = {
     "Cannon.exr": "B44 blocks",
 }
 
+# A reader that reads a file but reads it wrong, and the reason the disagreement
+# is not ours. A file listed here still has to be held against another reader:
+# the skip is recorded in the row rather than quietly omitted. Pillow returns a
+# zero alpha plane for a TIFF whose samples are in separate planes, which both
+# `tifffile` and the bytes themselves disagree with.
+PILLOW_MISREADS = {
+    "minisblack-2c-8b-alpha.tiff": "drops the alpha of separated planes",
+}
+
 # How much the three decoders may disagree: zero for an eight-bit picture read
 # by three implementations that all follow the same table, and one where a
 # sixteen-bit or a float sample has to be brought down to eight.
@@ -76,6 +88,8 @@ WRITTEN = [
     ("exr-piz", ".exr", 1, ("image", "openexr")),
     ("exr-piz-float", ".exr", 1, ("image", "openexr")),
     ("exr-rle", ".exr", 1, ("image", "openexr")),
+    ("exr-zips", ".exr", 1, ("image", "openexr")),
+    ("exr-none", ".exr", 1, ("image", "openexr")),
     ("exr-pxr24", ".exr", 1, ("image", "openexr")),
     ("farbfeld", ".ff", 0, ("image",)),
 ]
@@ -86,6 +100,14 @@ def read_pillow(path: Path):
     try:
         with Image.open(path) as picture:
             picture.seek(0)
+            if picture.mode == "La":
+                # Pillow has no conversion from grey-with-alpha straight to
+                # RGBA, but it can split the two, widen the grey to three
+                # channels and put the alpha back.
+                luma, alpha = picture.split()
+                colour = luma.convert("RGB")
+                colour.putalpha(alpha)
+                return np.array(colour, dtype=np.uint8)
             return np.array(picture.convert("RGBA"), dtype=np.uint8)
     except Exception:
         return None
@@ -113,6 +135,54 @@ def read_openexr(path: Path):
                     picture = np.concatenate([picture, alpha], axis=2)
                 return picture
         return None
+    except Exception:
+        return None
+
+
+def read_tifffile(path: Path):
+    """The picture as `tifffile` reads it, which is the reader that understands
+    TIFF samples stored in separate planes — a shape Pillow flattens and the
+    `image` crate refuses. Palette pages are left to Pillow, which has the colour
+    map; a page whose compression needs a codec this script does not carry is
+    left out too."""
+    try:
+        import tifffile
+    except ImportError:
+        return None
+    try:
+        with tifffile.TiffFile(path) as handle:
+            page = handle.pages[0]
+            if page.photometric not in (0, 1, 2):  # miniswhite, minisblack, rgb
+                return None
+            samples = page.asarray()
+            separate = page.planarconfig == 2
+            white_is_zero = page.photometric == 0
+        if separate and samples.ndim == 3:
+            samples = np.moveaxis(samples, 0, -1)
+        if samples.dtype == np.bool_:
+            samples = samples.astype(np.uint8) * 255
+        elif samples.dtype == np.uint16:
+            samples = np.rint(samples.astype(np.float64) / 257.0)
+        else:
+            samples = samples.astype(np.float64)
+        if white_is_zero:
+            samples = 255.0 - samples
+        if samples.ndim == 2:
+            samples = np.repeat(samples[:, :, None], 4, axis=2)
+            samples[:, :, 3] = 255
+        elif samples.shape[2] == 1:
+            samples = np.repeat(samples, 4, axis=2)
+            samples[:, :, 3] = 255
+        elif samples.shape[2] == 2:
+            samples = np.concatenate(
+                [np.repeat(samples[:, :, :1], 3, axis=2), samples[:, :, 1:]], axis=2
+            )
+        elif samples.shape[2] == 3:
+            alpha = np.full(samples.shape[:2] + (1,), 255.0)
+            samples = np.concatenate([samples, alpha], axis=2)
+        elif samples.shape[2] != 4:
+            return None
+        return np.clip(np.rint(samples), 0, 255).astype(np.uint8)
     except Exception:
         return None
 
@@ -191,6 +261,16 @@ def widest16(one, other):
     return int(difference.max()), int((difference > 0).sum())
 
 
+def refusal_reason(complaint: str) -> str:
+    """The part of a reader's refusal that says what it could not do, without
+    the local path it happened to be reading at the time."""
+    first = complaint.splitlines()[0] if complaint.strip() else "refused"
+    # The reader writes "error: <path>: <what it could not do>"; splitting only
+    # twice keeps the message whole even when it has a colon of its own.
+    pieces = first.split(": ", 2)
+    return (pieces[2] if len(pieces) > 2 else pieces[-1])[:72]
+
+
 def widest(one, other):
     """The largest difference, and how many samples are not the same."""
     if one.shape != other.shape:
@@ -246,10 +326,17 @@ def check_corpora(arguments, moon: Path, reader: Path, work: Path, report: Repor
                 sixteen = read_pillow16(path)
                 if sixteen is not None:
                     mine = read_ours16(moon, path, work)
+                    if mine is None:
+                        report.row(name, "sixteen bits: cannot read back", False)
+                        continue
                     gap, count = widest16(mine, sixteen)
                     details.append("Pillow16 %d/%d" % (gap, count))
                     report.row(name, ", ".join(details), gap <= 2)
                     continue
+                # Every row has to have been held against at least one reader
+                # that is not this library; a reader that refuses a shape says so
+                # in the row, and a file nobody else can read is not a pass.
+                compared = 0
                 if path.suffix.lower() == ".exr":
                     theirs = read_openexr(path)
                     gap, count = widest(ours, theirs) if theirs is not None else (None, None)
@@ -259,18 +346,34 @@ def check_corpora(arguments, moon: Path, reader: Path, work: Path, report: Repor
                     else:
                         details.append("openexr %d/%d" % (gap, count))
                         ok = ok and gap <= tolerance
+                        compared += 1
                 pillow = read_pillow(path)
                 if pillow is not None:
-                    gap, count = widest(ours, pillow)
-                    if gap is None:
-                        details.append("Pillow sees %s" % (pillow.shape,))
-                        ok = False
+                    if path.name in PILLOW_MISREADS:
+                        details.append("Pillow: " + PILLOW_MISREADS[path.name])
                     else:
-                        details.append("Pillow %d/%d" % (gap, count))
-                        ok = ok and gap <= tolerance
+                        gap, count = widest(ours, pillow)
+                        if gap is None:
+                            details.append("Pillow sees %s" % (pillow.shape,))
+                            ok = False
+                        else:
+                            details.append("Pillow %d/%d" % (gap, count))
+                            ok = ok and gap <= tolerance
+                            compared += 1
+                if path.suffix.lower() in (".tiff", ".tif"):
+                    plane_reader = read_tifffile(path)
+                    if plane_reader is not None:
+                        gap, count = widest(ours, plane_reader)
+                        if gap is None:
+                            details.append("tifffile sees %s" % (plane_reader.shape,))
+                            ok = False
+                        else:
+                            details.append("tifffile %d/%d" % (gap, count))
+                            ok = ok and gap <= tolerance
+                            compared += 1
                 theirs, complaint = read_image_crate(reader, path, work)
                 if theirs is None:
-                    details.append("image: " + complaint.splitlines()[0][:40])
+                    details.append("image: " + refusal_reason(complaint))
                 else:
                     gap, count = widest(ours, theirs)
                     if gap is None:
@@ -279,6 +382,10 @@ def check_corpora(arguments, moon: Path, reader: Path, work: Path, report: Repor
                     else:
                         details.append("image %d/%d" % (gap, count))
                         ok = ok and gap <= tolerance
+                        compared += 1
+                if compared == 0:
+                    details.append("no other reader could compare it")
+                    ok = False
                 report.row(name, ", ".join(details), ok)
 
 
@@ -309,7 +416,7 @@ def check_written(arguments, moon: Path, reader: Path, work: Path, report: Repor
             else:
                 theirs, complaint = read_image_crate(reader, path, work)
                 if theirs is None:
-                    details.append("image: " + complaint.splitlines()[0][:40])
+                    details.append("image: " + refusal_reason(complaint))
                     ok = False
                     continue
             if theirs is None:
