@@ -13,6 +13,7 @@ import {
   "moonbitstack/moonimage/farbfeld",
   "moonbitstack/moonimage/pnm",
   "moonbitstack/moonimage/tiff",
+  "moonbitstack/moonimage/webp",
   "moonbitstack/moonimage/dds",
   "moonbitlang/x/fs",
   "moonbitlang/core/env",

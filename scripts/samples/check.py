@@ -79,6 +79,8 @@ WRITTEN = [
     ("jpeg", ".jpg", 3, ("pillow", "image")),
     ("gif", ".gif", 1, ("pillow", "image")),
     ("webp", ".webp", 1, ("pillow", "image")),
+    ("webp-lossy", ".webp", 0, ("pillow", "image")),
+    ("webp-lossy-low", ".webp", 0, ("pillow", "image")),
     ("tiff", ".tiff", 0, ("pillow", "image")),
     ("dds", ".dds", 0, ("pillow",)),
     ("dds-bc1", ".dds", 0, ("pillow",)),

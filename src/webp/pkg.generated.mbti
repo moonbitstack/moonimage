@@ -24,6 +24,8 @@ pub fn encode_animation(@raster.Animation) -> Bytes raise @raster.Refused
 
 pub fn encode_lossless(@raster.Image) -> Bytes
 
+pub fn encode_lossy(@raster.Image, quality? : Int32) -> Bytes
+
 // Errors
 
 // Types and methods

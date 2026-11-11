@@ -237,6 +237,10 @@ fn write(format : String, path : String) -> Result[String, String] {
       compression: @exr.Compression::Dwaa,
       half: true,
     })
+  } else if format == "webp-lossy" {
+    @webp.encode_lossy(image)
+  } else if format == "webp-lossy-low" {
+    @webp.encode_lossy(image, quality=30)
   } else if format == "exr-parts" {
     // A picture and a half-size copy of it, which is the shape of a render that
     // writes a beauty pass beside a smaller auxiliary one.
