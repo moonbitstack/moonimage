@@ -104,6 +104,9 @@ WRITTEN = [
     # file this library wrote.
     ("exr-dwaa", ".exr", 1, ("openexr",)),
     ("exr-dwab", ".exr", 1, ("openexr",)),
+    # A file of two parts: the reader asked here opens the first, which is the
+    # picture the display window describes.
+    ("exr-parts", ".exr", 1, ("openexr",)),
     ("farbfeld", ".ff", 0, ("image",)),
 ]
 

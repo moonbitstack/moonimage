@@ -229,6 +229,17 @@ fn write(format : String, path : String) -> Result[String, String] {
       compression: @exr.Compression::Dwaa,
       half: true,
     })
+  } else if format == "exr-parts" {
+    // A picture and a half-size copy of it, which is the shape of a render that
+    // writes a beauty pass beside a smaller auxiliary one.
+    let small = image.scale(
+      image.width / 2,
+      image.height / 2,
+      sampling=@moonimage.Sampling::Nearest,
+    ) catch {
+      error => return Err("\{format}: \{error}")
+    }
+    @exr.encode_parts([("colour", image), ("half", small)])
   } else if format == "exr-dwab" {
     @exr.encode(image, options=@exr.EncodeOptions::{
       compression: @exr.Compression::Dwab,

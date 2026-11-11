@@ -73,3 +73,44 @@ test "a tiled file of frequencies decodes within a step of a half" {
     }
   }
 }
+
+///|
+test "a file of several parts this library writes holds the pictures it was given" {
+  let first = image_of(13, 9, @raster.PixelFormat::RgbaF32, floats(117))
+  let second = image_of(6, 4, @raster.PixelFormat::RgbaF32, floats(24))
+  let file = @exr.encode_parts([("colour", first), ("thumbnail", second)])
+  let images = @exr.decode_parts(file) catch {
+    error => abort("the file this library wrote does not read: \{error}")
+  }
+  assert_eq(images.length(), 2)
+  // The numbers of the test picture are multiples of a sixteenth, which is exact
+  // as a half, so a round trip through the file loses nothing.
+  assert_eq(float_digest_of(images[0]), float_digest_of(first))
+  assert_eq(images[1].width, 6)
+  assert_eq(images[1].height, 4)
+  assert_eq(float_digest_of(images[1]), float_digest_of(second))
+}
+
+///|
+test "several parts are written in every compression the file takes" {
+  let first = image_of(11, 7, @raster.PixelFormat::RgbaF32, floats(77))
+  let second = image_of(5, 3, @raster.PixelFormat::RgbaF32, floats(15))
+  for
+    compression in [
+      @exr.Compression::None,
+      @exr.Compression::Zip,
+      @exr.Compression::Piz,
+      @exr.Compression::Pxr24,
+    ] {
+    let file = @exr.encode_parts([("a", first), ("b", second)], options=@exr.EncodeOptions::{
+      compression,
+      half: true,
+    })
+    let images = @exr.decode_parts(file) catch {
+      error => abort("\{compression.code()}: \{error}")
+    }
+    assert_eq(images.length(), 2)
+    assert_eq(float_digest_of(images[0]), float_digest_of(first))
+    assert_eq(float_digest_of(images[1]), float_digest_of(second))
+  }
+}
