@@ -37,6 +37,17 @@ pub(all) enum Compression {
   Piz
   /// Twenty-four bits of every sample, split by significance and differenced.
   Pxr24
+  /// Blocks of four by four halves, fourteen bytes each: four bits of a sample
+  /// kept, everything below them dropped.
+  B44
+  /// The same, with a block of one value written in three bytes instead.
+  B44a
+  /// Eight-by-eight blocks of a picture turned into frequencies and quantized,
+  /// thirty-two scanlines to a chunk.
+  Dwaa
+  /// The same with two hundred and fifty-six scanlines to a chunk, which suits a
+  /// photograph better and a strip of a tiled render worse.
+  Dwab
 }
 
 ///|
@@ -55,6 +66,10 @@ pub fn Compression::code(self : Compression) -> Int32 {
     Zip => 3
     Piz => 4
     Pxr24 => 5
+    B44 => 6
+    B44a => 7
+    Dwaa => 8
+    Dwab => 9
   }
 }
 
@@ -69,6 +84,10 @@ pub fn Compression::of(code : Int32) -> Compression? {
     3 => Some(Zip)
     4 => Some(Piz)
     5 => Some(Pxr24)
+    6 => Some(B44)
+    7 => Some(B44a)
+    8 => Some(Dwaa)
+    9 => Some(Dwab)
     _ => None
   }
 }
@@ -82,6 +101,8 @@ fn lines_per_chunk(compression : Compression) -> Int32 {
     // loses one line rather than sixteen.
     None | Rle | Zips => 1
     Piz => 32
+    B44 | B44a | Dwaa => 32
+    Dwab => 256
     _ => 16
   }
 }
@@ -96,6 +117,10 @@ priv struct Channel {
   /// What a sample is: nought for an unsigned integer, one for a half, two for
   /// a float. PXR24 stores each of the three differently.
   kind : Int32
+  /// Whether the samples are already perceptually uniform, which B44 and DWA
+  /// each act on in their own way: a channel that is not gets a curve applied
+  /// before the lossy step.
+  linear : Bool
 }
 
 ///|
@@ -147,6 +172,15 @@ pub fn decode(
   }
   let row_bytes = row_size(channels, width)
   let sample_row = width * 16
+  // A chunk of B44 whose channels ask for the perceptual curve needs a table of
+  // sixty-five thousand entries, and one file's worth of chunks needs one of
+  // them: it is built here rather than in each chunk.
+  let b44_logs = if (compression == B44 || compression == B44a) &&
+    b44_needs_table(channels) {
+    b44_log_table()
+  } else {
+    []
+  }
   let out : FixedArray[Byte] = FixedArray::make(height * sample_row, b'\x00')
   // Alpha starts at one so that a picture without an alpha channel is opaque
   // rather than black.
@@ -187,6 +221,8 @@ pub fn decode(
         Rle => unpack_rle(body, want)
         Piz => piz_unpack(body, want, channels, width, lines)
         Pxr24 => pxr24_unpack(body, want, channels, width, lines)
+        B44 | B44a => b44_unpack(body, channels, width, lines, logs=b44_logs)
+        Dwaa | Dwab => dwa_unpack(body, channels, width, lines)
         _ => inflate(body, want, compression)
       }
     }
@@ -349,7 +385,9 @@ fn read_channels(body : BytesView) -> Array[Channel] raise @raster.Refused {
       2 => 4
       _ => raise @raster.Unsupported(at~, got="a sample type of \{kind}")
     }
-    channels.push({ name: name.0, sample, kind, })
+    // A byte the specification calls `pLinear`, then three reserved ones.
+    let linear = body[at + 4].to_int() != 0
+    channels.push({ name: name.0, sample, kind, linear, })
     at = at + 16
   }
   channels

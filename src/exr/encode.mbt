@@ -236,12 +236,22 @@ fn pack(
     // packing; nothing in front of them.
     let channels : Array[Channel] = []
     for _ in 0..<channel_count {
-      channels.push({ name: "", sample, kind: kind_of(sample), })
+      channels.push({ name: "", sample, kind: kind_of(sample), linear: false, })
     }
     if compression == Piz {
       return piz_pack(bytes, channels, width, lines)
     }
     return pxr24_pack(bytes, channels, width, lines)
+  }
+  if compression == B44 || compression == B44a {
+    // Blocks rather than bytes: the channel list is what says where one
+    // channel's blocks end and the next begins.
+    let channels : Array[Channel] = []
+    for _ in 0..<channel_count {
+      channels.push({ name: "", sample, kind: kind_of(sample), linear: false, })
+    }
+    let packed = b44_pack(bytes, channels, width, lines, compression == B44a)
+    return if packed.length() >= want { bytes } else { packed }
   }
   let packed = scramble(raw, want)
   let shorter = if compression == Rle {

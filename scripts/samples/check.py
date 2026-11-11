@@ -46,7 +46,6 @@ ROOT = Path(__file__).resolve().parents[2]
 REFUSED = {
     "quad-tile.jpg.tiff": "tiles rather than strips",
     "logluv-3c-16b.tiff": "LogLuv encoding",
-    "Cannon.exr": "B44 blocks",
 }
 
 # A reader that reads a file but reads it wrong, and the reason the disagreement
@@ -91,6 +90,8 @@ WRITTEN = [
     ("exr-zips", ".exr", 1, ("image", "openexr")),
     ("exr-none", ".exr", 1, ("image", "openexr")),
     ("exr-pxr24", ".exr", 1, ("image", "openexr")),
+    ("exr-b44", ".exr", 2, ("image", "openexr")),
+    ("exr-b44a", ".exr", 2, ("image", "openexr")),
     ("farbfeld", ".ff", 0, ("image",)),
 ]
 
