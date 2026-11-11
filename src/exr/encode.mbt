@@ -75,6 +75,14 @@ pub fn encode(image : @raster.Image, options? : EncodeOptions) -> Bytes {
   writer.u32_le(0x3F800000)
   writer.u8(0)
   let per_chunk = lines_per_chunk(options.compression)
+  // The two compressions that turn a block into frequencies need two tables of
+  // sixty-five thousand entries each; one of them for the whole file rather
+  // than one for every chunk of it.
+  let curve = if options.compression == Dwaa || options.compression == Dwab {
+    Some(dwa_curve())
+  } else {
+    None
+  }
   let chunks = (height + per_chunk - 1) / per_chunk
   let table_at = writer.length()
   writer.zeros(chunks * 8)
@@ -116,10 +124,11 @@ pub fn encode(image : @raster.Image, options? : EncodeOptions) -> Bytes {
       raw,
       row_bytes * lines,
       options.compression,
-      names.length(),
+      names,
       width,
       lines,
       sample,
+      curve,
     )
     let here = writer.length()
     // The offset table was reserved before the first chunk, so its entry is
@@ -222,14 +231,27 @@ fn pack(
   raw : FixedArray[Byte],
   want : Int32,
   compression : Compression,
-  channel_count : Int32,
+  names : Array[String],
   width : Int32,
   lines : Int32,
   sample : Int32,
+  curve : DwaCurve?,
 ) -> Bytes {
   let bytes = Bytes::from_array(raw.clamped_view())
   if compression == None {
     return bytes
+  }
+  let channel_count = names.length()
+  if compression == Dwaa || compression == Dwab {
+    // The frequencies of a block depend on what the channel means, so this one
+    // needs the names the others do not.
+    let channels : Array[Channel] = []
+    for name in names {
+      channels.push({ name, sample, kind: kind_of(sample), linear: false, })
+    }
+    let tables = curve.unwrap_or(dwa_curve())
+    let packed = dwa_pack(bytes, channels, width, lines, tables)
+    return if packed.length() >= want { bytes } else { packed }
   }
   if compression == Piz || compression == Pxr24 {
     // Both read the chunk by channel rather than by row, and both do their own

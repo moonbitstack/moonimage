@@ -92,6 +92,11 @@ WRITTEN = [
     ("exr-pxr24", ".exr", 1, ("image", "openexr")),
     ("exr-b44", ".exr", 2, ("image", "openexr")),
     ("exr-b44a", ".exr", 2, ("image", "openexr")),
+    # The two frequency-domain compressions are lossy by construction; what is
+    # checked here is that the format's own reader and this one agree about the
+    # file this library wrote.
+    ("exr-dwaa", ".exr", 1, ("openexr",)),
+    ("exr-dwab", ".exr", 1, ("openexr",)),
     ("farbfeld", ".ff", 0, ("image",)),
 ]
 
