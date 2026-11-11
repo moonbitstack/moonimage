@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # What this library does with each official sample it cannot read, and why. A
 # file listed here has to be refused; a file that is not listed has to be read.
 REFUSED = {
-    "quad-tile.jpg.tiff": "tiles rather than strips",
+    "quad-tile.jpg.tiff": "JPEG-compressed tiles",
     "logluv-3c-16b.tiff": "LogLuv encoding",
 }
 

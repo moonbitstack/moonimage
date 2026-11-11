@@ -128,10 +128,11 @@
             <code>decode</code> looks at the first bytes and picks the codec;
             <code>encode</code> takes a picture and a format. The same picture
             goes out as PNG, QOI, BMP, TGA, JPEG, GIF, lossless WebP, TIFF, an
-            icon, a PNM, farbfeld, Radiance HDR or OpenEXR, without the call
-            site changing. OpenEXR takes any of its nine scanline compressions,
+            icon, a PNM, farbfeld, Radiance HDR, OpenEXR or a texture, without
+            the call site changing. OpenEXR takes any of its nine compressions,
             the wavelet of PIZ, the plane-splitting of PXR24, the blocks of B44
-            and the frequencies of DWA included.
+            and the frequencies of DWA included; a TIFF can be written as strips
+            or as tiles; a texture as a surface of plain samples.
           </p>
         </div>
 
@@ -234,11 +235,11 @@
       <p class="note">
         The test images of libtiff, the pictures of openexr-images and the
         samples of Netpbm are decoded here and by the others, and every file has
-        to be held against at least one reader that is not this library. Two
-        files are refused on purpose and named — a tiled TIFF and a LogLuv
-        TIFF — as are the shapes a reference reader is known to misread.
-        The two formats that do not come back exact are the two whose inverse
-        transforms are done in different arithmetic.
+        to be held against at least one reader that is not this library. One
+        file is refused on purpose and named — a LogLuv TIFF — as are the shapes
+        a reference reader is known to misread. The formats that do not come back
+        exact are the ones whose inverse transforms are done in different
+        arithmetic.
       </p>
     </div>
   </section>

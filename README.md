@@ -82,13 +82,13 @@ options record.
 | JPEG | baseline and progressive, every subsampling, greyscale, EXIF orientation | baseline, quality 1–100, three subsamplings | — | `@moonimage/jpeg` |
 | GIF | palettes, transparency, interlace, run lengths | palette by exact colours or median cut, dithering | yes | `@moonimage/gif` |
 | WebP | lossless (VP8L) with its four transforms, and lossy (VP8) with its boolean coder, predictors, loop filter and chroma upsampling; alpha in either; animated files | lossless, with a predictor transform and LZ77 | yes | `@moonimage/webp` |
-| TIFF | strips, LZW, PackBits, deflate or none, horizontal prediction, grey, grey with alpha, RGB, RGBA and palette at 1 to 16 bits, planar or chunky, every page | 8 and 16 bits, three compressions, prediction on request, several pages | pages | `@moonimage/tiff` |
+| TIFF | strips or tiles, LZW, PackBits, deflate or none, horizontal prediction, grey, grey with alpha, RGB, RGBA and palette at 1 to 16 bits, planar or chunky, every page | 8 and 16 bits, three compressions, prediction on request, several pages, tiles on request | pages | `@moonimage/tiff` |
 | ICO / CUR | PNG entries and bitmap entries at 1/4/8/24/32 bits with the one-bit mask, every size in the file | PNG entries, at any list of sizes | sizes | `@moonimage/ico` |
 | PNM | PBM, PGM, PPM and PAM, both spellings, any maximum | all four shapes, both spellings | — | `@moonimage/pnm` |
 | Radiance HDR | RGBE, the new run-length code and the flat one, all four origins | RGBE with the run-length code | — | `@moonimage/hdr` |
-| OpenEXR | scanlines in half or float, uncompressed, RLE, ZIPS, ZIP, PIZ, PXR24, B44, B44A, DWAA or DWAB | everything but the two DWA | — | `@moonimage/exr` |
+| OpenEXR | scanlines or tiles, one part or several, in half or float, uncompressed, RLE, ZIPS, ZIP, PIZ, PXR24, B44, B44A, DWAA or DWAB | scanlines, all nine compressions | — | `@moonimage/exr` |
 | farbfeld | the whole format | the whole format | — | `@moonimage/farbfeld` |
-| DDS | BC1 to BC7 blocks, and uncompressed surfaces | — | — | `@moonimage/dds` |
+| DDS | BC1 to BC7 blocks, and uncompressed surfaces | BC1 to BC5 blocks, and uncompressed surfaces | — | `@moonimage/dds` |
 
 Both halves of WebP are read; the lossless one, VP8L, is also written. VP8 is the
 intra frame of a video codec, so its picture is rebuilt rather than decoded: a
@@ -103,14 +103,18 @@ A lossy picture has no alpha in VP8 itself, so a transparent one carries a
 separate `ALPH` chunk beside the picture. That is read too, in a still picture and
 inside an animation frame, and comes back as four samples per pixel.
 
-A TIFF is a directory of tags pointing at data anywhere in the file; this reader
-takes strips rather than tiles, and refuses a tiled file by name instead of
-reading its rows in the wrong order. A DDS is a block grid: four by four pixels
-become eight or sixteen bytes, and what those bytes hold is a format of its own —
-two endpoints and an index a pixel in BC1 to BC5, a mode number and a table of
-shapes in BC7, and half-precision light in BC6H. `decode` gives the picture in
-the layout the block is, and `decode` takes a format for the one a caller is
-drawing with, because a block layout is rarely a display layout.
+A TIFF is a directory of tags pointing at data anywhere in the file, and a page
+of it holds either strips — rows grouped for compression — or tiles, which are
+the same rows cut into rectangles. Both are read, and either can be written. An
+EXR is read the same way: a part of it holds scanlines or tiles, and a file may
+hold several parts, each with its own channels and its own compression.
+
+A DDS is a block grid: four by four pixels become eight or sixteen bytes, and
+what those bytes hold is a format of its own — two endpoints and an index a pixel
+in BC1 to BC5, a mode number and a table of shapes in BC7, and half-precision
+light in BC6H. `decode` gives the picture in the layout the block is, and `decode`
+takes a format for the one a caller is drawing with, because a block layout is
+rarely a display layout.
 
 ## The image
 
@@ -347,7 +351,7 @@ bits. The other two are refused on purpose, and named:
 
 | File | Refused because |
 |:--|:--|
-| `quad-tile.jpg.tiff` | the page is tiled rather than stripped |
+| `quad-tile.jpg.tiff` | its tiles are JPEG-compressed |
 | `logluv-3c-16b.tiff` | the samples are LogLuv encoded |
 
 Where a reference reader cannot be used as one, the harness says so rather than
@@ -357,17 +361,20 @@ the single-channel OpenEXR ramps. Every file has to be held against at least one
 reader that is not this library.
 
 **Writing.** Every format this library produces is written once and read back by
-Pillow and by `image` — by OpenEXR too for the eight compressions of that format
-this library writes — and the three have to agree about what the file says. A format that is lossy is
+Pillow and by `image` — by OpenEXR too for the nine compressions of that format,
+and by `tifffile` for the tiles of a page — and they have to agree about what the
+file says. A format that is lossy is
 not required to give back what went in, only to mean the same thing to everyone
 who reads it.
 
 | Format | Largest disagreement |
 |:--|:--|
-| PNG, BMP, TGA, GIF, TIFF, ICO, PNM, QOI, farbfeld | none |
+| PNG, BMP, TGA, GIF, TIFF, tiled TIFF, ICO, PNM, QOI, farbfeld | none |
 | WebP, lossless | none |
 | OpenEXR, uncompressed, RLE, ZIP, PIZ, PXR24 | none |
 | OpenEXR, B44 | one step, on one sample of three thousand |
+| DDS, uncompressed | none |
+| DDS, BC1 to BC5 | none, between two readers of the same blocks |
 | Radiance HDR | one step |
 | JPEG | three steps |
 
@@ -382,12 +389,16 @@ eight-bit sample once in a while.
 
 - **AVIF.** Decoding one needs a whole AV1 decoder, which is several times the
   size of this library, so it is not planned.
-- **Writing the two DWA compressions of OpenEXR.** Reading them is done, and so
-  is writing B44 and B44A; a writer of a frequency-domain picture is a quantizer
-  and an entropy coder of its own, and this one has no caller asking for it.
-- **Tiled and multi-part OpenEXR, tiled TIFF.** Both readers take scanlines and
-  strips, and say so instead of reading the rows in the wrong order.
-- **Writing tiled TIFF, writing lossy WebP, writing DDS.**
+- **Writing lossy WebP.** The lossless half is written; the lossy half needs a VP8
+  intra encoder — a forward transform, a quantizer, a mode decision and the
+  boolean coder's other side — which is a codec in itself rather than a page of
+  arithmetic.
+- **Writing BC6H and BC7 blocks of a DDS.** Reading them is done, and BC1 to BC5
+  are written; the endpoints of one of their blocks are chosen by a search over
+  eight modes and sixty-four partitions, and a block fitted by the simple search
+  this writer uses would be a worse picture than those formats exist for.
+- **Writing several parts of an OpenEXR.** Reading them is done; a file this
+  library writes holds one picture, which is what a caller of `encode` has.
 
 ## Interface
 

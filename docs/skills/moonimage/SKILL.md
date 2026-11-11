@@ -150,9 +150,9 @@ test {
 
 ## Things that catch people out
 
-- **`encode` raises.** A format that cannot be written — DDS is read-only —
-  raises `Refused` rather than writing something else. Handle it or declare
-  `raise` on the function.
+- **`encode` raises.** A picture that cannot be written in the format asked for
+  raises `Refused` rather than being written as something else. Handle it or
+  declare `raise` on the function.
 - **A DDS decodes into the layout the block is**: BC4 grey, BC5 red and green,
   BC6H float, the rest RGBA. That is right for a texture you are about to sample,
   and wrong for one you are about to draw; pass `format=` to `decode` — or to
@@ -170,8 +170,15 @@ test {
   said, so that a round trip through `Gray16` is the identity.
 - **`RgbaF32` is not clamped on the way in.** HDR and OpenEXR pictures keep
   values above one; converting to `Rgba8` is what clamps them.
-- **OpenEXR is written in eight of its nine compressions**, chosen with
-  `exr.EncodeOptions`: everything but `Dwaa` and `Dwab`, which are read and not
-  written. `Pxr24` keeps twenty-four bits of every sample, so a float loses its
-  last eight bits of mantissa; `B44` and `B44a` keep four bits of a half in a
-  block of four by four; the rest are exact.
+- **OpenEXR is written in all nine of its compressions**, chosen with
+  `exr.EncodeOptions`. `Pxr24` keeps twenty-four bits of every sample, so a float
+  loses its last eight bits of mantissa; `B44` and `B44a` keep four bits of a
+  half in a block of four by four; `Dwaa` and `Dwab` keep the frequencies of a
+  block of eight by eight, and are the lossiest of the nine. The rest are exact.
+- **A tiled TIFF is written by `encode_tiled`**, which takes the size of a tile;
+  `encode` writes strips. Both read back as the same picture.
+- **An OpenEXR may hold several parts.** `decode` returns the first; `decode_parts`
+  returns them all, in the order the file lists them.
+- **A DDS is written by `dds.encode`**, which takes a block format or nothing at
+  all for a surface of plain samples — the only lossless choice, and the one
+  `encode` makes. `Bc1` to `Bc5` are written; `Bc6h` and `Bc7` refuse.

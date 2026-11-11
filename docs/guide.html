@@ -231,12 +231,16 @@ exr: 444 bytes</code></pre>
           <code>@jpeg.encode(image, options=@jpeg.EncodeOptions::{ quality: 92, subsampling: @jpeg.Subsampling::Yuv444 })</code>.
           OpenEXR takes a compression the same way, out of the nine the format
           names: <code>None</code>, <code>Rle</code>, <code>Zips</code>,
-          <code>Zip</code>, <code>Piz</code>, <code>Pxr24</code> and the two
-          block codes this library writes, with <code>Dwaa</code> and
-          <code>Dwab</code> read. PIZ is the one that wavelet-transforms the
-          words of a chunk before it Huffman-codes them; B44 keeps four bits of
-          every sample in a block of four by four; DWA stores the frequencies of
-          such a block instead of the block.
+          <code>Zip</code>, <code>Piz</code>, <code>Pxr24</code>,
+          <code>B44</code>, <code>B44a</code>, <code>Dwaa</code> or
+          <code>Dwab</code>. PIZ is the one that wavelet-transforms the words of
+          a chunk before it Huffman-codes them; B44 keeps four bits of every
+          sample in a block of four by four; DWA stores the frequencies of such a
+          block instead of the block. A TIFF is written as strips by
+          <code>encode</code> and as tiles by <code>encode_tiled</code>, which
+          takes the size of a tile; a texture is written by
+          <code>@dds.encode</code>, which takes the block format or none at all
+          for a surface of plain samples.
         </p>
       </article>
 

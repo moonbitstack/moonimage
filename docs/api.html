@@ -56,8 +56,8 @@
         <a href="#moonimage" title="Every format, one door">moonimage<span>4</span></a>
         <a href="#raster" title="Pictures and pixels">raster<span>78</span></a>
         <a href="#bmp" title="Windows bitmap">bmp<span>5</span></a>
-        <a href="#dds" title="DirectDraw surface">dds<span>2</span></a>
-        <a href="#exr" title="OpenEXR">exr<span>9</span></a>
+        <a href="#dds" title="DirectDraw surface">dds<span>3</span></a>
+        <a href="#exr" title="OpenEXR">exr<span>10</span></a>
         <a href="#farbfeld" title="farbfeld">farbfeld<span>2</span></a>
         <a href="#hdr" title="Radiance HDR">hdr<span>2</span></a>
         <a href="#ico" title="Windows icons and cursors">ico<span>9</span></a>
@@ -67,7 +67,7 @@
         <a href="#pnm" title="The portable anymap">pnm<span>6</span></a>
         <a href="#qoi" title="Quite OK Image">qoi<span>2</span></a>
         <a href="#tga" title="Truevision TGA">tga<span>5</span></a>
-        <a href="#tiff" title="TIFF">tiff<span>11</span></a>
+        <a href="#tiff" title="TIFF">tiff<span>12</span></a>
         <a href="#webp" title="WebP">webp<span>9</span></a>
     </nav>
     <div>
@@ -94,7 +94,7 @@
         <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, format : @raster.Format) -&gt; Bytes raise @raster.Refused</code>
         <div class="doc"><p>The image as bytes of the named format, with that format's defaults.</p>
 <p>A caller that wants to choose how it is written calls the format's own package, which takes its options record.</p>
-<p><code>Dds</code> is refused: a block-compressed texture is a picture whose blocks were chosen by a search, and this library reads them rather than guessing them.</p></div>
+<p><code>Dds</code> is written as a surface of plain samples. A block-compressed texture is written by that package's own call, which takes the block format.</p></div>
       </div>
       <div class="entry">
         <span class="kind">function</span>
@@ -681,6 +681,13 @@ divided.</em></li>
         <div class="doc"><p>The picture in these bytes.</p>
 <p>A texture usually carries a chain of mipmaps after the first surface; this reads the first, which is the only one a caller that wants "the picture" means.</p></div>
       </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode(image : @raster.Image, block? : Block) -&gt; Bytes raise @raster.Refused</code>
+        <div class="doc"><p>The picture as a DDS.</p>
+<p>Without a block the surface is thirty-two bits a pixel and uncompressed, which is what every reader of the format opens and what loses nothing. With one, the picture is cut into four-by-four blocks; the blocks at the right and the bottom reach past the picture, and the pixels there repeat the ones at the edge, so that the box a block is fitted to is not stretched by a colour that is not in the picture.</p>
+<p>BC1, BC2, BC3, BC4 and BC5 are written. BC6H and BC7 are read and not written: the endpoints of one of their blocks are chosen by a search over eight modes and sixty-four partitions, and a block fitted by the simple search used here would be a worse picture than the format exists for. Asking for one refuses rather than writing a file in some other format.</p></div>
+      </div>
     </section>
     <section class="pkg" id="exr">
       <h2>exr <span>OpenEXR</span></h2>
@@ -732,8 +739,14 @@ than a display has, and half the bytes.</em></li>
       <div class="entry">
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
-        <div class="doc"><p>The image in these bytes.</p>
-<p>Every channel of the file is read; the result is an <code>RgbaF32</code> image, with the channels that were not there filled in — grey becomes equal parts red, green and blue, and a missing alpha becomes one.</p></div>
+        <div class="doc"><p>The image in these bytes, which is the first part of the file when it has more than one.</p>
+<p>Every channel of the part is read; the result is an <code>RgbaF32</code> image, with the channels that were not there filled in — grey becomes equal parts red, green and blue, and a missing alpha becomes one.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode_parts(bytes : BytesView, limits? : @raster.Limits) -&gt; Array[@raster.Image] raise @raster.Refused</code>
+        <div class="doc"><p>Every part of the file, in the order the file lists them.</p>
+<p>A file of one image has one part. A file of several — a beauty pass and its depth, two views of the same shot — carries a header for each, and each part has its own channels, its own compression and its own window. The window of the first part is the display window of all of them, which is why a picture with no pixels of its own is still a part.</p></div>
       </div>
       <div class="entry">
         <span class="kind">function</span>
@@ -1196,6 +1209,12 @@ which makes a photograph compress better at the cost of one pass.</em></li>
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> encode_pages(images : Array[@raster.Image], options? : EncodeOptions) -&gt; Bytes</code>
         <div class="doc"><p>Several images as the pages of one file.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> encode_tiled(image : @raster.Image, tile_width : Int32, tile_height : Int32, options? : EncodeOptions) -&gt; Bytes</code>
+        <div class="doc"><p>The image as a TIFF whose samples are tiles rather than strips.</p>
+<p>A tile is a rectangle of the page, compressed on its own, and the tiles at the right and the bottom are padded to the full tile rather than cut short — a reader of a tiled page always unpacks a whole tile. Sixteen by sixteen is the size the format's own tools write; anything else is the caller's business, and a reader that follows the format reads it.</p></div>
       </div>
       <div class="entry">
         <span class="kind">function</span>
