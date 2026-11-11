@@ -118,15 +118,15 @@ test "an animation takes the layout for every frame at once" {
 }
 
 ///|
-test "a read-only format is refused when it is asked to be written" {
-  let refused = try {
-    ignore(@moonimage.encode(plate(), @moonimage.Format::Dds))
-    false
-  } catch {
-    @moonimage.Refused::Unsupported(..) => true
-    _ => false
+test "a texture is written as a surface of plain samples" {
+  let image = plate()
+  let file = @moonimage.encode(image, @moonimage.Format::Dds) catch {
+    error => abort("the texture is written: \{error}")
   }
-  assert_true(refused)
+  let back = @moonimage.decode(file) catch { error => abort("\{error}") }
+  assert_eq(back.width, image.width)
+  assert_eq(back.height, image.height)
+  assert_eq(back.format, @moonimage.PixelFormat::Rgba8)
 }
 
 ///|

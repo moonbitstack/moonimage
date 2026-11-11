@@ -184,8 +184,8 @@ fn widest(frames : Array[@raster.Frame]) -> (Int32, Int32) {
 /// A caller that wants to choose how it is written calls the format's own
 /// package, which takes its options record.
 ///
-/// `Dds` is refused: a block-compressed texture is a picture whose blocks were
-/// chosen by a search, and this library reads them rather than guessing them.
+/// `Dds` is written as a surface of plain samples. A block-compressed texture is
+/// written by that package's own call, which takes the block format.
 pub fn encode(
   image : @raster.Image,
   format : @raster.Format,
@@ -205,7 +205,7 @@ pub fn encode(
     Hdr => @hdr.encode(image)
     Exr => @exr.encode(image)
     Farbfeld => @farbfeld.encode(image)
-    Dds => raise @raster.Unsupported(at=0, got="DDS")
+    Dds => @dds.encode(image)
   }
 }
 

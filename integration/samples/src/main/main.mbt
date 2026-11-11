@@ -194,6 +194,22 @@ fn write(format : String, path : String) -> Result[String, String] {
       compression: @exr.Compression::B44a,
       half: true,
     })
+  } else if format == "dds" {
+    @dds.encode(image) catch {
+      error => return Err("\{format}: \{error}")
+    }
+  } else if format == "dds-bc1" {
+    @dds.encode(image, block=@dds.Block::Bc1) catch {
+      error => return Err("\{format}: \{error}")
+    }
+  } else if format == "dds-bc3" {
+    @dds.encode(image, block=@dds.Block::Bc3) catch {
+      error => return Err("\{format}: \{error}")
+    }
+  } else if format == "dds-bc5" {
+    @dds.encode(image, block=@dds.Block::Bc5) catch {
+      error => return Err("\{format}: \{error}")
+    }
   } else if format == "tiff-tiled" {
     @tiff.encode_tiled(image, 16, 16)
   } else if format == "tiff-tiled-lzw" {

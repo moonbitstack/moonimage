@@ -148,7 +148,7 @@ fn decode_plain(
   let red = le32(bytes, 92)
   let green = le32(bytes, 96)
   let blue = le32(bytes, 100)
-  let alpha = le32(bytes, 108)
+  let alpha = le32(bytes, 104)
   if bits != 32 && bits != 24 {
     raise @raster.Unsupported(at=88, got="\{bits} bits a pixel uncompressed")
   }
