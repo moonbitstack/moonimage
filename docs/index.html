@@ -129,7 +129,8 @@
             <code>encode</code> takes a picture and a format. The same picture
             goes out as PNG, QOI, BMP, TGA, JPEG, GIF, lossless WebP, TIFF, an
             icon, a PNM, farbfeld, Radiance HDR or OpenEXR, without the call
-            site changing.
+            site changing. OpenEXR takes all six of its scanline compressions,
+            the wavelet of PIZ and the plane-splitting of PXR24 included.
           </p>
         </div>
 
@@ -150,8 +151,11 @@
           <p>
             Mirror on either axis, rotate by quarter turns or by any angle,
             crop to a rectangle, and scale with nearest, bilinear, Catmull-Rom,
-            Gaussian or Lanczos resampling. Blur, sharpen, and the four colour
-            knobs. Each returns a new picture; the original is untouched.
+            Gaussian or Lanczos resampling. Every filter widens its footprint at
+            a downscale, bilinear included. Blur by the Gaussian kernel or by
+            the three box passes Pillow and the browsers use, sharpen, and turn
+            the four colour knobs. Each returns a new picture; the original is
+            untouched.
           </p>
         </div>
 
@@ -192,6 +196,49 @@
         <div class="figure"><b>9</b><span>pixel layouts</span></div>
         <div class="figure"><b>5</b><span>resampling filters</span></div>
       </div>
+    </div>
+  </section>
+
+  <section class="band" id="consistency">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>Held against the reference</h2>
+        <p>the official pictures in, every format it writes out</p>
+      </div>
+
+      <div class="figures">
+        <div class="figure"><b>20</b><span>official pictures at pinned commits</span></div>
+        <div class="figure"><b>6</b><span>OpenEXR compressions</span></div>
+        <div class="figure"><b>4</b><span>independent readers</span></div>
+        <div class="figure"><b>39</b><span>checks in continuous integration</span></div>
+      </div>
+
+      <table class="formats" style="margin-top: 26px;">
+        <thead>
+          <tr><th>Direction</th><th>Who else reads it</th><th>Largest disagreement</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Reading the corpora</td>
+            <td>Pillow, the <code>image</code> crate, OpenEXR, tifffile</td>
+            <td>one step, where a half or a float comes down to eight bits</td>
+          </tr>
+          <tr>
+            <td>Writing every format</td>
+            <td>Pillow, the <code>image</code> crate, OpenEXR</td>
+            <td>none, except three steps for JPEG and one for Radiance HDR</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">
+        The test images of libtiff, the pictures of openexr-images and the
+        samples of Netpbm are decoded here and by the others, and every file has
+        to be held against at least one reader that is not this library. Three
+        files are refused on purpose and named — a tiled TIFF, a LogLuv TIFF and
+        a B44 EXR — as are the shapes a reference reader is known to misread.
+        The two formats that do not come back exact are the two whose inverse
+        transforms are done in different arithmetic.
+      </p>
     </div>
   </section>
 

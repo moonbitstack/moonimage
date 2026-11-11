@@ -169,7 +169,10 @@ println(<span class="tok-str">"as grey: \{grey.format}, \{eighth(shade.r)}"</spa
         <p>
           Four operations, each returning a new picture: rotate by quarter
           turns, mirror, crop, scale. Scaling defaults to bilinear and also
-          takes <code>Nearest</code> and <code>Lanczos</code>.
+          takes <code>Nearest</code> and <code>Lanczos</code>. Every filter
+          widens its footprint when the picture is made smaller, bilinear
+          included: an output pixel then averages everything it stands for
+          rather than sampling one input pixel and throwing the rest away.
         </p>
 <pre><code><span class="tok-kw">let</span> turned = back.rotate(quarters=<span class="tok-num">1</span>)
 <span class="tok-kw">let</span> mirrored = back.flip_horizontal()
@@ -226,6 +229,10 @@ exr: 444 bytes</code></pre>
           Formats with options take them as a record with a default:
           <code>@png.encode(image, options=@png.EncodeOptions::best())</code>,
           <code>@jpeg.encode(image, options=@jpeg.EncodeOptions::{ quality: 92, subsampling: @jpeg.Subsampling::Yuv444 })</code>.
+          OpenEXR takes a compression the same way — <code>None</code>,
+          <code>Rle</code>, <code>Zips</code>, <code>Zip</code>,
+          <code>Piz</code> or <code>Pxr24</code> — and PIZ is the one that
+          wavelet-transforms the words of a chunk before it Huffman-codes them.
         </p>
       </article>
 
@@ -315,6 +322,15 @@ println(<span class="tok-str">"two by two limit: \{capped}"</span>)</code></pre>
           through a matrix of its own, which is why a grey pixel comes back the
           grey it was.
         </p>
+        <p>
+          The default blur convolves with the Gaussian kernel, which is what the
+          radius means. <code>Kernel::Boxes</code> asks for the other arithmetic:
+          three box passes per axis whose widths are chosen so that the three
+          together have the variance of that Gaussian. It costs an addition and
+          a subtraction a sample however wide the blur is, lands within a step
+          of the kernel everywhere, and is the one to reach for when a picture
+          has to match one Pillow, Skia or a browser produced.
+        </p>
       </article>
 
       <article class="step" id="composite">
@@ -336,6 +352,14 @@ println(<span class="tok-str">"two by two limit: \{capped}"</span>)</code></pre>
       </article>
 
       <p class="note" style="margin-top: 30px;">
+        Both directions are held against other implementations: the official
+        pictures of libtiff, openexr-images and Netpbm are decoded here and by
+        Pillow, the <code>image</code> crate, tifffile and OpenEXR's own
+        library, and every format this library writes is read back by those
+        readers. The <a href="index.html#consistency">homepage</a> lists what
+        agrees and what is refused by name.
+      </p>
+      <p class="note">
         Next: the <a href="api.html">API reference</a>, every type and function
         with the arguments they take.
       </p>
@@ -352,6 +376,8 @@ println(<span class="tok-str">"two by two limit: \{capped}"</span>)</code></pre>
       <a href="#formats">Write every format</a>
       <a href="#animation">Animation</a>
       <a href="#refuse">When it refuses</a>
+      <a href="#filters">Soft, crisp, and the four colour knobs</a>
+      <a href="#composite">One picture over another</a>
     </aside>
   </div>
 </main>

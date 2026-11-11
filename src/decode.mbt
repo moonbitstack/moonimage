@@ -21,6 +21,7 @@ pub using @raster {
   type Icc,
   type Image,
   type Intent,
+  type Kernel,
   type Limits,
   type Metadata,
   type Pixel,

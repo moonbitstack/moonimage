@@ -27,10 +27,10 @@ OUT = ROOT / "docs" / "api.html"
 # formats by name. `anchor` is what the other pages link to.
 PACKAGES = [
     ("moonimage", "Every format, one door", "Format detection, decoding, encoding and animation, all of it delegating to the packages below."),
-    ("raster", "Pictures and pixels", "The picture itself: layouts, conversion, geometry, turning, scaling, blurring, sharpening, colour adjustments, compositing, animation frames, metadata, limits and the one error type."),
+    ("raster", "Pictures and pixels", "The picture itself: layouts, conversion, geometry, turning, scaling, blurring by kernel or by three box passes, sharpening, colour adjustments, compositing, animation frames, metadata, limits and the one error type."),
     ("bmp", "Windows bitmap", "Every header version, one to thirty-two bits a pixel, the two run-length encodings and both row orders."),
     ("dds", "DirectDraw surface", "Block-compressed textures from BC1 to BC7, read a block at a time: eight-bit colour in the first five, and light in halves in BC6H."),
-    ("exr", "OpenEXR", "Scanline pictures in half or float samples, uncompressed or under RLE, ZIPS or ZIP, with the half-precision conversion the format turns on."),
+    ("exr", "OpenEXR", "Scanline pictures in half or float samples, in all six scanline compressions from none through PIZ and PXR24, with the half-precision conversion the format turns on."),
     ("farbfeld", "farbfeld", "A signature, two sizes and the samples: the simplest format there is."),
     ("hdr", "Radiance HDR", "RGBE samples that are not clamped to a display, with the format's own run-length code and all four origins."),
     ("ico", "Windows icons and cursors", "One picture at several sizes, as PNG entries or as bitmaps with their one-bit mask."),

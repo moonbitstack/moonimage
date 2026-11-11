@@ -86,7 +86,7 @@ options record.
 | ICO / CUR | PNG entries and bitmap entries at 1/4/8/24/32 bits with the one-bit mask, every size in the file | PNG entries, at any list of sizes | sizes | `@moonimage/ico` |
 | PNM | PBM, PGM, PPM and PAM, both spellings, any maximum | all four shapes, both spellings | — | `@moonimage/pnm` |
 | Radiance HDR | RGBE, the new run-length code and the flat one, all four origins | RGBE with the run-length code | — | `@moonimage/hdr` |
-| OpenEXR | scanlines in half or float, uncompressed, RLE, ZIPS or ZIP | the same three compressions | — | `@moonimage/exr` |
+| OpenEXR | scanlines in half or float, uncompressed, RLE, ZIPS, ZIP, PIZ or PXR24 | the same six compressions | — | `@moonimage/exr` |
 | farbfeld | the whole format | the whole format | — | `@moonimage/farbfeld` |
 | DDS | BC1 to BC7 blocks, and uncompressed surfaces | — | — | `@moonimage/dds` |
 
@@ -193,9 +193,10 @@ test {
 ```
 
 Alpha is resampled premultiplied even when the image is not stored that way, so a
-transparent pixel's colour does not bleed into its neighbours. The four filters
-that reach past two taps widen their footprint when the image is made smaller;
-bilinear stays at two taps, which is what makes it the cheap one.
+transparent pixel's colour does not bleed into its neighbours. Every filter
+widens its footprint when the image is made smaller, bilinear included: what it
+reaches for at a downscale is everything the output pixel stands for, which is
+the whole of antialiasing.
 
 A rotation that is not a right angle resamples, and can grow the canvas to hold
 what comes out:
@@ -221,6 +222,20 @@ test {
   assert_eq(soft.width, 6)
   let crisp = soft.unsharp_mask(radius=1.0, amount=150.0, threshold=3)
   assert_eq(crisp.height, 5)
+}
+```
+
+`kernel` chooses how the Gaussian is worked out. The default convolves with the
+kernel, which is what the number means. `Boxes` does what Pillow, Skia and the
+browsers do — three box passes whose widths are chosen so that their variance is
+the variance asked for — which is cheaper and within a step of the kernel
+everywhere, and is the one to reach for when a picture has to match one of those:
+
+```moonbit
+test {
+  let image = @moonimage.Image::new(6, 5, @moonimage.PixelFormat::Rgba8)
+  let same_as_pillow = image.blur(1.5, kernel=@moonimage.Kernel::Boxes)
+  assert_eq(same_as_pillow.width, 6)
 }
 ```
 
@@ -318,12 +333,56 @@ test {
 The defaults are what a desktop application can live with. A caller reading
 untrusted files should pass `strict` or a tighter record of its own.
 
+## Consistency
+
+A format is implemented when two other implementations agree with this one about
+the same file. Both directions are measured on real pictures.
+
+**Reading.** The test images of libtiff, the pictures of openexr-images and the
+samples of Netpbm — twenty files at pinned commits — are decoded here, by Pillow,
+by the `image` crate, by `tifffile` for pages whose samples are in separate
+planes, and by OpenEXR's own library for that format. Seventeen of them agree to
+within a step of an eight-bit sample, or exactly where the samples are eight
+bits. The other three are refused on purpose, and named:
+
+| File | Refused because |
+|:--|:--|
+| `quad-tile.jpg.tiff` | the page is tiled rather than stripped |
+| `logluv-3c-16b.tiff` | the samples are LogLuv encoded |
+| `Cannon.exr` | the blocks are B44 |
+
+Where a reference reader cannot be used as one, the harness says so rather than
+counting a silent pass: Pillow drops the alpha plane of a separated-plane TIFF,
+which `tifffile` confirms exactly, and the `image` crate refuses those pages and
+the single-channel OpenEXR ramps. Every file has to be held against at least one
+reader that is not this library.
+
+**Writing.** Every format this library produces is written once and read back by
+Pillow and by `image` — by OpenEXR too for the six compressions of that format —
+and the three have to agree about what the file says. A format that is lossy is
+not required to give back what went in, only to mean the same thing to everyone
+who reads it.
+
+| Format | Largest disagreement |
+|:--|:--|
+| PNG, BMP, TGA, GIF, TIFF, ICO, PNM, QOI, farbfeld | none |
+| WebP, lossless | none |
+| OpenEXR, all six compressions | none |
+| Radiance HDR | one step |
+| JPEG | three steps |
+
+The two that are not exact are the two whose decoders do an inverse transform
+from different arithmetic: libjpeg's integer DCT and this library's; and a
+Radiance RGBE triplet, which has eight bits of exponent to lose a mantissa in.
+
 ## What it does not do
 
 - **AVIF.** Decoding one needs a whole AV1 decoder, which is several times the
   size of this library, so it is not planned.
-- **PIZ, the wavelet compression of OpenEXR.** The three either side of it are
-  read and written.
+- **B44 and the two DWA compressions of OpenEXR.** They are refused by name
+  rather than misread; the six around them are read and written.
+- **Tiled and multi-part OpenEXR, tiled TIFF.** Both readers take scanlines and
+  strips, and say so instead of reading the rows in the wrong order.
 - **Writing tiled TIFF, writing lossy WebP, writing DDS.**
 
 ## Interface
@@ -341,7 +400,7 @@ untrusted files should pass `strict` or a tighter record of its own.
 | `Image::to_premultiplied`, `Image::to_straight` | colour × alpha, and back |
 | `Image::flip_horizontal`, `Image::flip_vertical`, `Image::rotate`, `Image::rotate_by`, `Image::crop` | moving pixels without reading them |
 | `Image::scale` | a new size, by any of five filters |
-| `Image::blur`, `Image::unsharp_mask` | a Gaussian, and the difference that undoes it |
+| `Image::blur`, `Image::unsharp_mask`, `Kernel` | a Gaussian by the kernel or by three box passes, and the difference that undoes it |
 | `Image::brightness`, `Image::contrast`, `Image::hue_rotate`, `Image::invert` | the four colour knobs |
 | `Image::composite` | another picture laid over this one |
 | `Image::orient`, `Image::upright` | the way up a camera said the picture was |

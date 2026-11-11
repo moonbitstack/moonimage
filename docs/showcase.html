@@ -48,8 +48,9 @@
         <p class="lede">
           The plate is read once, then written in every format this library can
           write and read straight back. Below it, the arithmetic: crop, turn,
-          scale, blur, sharpen, brighten, turn the hue. Every number and every
-          pixel on this page came out of the library compiled to JavaScript.
+          scale, blur by kernel or by three box passes, sharpen, brighten, turn
+          the hue. Every number and every pixel on this page came out of the
+          library compiled to JavaScript.
         </p>
         <p class="actions">
           <a class="button" href="#formats">Formats</a>
@@ -135,6 +136,7 @@
           <h3>Filters</h3>
           <p class="chips" id="filters">
             <button class="chip" data-op="blur" data-amount="2">Blur, radius 2</button>
+            <button class="chip" data-op="box-blur" data-amount="2">Blur, three box passes</button>
             <button class="chip" data-op="unsharp" data-amount="1.5">Sharpen</button>
           </p>
 

@@ -156,6 +156,7 @@ fn apply(
       }
     }
     "blur" => image.blur(amount)
+    "box-blur" => image.blur(amount, kernel=@raster.Kernel::Boxes)
     "unsharp" => image.unsharp_mask(radius=amount, amount=160.0)
     "brightness" => image.brightness(amount)
     "contrast" => image.contrast(amount)

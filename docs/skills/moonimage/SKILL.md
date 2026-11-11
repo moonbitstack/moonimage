@@ -119,6 +119,19 @@ test {
 }
 ```
 
+A blur is the Gaussian kernel unless you ask for the other arithmetic. Three box
+passes, which is what Pillow, Skia and the browsers use, cost one addition and
+one subtraction a sample and land within a step of the kernel everywhere; reach
+for them when a picture has to match one of those:
+
+```moonbit
+test {
+  let image = @moonimage.Image::new(4, 4, @moonimage.PixelFormat::Rgba8)
+  let for_pillow = image.blur(2.0, kernel=@moonimage.Kernel::Boxes)
+  assert_eq(for_pillow.width, 4)
+}
+```
+
 ## Animation
 
 `decode_animation` returns frames whatever the file was; a still picture comes
@@ -149,10 +162,15 @@ test {
   `Limits::strict()` for uploads; the default allows a gigabyte of expansion.
 - **Grey in a bit map is inverted.** In PBM a set bit is black; every other
   format here has nought as black.
-- **`Image::scale` with `Bilinear` does not widen its footprint when making a
-  picture smaller.** Use `CatmullRom`, `Gaussian` or `Lanczos` for a downscale
-  that has to average the whole footprint rather than sample it.
+- **Every filter widens its footprint at a downscale**, bilinear included: an
+  output pixel averages what it stands for rather than sampling one of the input
+  pixels. `Nearest` is the only one that still picks, and that is the point of
+  it.
 - **16-bit samples are big-endian** in every `PixelFormat`, whatever the file
   said, so that a round trip through `Gray16` is the identity.
 - **`RgbaF32` is not clamped on the way in.** HDR and OpenEXR pictures keep
   values above one; converting to `Rgba8` is what clamps them.
+- **OpenEXR is written in any of its six compressions**, chosen with
+  `exr.EncodeOptions`. `Pxr24` keeps twenty-four bits of every sample, so a float
+  loses its last eight bits of mantissa; the other five are exact. `B44` and the
+  two `Dwa` compressions are refused when reading rather than approximated.

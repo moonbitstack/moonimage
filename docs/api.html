@@ -54,7 +54,7 @@
   <div class="api">
     <nav aria-label="Packages">
         <a href="#moonimage" title="Every format, one door">moonimage<span>4</span></a>
-        <a href="#raster" title="Pictures and pixels">raster<span>77</span></a>
+        <a href="#raster" title="Pictures and pixels">raster<span>78</span></a>
         <a href="#bmp" title="Windows bitmap">bmp<span>5</span></a>
         <a href="#dds" title="DirectDraw surface">dds<span>2</span></a>
         <a href="#exr" title="OpenEXR">exr<span>9</span></a>
@@ -105,7 +105,7 @@
     </section>
     <section class="pkg" id="raster">
       <h2>raster <span>Pictures and pixels</span></h2>
-      <p>The picture itself: layouts, conversion, geometry, turning, scaling, blurring, sharpening, colour adjustments, compositing, animation frames, metadata, limits and the one error type.</p>
+      <p>The picture itself: layouts, conversion, geometry, turning, scaling, blurring by kernel or by three box passes, sharpening, colour adjustments, compositing, animation frames, metadata, limits and the one error type.</p>
       <div class="entry">
         <span class="kind">struct</span>
         <code class="sig"><span class="kw">pub(all) struct</span> Animation</code>
@@ -252,9 +252,10 @@ the last row is tight.</em></li>
           <li><b>metadata</b><span>Metadata</span> <em>What the file said about itself.</em></li>
         </ul>
         <div class="entry method">
-          <code class="sig"><span class="kw">pub fn</span> Image::blur(self : Image, radius : Double) -&gt; Image</code>
+          <code class="sig"><span class="kw">pub fn</span> Image::blur(self : Image, radius : Double, kernel~ : Kernel = Exact) -&gt; Image</code>
           <div class="doc"><p>The image blurred with a Gaussian of standard deviation <code>radius</code>.</p>
-<p>A radius of zero or less is the image itself, so a caller that computes the radius from a size does not have to check for the case.</p></div>
+<p>A radius of zero or less is the image itself, so a caller that computes the radius from a size does not have to check for the case.</p>
+<p><code>kernel</code> chooses how the Gaussian is worked out. <code>Exact</code> convolves with the kernel, which is what the number means; <code>Boxes</code> is the same blur by the arithmetic the rest of the world uses, for a caller comparing against a picture some other library made.</p></div>
         </div>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Image::brightness(self : Image, factor : Double) -&gt; Image</code>
@@ -379,6 +380,20 @@ the last row is tight.</em></li>
           <code class="sig"><span class="kw">pub fn</span> Intent::of(code : Int32) -&gt; Intent?</code>
           <div class="doc"><p>The intent a number stands for, or <code>None</code> if it is not one of the four.</p></div>
         </div>
+      </div>
+      <div class="entry">
+        <span class="kind">enum</span>
+        <code class="sig"><span class="kw">pub(all) enum</span> Kernel</code>
+        <div class="doc"><p>How a blur is worked out.</p></div>
+        <ul class="variants">
+          <li>Exact <em>The kernel itself: every sample within three sigma, weighted by the
+Gaussian, convolved in two passes.</em></li>
+          <li>Boxes <em>Three box passes per axis, whose sides are chosen so that the three
+together have the variance of the Gaussian asked for. This is what Pillow,
+Skia and most drawing systems do: a box pass is an addition and a
+subtraction per sample, and three of them are within a step of a sample of
+the kernel everywhere.</em></li>
+        </ul>
       </div>
       <div class="entry">
         <span class="kind">struct</span>
@@ -669,7 +684,7 @@ divided.</em></li>
     </section>
     <section class="pkg" id="exr">
       <h2>exr <span>OpenEXR</span></h2>
-      <p>Scanline pictures in half or float samples, uncompressed or under RLE, ZIPS or ZIP, with the half-precision conversion the format turns on.</p>
+      <p>Scanline pictures in half or float samples, in all six scanline compressions from none through PIZ and PXR24, with the half-precision conversion the format turns on.</p>
       <div class="entry">
         <span class="kind">enum</span>
         <code class="sig"><span class="kw">pub(all) enum</span> Compression</code>
@@ -679,6 +694,8 @@ divided.</em></li>
           <li>Rle <em>A byte-oriented run-length code.</em></li>
           <li>Zips <em>Deflate, one scanline to a chunk.</em></li>
           <li>Zip <em>Deflate, sixteen scanlines to a chunk.</em></li>
+          <li>Piz <em>A bitmap of the words used, a wavelet, and a Huffman code.</em></li>
+          <li>Pxr24 <em>Twenty-four bits of every sample, split by significance and differenced.</em></li>
         </ul>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Compression::code(self : Compression) -&gt; Int32</code>
@@ -724,9 +741,7 @@ than a display has, and half the bytes.</em></li>
       </div>
       <div class="entry">
         <span class="kind">function</span>
-        <code class="sig"><span class="kw">pub fn</span> half_to_float(bits : Int32) -&gt; Float</code>
-        <div class="doc"><p>A half-precision sample as a float.</p>
-<p>Half is this format's own sample type — a scanline of an OpenEXR is a run of them unless it was written as float — so this is the conversion a reader of this package reaches for, and it is the one <code>raster</code> keeps for every format whose samples are halves. There is one implementation of it, here and there and in a block of BC6H alike.</p></div>
+        <code class="sig">pub  fn half_to_float(Int32) -&gt; Float</code>
       </div>
     </section>
     <section class="pkg" id="farbfeld">
