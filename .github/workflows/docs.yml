@@ -36,7 +36,10 @@ jobs:
       - name: build the demo the homepage runs
         run: |
           moon build src/examples/browser --target js --release
-          cp _build/js/release/build/examples/browser/browser.js docs/demo.js
+          # The workspace puts the module's name in the path, and where a build
+          # leaves its output is the toolchain's business rather than this
+          # workflow's: find the file it made.
+          find _build/js/release/build -name browser.js -exec cp {} docs/demo.js \;
 
       - name: api reference is current
         run: |
