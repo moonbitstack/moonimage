@@ -11,6 +11,8 @@
 //   moon run src/main -- write png out.png
 //   moon run src/main -- decode out.png pixels.rgba
 //   moon run src/main -- decode32 out.exr floats.bin
+//   moon run src/main -- resize in.rgba 13 9 26 18 lanczos out.rgba
+//   moon run src/main -- blur in.rgba 13 9 1.5 boxes out.rgba
 //
 // Run from `integration/samples`, which is the module the file system lives in:
 // the library itself imports nothing that touches a disk.
@@ -30,6 +32,35 @@ fn main {
     "decode" => decode(arguments[2], arguments[3], false)
     "decode32" => decode(arguments[2], arguments[3], true)
     "decode16" => decode(arguments[2], arguments[3], false, sixteen=true)
+    "resize" =>
+      if arguments.length() < 9 {
+        Err(
+          "resize takes a file, its size, the size wanted, a filter, and a target",
+        )
+      } else {
+        resize(
+          arguments[2],
+          int_of(arguments[3]),
+          int_of(arguments[4]),
+          int_of(arguments[5]),
+          int_of(arguments[6]),
+          arguments[7],
+          arguments[8],
+        )
+      }
+    "blur" =>
+      if arguments.length() < 8 {
+        Err("blur takes a file, its size, a radius, a kernel, and a target")
+      } else {
+        blur(
+          arguments[2],
+          int_of(arguments[3]),
+          int_of(arguments[4]),
+          double_of(arguments[5]),
+          arguments[6],
+          arguments[7],
+        )
+      }
     _ => Err("no such command: \{arguments[1]}")
   }
   match outcome {
@@ -47,6 +78,8 @@ fn usage() -> String {
   "       samples decode <path> <out>\n" +
   "       samples decode32 <path> <out>\n" +
   "       samples decode16 <path> <out>\n" +
+  "       samples resize <in.rgba> <w> <h> <to-w> <to-h> <filter> <out.rgba>\n" +
+  "       samples blur <in.rgba> <w> <h> <radius> <kernel> <out.rgba>\n" +
   "formats: " +
   formats().map(fn(one) { one.0 }).join(", ")
 }
@@ -174,6 +207,141 @@ fn write(format : String, path : String) -> Result[String, String] {
     error => return Err("writing \{path}: \{@debug.Debug::to_repr(error)}")
   }
   Ok("\{format} \{image.width}x\{image.height} \{bytes.length()} bytes")
+}
+
+///|
+/// A number the scripts on the other side wrote.
+fn int_of(text : String) -> Int32 {
+  let mut value = 0
+  let mut at = 0
+  let negative = text.length() > 0 && text[0] == '-'
+  if negative {
+    at = 1
+  }
+  while at < text.length() {
+    let digit = text[at].to_int() - 48
+    if digit < 0 || digit > 9 {
+      break
+    }
+    value = value * 10 + digit
+    at = at + 1
+  }
+  if negative {
+    -value
+  } else {
+    value
+  }
+}
+
+///|
+/// A decimal number, as the scripts on the other side write them.
+fn double_of(text : String) -> Double {
+  let mut whole = 0.0
+  let mut fraction = 0.0
+  let mut scale = 1.0
+  let mut at = 0
+  while at < text.length() && text[at] != '.' {
+    whole = whole * 10.0 + (text[at].to_int() - 48).to_double()
+    at = at + 1
+  }
+  if at < text.length() {
+    at = at + 1
+    while at < text.length() {
+      let digit = text[at].to_int() - 48
+      if digit < 0 || digit > 9 {
+        break
+      }
+      fraction = fraction * 10.0 + digit.to_double()
+      scale = scale * 10.0
+      at = at + 1
+    }
+  }
+  whole + fraction / scale
+}
+
+///|
+/// The samples of a picture as they are, which is what a script that drew them
+/// wrote: four bytes a pixel, red first.
+fn pixels_of(
+  path : String,
+  width : Int32,
+  height : Int32,
+) -> Result[@moonimage.Image, String] {
+  let bytes = @fs.read_file_to_bytes(path) catch {
+    error => return Err("reading \{path}: \{@debug.Debug::to_repr(error)}")
+  }
+  if bytes.length() != width * height * 4 {
+    return Err(
+      "\{path} holds \{bytes.length()} bytes, want \{width * height * 4}",
+    )
+  }
+  let image = @moonimage.Image::of(
+    width,
+    height,
+    @moonimage.PixelFormat::Rgba8,
+    bytes,
+  ) catch {
+    error => return Err("\{path}: \{error}")
+  }
+  Ok(image)
+}
+
+///|
+fn resize(
+  path : String,
+  width : Int32,
+  height : Int32,
+  to_width : Int32,
+  to_height : Int32,
+  filter : String,
+  out : String,
+) -> Result[String, String] {
+  let image = match pixels_of(path, width, height) {
+    Ok(image) => image
+    Err(message) => return Err(message)
+  }
+  let sampling = match filter {
+    "nearest" => @moonimage.Sampling::Nearest
+    "bilinear" => @moonimage.Sampling::Bilinear
+    "catmull-rom" => @moonimage.Sampling::CatmullRom
+    "gaussian" => @moonimage.Sampling::Gaussian
+    "lanczos" => @moonimage.Sampling::Lanczos
+    _ => return Err("no such filter: \{filter}")
+  }
+  let scaled = image.scale(to_width, to_height, sampling~) catch {
+    error => return Err("\{path}: \{error}")
+  }
+  let pixels = scaled.convert(@moonimage.PixelFormat::Rgba8).pixels
+  @fs.write_bytes_to_file(out, pixels) catch {
+    error => return Err("writing \{out}: \{@debug.Debug::to_repr(error)}")
+  }
+  Ok("\{to_width} \{to_height}")
+}
+
+///|
+fn blur(
+  path : String,
+  width : Int32,
+  height : Int32,
+  radius : Double,
+  kernel : String,
+  out : String,
+) -> Result[String, String] {
+  let image = match pixels_of(path, width, height) {
+    Ok(image) => image
+    Err(message) => return Err(message)
+  }
+  let kind = match kernel {
+    "exact" => @moonimage.Kernel::Exact
+    "boxes" => @moonimage.Kernel::Boxes
+    _ => return Err("no such kernel: \{kernel}")
+  }
+  let blurred = image.blur(radius, kernel=kind)
+  let pixels = blurred.convert(@moonimage.PixelFormat::Rgba8).pixels
+  @fs.write_bytes_to_file(out, pixels) catch {
+    error => return Err("writing \{out}: \{@debug.Debug::to_repr(error)}")
+  }
+  Ok("\{width} \{height}")
 }
 
 ///|

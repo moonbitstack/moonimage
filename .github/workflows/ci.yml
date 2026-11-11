@@ -132,3 +132,14 @@ jobs:
 
       - name: check
         run: python3 scripts/samples/check.py
+
+      # The bound the filter tests are held to, and the measurement behind it:
+      # the same picture through both implementations, counted pixel by pixel.
+      - name: the filters, counted against Pillow
+        run: |
+          python3 scripts/samples/filters.py | tee "$RUNNER_TEMP/filters.txt"
+          {
+            echo "### moonimage — resampling and blur against Pillow"
+            echo ""
+            cat "$RUNNER_TEMP/filters.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
