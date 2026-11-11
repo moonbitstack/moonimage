@@ -53,6 +53,20 @@ let tag_predictor : Int32 = 317
 let tag_color_map : Int32 = 320
 
 ///|
+/// The size of a tile, the offsets of the tiles and how long each one is: the
+/// tags of a page whose samples are rectangles rather than strips.
+let tag_tile_width : Int32 = 322
+
+///|
+let tag_tile_length : Int32 = 323
+
+///|
+let tag_tile_offsets : Int32 = 324
+
+///|
+let tag_tile_byte_counts : Int32 = 325
+
+///|
 let tag_extra_samples : Int32 = 338
 
 ///|
@@ -482,7 +496,11 @@ fn pack_lzw(data : BytesView) -> Bytes {
       suffix[next] = byte
       codes[probe] = next
       next = next + 1
-      if next == (1 << width) - 1 && width < 12 {
+      // The width grows one entry later here than in the reader, because a
+      // reader learns of an entry one code after the writer made it: the writer
+      // has the entry the moment it stops matching, the reader only once it has
+      // read the code that ended the match.
+      if next == 1 << width && width < 12 {
         width = width + 1
       }
     } else {

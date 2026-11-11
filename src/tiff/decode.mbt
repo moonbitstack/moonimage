@@ -113,9 +113,6 @@ fn page_of(
   little : Bool,
   limits : @raster.Limits,
 ) -> @raster.Image raise @raster.Refused {
-  if directory.find(322) is Some(_) {
-    raise @raster.Unsupported(at=0, got="a tiled TIFF")
-  }
   let width = directory.number(tag_image_width, 0)
   let height = directory.number(tag_image_length, 0)
   if width <= 0 || height <= 0 {
@@ -137,19 +134,52 @@ fn page_of(
   let planar = directory.number(tag_planar, 1)
   let predictor = directory.number(tag_predictor, 1)
   let fill_order = directory.number(tag_fill_order, 1)
+  let planes = if planar == 2 { samples } else { 1 }
+  // A strip of a chunky page holds whole pixels; a strip of a planar page holds
+  // one channel of them, which is why the two row lengths differ.
+  let row_length = if planar == 2 {
+    (width.to_int64() * bits.to_int64() + 7L).to_int() / 8
+  } else {
+    (width.to_int64() * samples.to_int64() * bits.to_int64() + 7L).to_int() / 8
+  }
+  // A page whose samples are rectangles rather than rows says so with a tile
+  // width; everything else about it — the samples, the bits, the compression,
+  // the predictor — is read the same way.
+  let raw = if directory.find(tag_tile_width) is Some(_) {
+    read_tiles(
+      data, directory, compression, width, height, samples, bits, planar, fill_order,
+      predictor, row_length, limits,
+    )
+  } else {
+    read_strips(
+      data, directory, compression, height, row_length, planes, samples, bits, planar,
+      fill_order, predictor, limits,
+    )
+  }
+  let image = assemble_page(
+    raw, width, height, samples, bits, photometric, planar, row_length, little, directory,
+  )
+  { ..image, metadata: metadata_of(directory), }
+}
+
+///|
+/// A page of strips: rows grouped for compression, each strip holding one plane
+/// of one run of rows.
+fn read_strips(
+  data : BytesView,
+  directory : Directory,
+  compression : Compression,
+  height : Int32,
+  row_length : Int32,
+  planes : Int32,
+  samples : Int32,
+  bits : Int32,
+  planar : Int32,
+  fill_order : Int32,
+  predictor : Int32,
+  limits : @raster.Limits,
+) -> FixedArray[Byte] raise @raster.Refused {
   let rows_per_strip = directory.number(tag_rows_per_strip, height)
-  if samples < 1 || samples > 4 {
-    raise @raster.Unsupported(at=0, got="\{samples} samples a pixel")
-  }
-  if bits != 1 && bits != 2 && bits != 4 && bits != 8 && bits != 16 {
-    raise @raster.Unsupported(at=0, got="\{bits} bits a sample")
-  }
-  if planar != 1 && planar != 2 {
-    raise @raster.Unsupported(at=0, got="a planar configuration of \{planar}")
-  }
-  if predictor != 1 && predictor != 2 {
-    raise @raster.Unsupported(at=0, got="a predictor of \{predictor}")
-  }
   let offsets = directory.numbers(tag_strip_offsets)
   let counts = directory.numbers(tag_strip_byte_counts)
   if offsets.is_empty() || counts.is_empty() {
@@ -163,14 +193,6 @@ fn page_of(
     height
   } else {
     rows_per_strip
-  }
-  let planes = if planar == 2 { samples } else { 1 }
-  // A strip of a chunky page holds whole pixels; a strip of a planar page holds
-  // one channel of them, which is why the two row lengths differ.
-  let row_length = if planar == 2 {
-    (width.to_int64() * bits.to_int64() + 7L).to_int() / 8
-  } else {
-    (width.to_int64() * samples.to_int64() * bits.to_int64() + 7L).to_int() / 8
   }
   let rows_of = (height + strip_rows - 1) / strip_rows
   if offsets.length() < rows_of * planes {
@@ -222,10 +244,119 @@ fn page_of(
   if predictor == 2 {
     undo_prediction(raw, row_length, height * planes, samples, bits, planar)
   }
-  let image = assemble_page(
-    raw, width, height, samples, bits, photometric, planar, row_length, little, directory,
+  raw
+}
+
+///|
+/// A page of tiles: rectangles of the page, each one a full tile's worth of
+/// samples — the tiles at the right and the bottom are padded rather than cut
+/// short, which is what the format asks for and what a reader of one expects.
+fn read_tiles(
+  data : BytesView,
+  directory : Directory,
+  compression : Compression,
+  width : Int32,
+  height : Int32,
+  samples : Int32,
+  bits : Int32,
+  planar : Int32,
+  fill_order : Int32,
+  predictor : Int32,
+  row_length : Int32,
+  limits : @raster.Limits,
+) -> FixedArray[Byte] raise @raster.Refused {
+  let tile_width = directory.number(tag_tile_width, 0)
+  let tile_length = directory.number(tag_tile_length, 0)
+  if tile_width <= 0 || tile_length <= 0 {
+    raise @raster.Unexpected(
+      at=0,
+      got="a tile of \{tile_width} by \{tile_length}",
+      want="a tile with pixels in it",
+    )
+  }
+  // A tile of samples narrower than a byte would have to be shifted by a bit
+  // count that depends on the column it lands in; the shapes a tiled page is
+  // stored in are eight and sixteen bits.
+  if bits != 8 && bits != 16 {
+    raise @raster.Unsupported(at=0, got="a tiled page of \{bits}-bit samples")
+  }
+  let planes = if planar == 2 { samples } else { 1 }
+  let across = (width + tile_width - 1) / tile_width
+  let down = (height + tile_length - 1) / tile_length
+  let tile_row_length = if planar == 2 {
+    tile_width * bits / 8
+  } else {
+    tile_width * samples * bits / 8
+  }
+  // A tile of a planar page holds one channel, so the samples the predictor
+  // looks back over are its own rather than a pixel's worth.
+  let within_row = if planar == 2 { 1 } else { samples }
+  let pixel_size = if planar == 2 { bits / 8 } else { samples * bits / 8 }
+  let offsets = directory.numbers(tag_tile_offsets)
+  let counts = directory.numbers(tag_tile_byte_counts)
+  if offsets.length() < across * down * planes ||
+    counts.length() < across * down * planes {
+    raise @raster.Unexpected(
+      at=0,
+      got="\{offsets.length()} tiles",
+      want="\{across * down * planes} for a page this size",
+    )
+  }
+  let raw : FixedArray[Byte] = FixedArray::make(
+    row_length * height * planes,
+    b'\x00',
   )
-  { ..image, metadata: metadata_of(directory), }
+  let mut total = 0
+  for plane in 0..<planes {
+    for ty in 0..<down {
+      for tx in 0..<across {
+        let index = plane * across * down + ty * across + tx
+        let offset = offsets[index]
+        let length = counts[index]
+        if offset < 0 ||
+          length < 0 ||
+          offset.to_int64() + length.to_int64() > data.length().to_int64() {
+          raise @raster.Truncated(at=offset, want=length)
+        }
+        let body = data.clamped_view(start=offset, end=offset + length)
+        let want = tile_row_length * tile_length
+        total = total + want
+        limits.check_bytes(total)
+        let tile = inflate_strip(body, want, compression)
+        if fill_order == 2 {
+          for i in 0..<want {
+            tile[i] = reverse_bits(tile[i].to_int()).to_byte()
+          }
+        }
+        if predictor == 2 {
+          undo_prediction(
+            tile, tile_row_length, tile_length, within_row, bits, planar,
+          )
+        }
+        let columns = if tx * tile_width + tile_width > width {
+          width - tx * tile_width
+        } else {
+          tile_width
+        }
+        let rows = if ty * tile_length + tile_length > height {
+          height - ty * tile_length
+        } else {
+          tile_length
+        }
+        let base = plane * row_length * height
+        for row in 0..<rows {
+          let source = row * tile_row_length
+          let target = base +
+            (ty * tile_length + row) * row_length +
+            tx * tile_width * pixel_size
+          for k in 0..<(columns * pixel_size) {
+            raw[target + k] = tile[source + k]
+          }
+        }
+      }
+    }
+  }
+  raw
 }
 
 ///|

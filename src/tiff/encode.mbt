@@ -47,6 +47,25 @@ pub fn encode(image : @raster.Image, options? : EncodeOptions) -> Bytes {
 }
 
 ///|
+/// The image as a TIFF whose samples are tiles rather than strips.
+///
+/// A tile is a rectangle of the page, compressed on its own, and the tiles at the
+/// right and the bottom are padded to the full tile rather than cut short — a
+/// reader of a tiled page always unpacks a whole tile. Sixteen by sixteen is the
+/// size the format's own tools write; anything else is the caller's business,
+/// and a reader that follows the format reads it.
+pub fn encode_tiled(
+  image : @raster.Image,
+  tile_width : Int32,
+  tile_height : Int32,
+  options? : EncodeOptions,
+) -> Bytes {
+  let options = options.unwrap_or(EncodeOptions::default())
+  let plan = plan_of_tiled(image, options, tile_width, tile_height)
+  write_plans([plan])
+}
+
+///|
 /// Several images as the pages of one file.
 pub fn encode_pages(
   images : Array[@raster.Image],
@@ -57,6 +76,12 @@ pub fn encode_pages(
   for image in images {
     plans.push(plan_of(image, options))
   }
+  write_plans(plans)
+}
+
+///|
+/// The header, the bodies of every page one after another, then the directories.
+fn write_plans(plans : Array[Plan]) -> Bytes {
   let writer = @wire.Writer::new()
   writer.u8(0x49)
   writer.u8(0x49)
@@ -102,7 +127,10 @@ priv struct Plan {
   predictor : Int32
   alpha : Int32
   compression : Compression
+  /// The strips of a page, or its tiles: a tile is a strip in every way but the
+  /// shape the reader gives it, which the tile tags say.
   strips : Array[Bytes]
+  tiles : (Int32, Int32)?
   icc : Bytes?
 }
 
@@ -188,6 +216,110 @@ fn plan_of(image : @raster.Image, options : EncodeOptions) -> Plan {
     alpha,
     compression: options.compression,
     strips,
+    tiles: None,
+    icc: match source.metadata.icc {
+      Some(profile) => Some(profile.profile)
+      None => None
+    },
+  }
+}
+
+///|
+/// What a tiled page is made of: the same header as a page of strips, and the
+/// rectangles of the picture instead of its rows.
+fn plan_of_tiled(
+  image : @raster.Image,
+  options : EncodeOptions,
+  tile_width : Int32,
+  tile_height : Int32,
+) -> Plan {
+  if tile_width <= 0 || tile_height <= 0 {
+    abort("a tile needs a width and a height above zero")
+  }
+  let source = if image.format.is_float() {
+    image.convert(@raster.PixelFormat::Rgba16)
+  } else {
+    image
+  }
+  let format = source.format
+  let samples = format.channels()
+  let bits = format.bits()
+  let pixel_bytes = samples * bits / 8
+  let photometric = if format.is_gray() { 1 } else { 2 }
+  let alpha = if format.is_gray() {
+    if samples == 2 {
+      1
+    } else {
+      0
+    }
+  } else if samples == 4 {
+    1
+  } else {
+    0
+  }
+  let predictor = if options.predictor && (bits == 8 || bits == 16) {
+    2
+  } else {
+    1
+  }
+  let tile_row = tile_width * pixel_bytes
+  let across = (source.width + tile_width - 1) / tile_width
+  let down = (source.height + tile_height - 1) / tile_height
+  let tiles : Array[Bytes] = []
+  for ty in 0..<down {
+    for tx in 0..<across {
+      // A tile is a whole tile even where the picture stops: what lies beyond
+      // the last column is nought, which is what the format's own writers leave
+      // there and what a reader skips.
+      let body : FixedArray[Byte] = FixedArray::make(
+        tile_row * tile_height,
+        b'\x00',
+      )
+      for y in 0..<tile_height {
+        let source_y = ty * tile_height + y
+        if source_y >= source.height {
+          continue
+        }
+        let mut x = 0
+        while x < tile_width && tx * tile_width + x < source.width {
+          let source_at = source_y * source.stride +
+            (tx * tile_width + x) * pixel_bytes
+          let target = y * tile_row + x * pixel_bytes
+          for k in 0..<pixel_bytes {
+            body[target + k] = source.pixels[source_at + k]
+          }
+          x = x + 1
+        }
+      }
+      if predictor == 2 {
+        apply_prediction(body, tile_row, tile_height, samples, bits)
+      }
+      if bits == 16 {
+        swap_words(body, tile_row * tile_height)
+      }
+      let packed = Bytes::from_array(body.clamped_view())
+      tiles.push(
+        match options.compression {
+          None => packed
+          Lzw => pack_lzw(packed)
+          PackBits => pack_bits(packed)
+          Deflate => @zlib.zlib(packed)
+        },
+      )
+    }
+  }
+  {
+    width: source.width,
+    height: source.height,
+    samples,
+    bits,
+    photometric,
+    rows_per_strip: 0,
+    predictor,
+    alpha,
+    compression: options.compression,
+    strips: tiles,
+    tiles: Some((tile_width, tile_height)),
     icc: match source.metadata.icc {
       Some(profile) => Some(profile.profile)
       None => None
@@ -291,15 +423,30 @@ fn entries_of(plan : Plan) -> Array[Entry] {
   let entries : Array[Entry] = []
   entries.push(long_entry(tag_image_width, plan.width))
   entries.push(long_entry(tag_image_length, plan.height))
+  match plan.tiles {
+    Some((tile_width, tile_height)) => {
+      entries.push(long_entry(tag_tile_width, tile_width))
+      entries.push(long_entry(tag_tile_length, tile_height))
+    }
+    None => ()
+  }
   entries.push(
     shorts_entry(tag_bits_per_sample, repeat(plan.bits, plan.samples)),
   )
   entries.push(short_entry(tag_compression, plan.compression.code()))
   entries.push(short_entry(tag_photometric, plan.photometric))
-  entries.push(longs_entry(tag_strip_offsets, []))
   entries.push(short_entry(tag_samples_per_pixel, plan.samples))
-  entries.push(long_entry(tag_rows_per_strip, plan.rows_per_strip))
-  entries.push(longs_entry(tag_strip_byte_counts, []))
+  match plan.tiles {
+    Some(_) => {
+      entries.push(longs_entry(tag_tile_offsets, []))
+      entries.push(longs_entry(tag_tile_byte_counts, []))
+    }
+    None => {
+      entries.push(longs_entry(tag_strip_offsets, []))
+      entries.push(long_entry(tag_rows_per_strip, plan.rows_per_strip))
+      entries.push(longs_entry(tag_strip_byte_counts, []))
+    }
+  }
   entries.push(short_entry(tag_planar, 1))
   if plan.predictor != 1 {
     entries.push(short_entry(tag_predictor, plan.predictor))
@@ -434,9 +581,10 @@ fn write_directory(
   }
   let filled : Array[Entry] = []
   for entry in entries_of(plan) {
-    if entry.tag == tag_strip_offsets {
+    if entry.tag == tag_strip_offsets || entry.tag == tag_tile_offsets {
       filled.push(longs_entry(entry.tag, offsets))
-    } else if entry.tag == tag_strip_byte_counts {
+    } else if entry.tag == tag_strip_byte_counts ||
+      entry.tag == tag_tile_byte_counts {
       filled.push(longs_entry(entry.tag, counts))
     } else {
       filled.push(entry)

@@ -129,35 +129,72 @@ test "an orientation tag comes back as a number one to eight" {
 }
 
 ///|
-test "a tile is refused rather than read as strips" {
-  let image = sample_image()
-  let file = encoded(image, @tiff.EncodeOptions::default())
-  // The strip offsets tag is 273 (0x0111); renaming it to the first tile tag,
-  // 322 (0x0142), leaves a file whose pixels are in strips under a tag that
-  // says they are in tiles.
-  let changed = replace_tag(file, b"\x11\x01", b"\x42\x01")
-  let refused = try {
-    ignore(@tiff.decode(changed))
-    false
-  } catch {
-    @raster.Refused::Unsupported(..) => true
-    _ => false
+/// A picture wider than a tile and not a multiple of one, so that the last
+/// column and the last row of tiles are the padded ones.
+fn tiled_image() -> @raster.Image {
+  let width = 35
+  let height = 21
+  let pixels : FixedArray[Byte] = FixedArray::make(width * height * 4, b'\x00')
+  for y in 0..<height {
+    for x in 0..<width {
+      let at = (y * width + x) * 4
+      pixels[at] = (x * 7).to_byte()
+      pixels[at + 1] = (y * 11).to_byte()
+      pixels[at + 2] = ((x + y) * 3).to_byte()
+      pixels[at + 3] = b'\xff'
+    }
   }
-  assert_true(refused)
+  image_of(
+    width,
+    height,
+    @raster.PixelFormat::Rgba8,
+    Bytes::from_array(pixels.clamped_view()),
+  )
 }
 
 ///|
-/// The file with every occurrence of one tag number swapped for another.
-fn replace_tag(file : Bytes, from : Bytes, to : Bytes) -> Bytes {
-  let out : FixedArray[Byte] = FixedArray::make(file.length(), b'\x00')
-  for i in 0..<file.length() {
-    out[i] = file[i]
-  }
-  for i in 0..<(file.length() - 1) {
-    if file[i] == from[0] && file[i + 1] == from[1] {
-      out[i] = to[0]
-      out[i + 1] = to[1]
+test "a tiled page round trips at every compression" {
+  let image = tiled_image()
+  for
+    compression in [
+      @tiff.Compression::None,
+      @tiff.Compression::Lzw,
+      @tiff.Compression::PackBits,
+      @tiff.Compression::Deflate,
+    ] {
+    let options : @tiff.EncodeOptions = {
+      compression,
+      rows_per_strip: 0,
+      predictor: compression == @tiff.Compression::Deflate,
     }
+    let file = @tiff.encode_tiled(image, 16, 16, options~)
+    let back = decoded(file)
+    assert_eq(back.width, 35)
+    assert_eq(back.height, 21)
+    assert_eq(digest_of(back), digest_of(image))
   }
-  Bytes::from_array(out.clamped_view())
+}
+
+///|
+test "a tiled page and a page of strips hold the same pixels" {
+  let image = tiled_image()
+  let strips = encoded(image, @tiff.EncodeOptions::default())
+  let tiles = @tiff.encode_tiled(image, 16, 16)
+  // Different files, the same picture: the shape of a page is not part of what
+  // it says.
+  assert_eq(digest_of(decoded(tiles)), digest_of(decoded(strips)))
+}
+
+///|
+test "an LZW stream stays in step past the widening of its codes" {
+  // A page of a few thousand bytes grows the code width twice, and a writer
+  // that grows it one code early or one code late reads back as a picture with
+  // a seam in it rather than as a refusal.
+  let image = tiled_image()
+  let file = encoded(image, @tiff.EncodeOptions::{
+    compression: @tiff.Compression::Lzw,
+    rows_per_strip: 0,
+    predictor: false,
+  })
+  assert_eq(digest_of(decoded(file)), digest_of(image))
 }

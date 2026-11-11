@@ -15,6 +15,8 @@ pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
 
 pub fn encode_pages(Array[@raster.Image], options? : EncodeOptions) -> Bytes
 
+pub fn encode_tiled(@raster.Image, Int32, Int32, options? : EncodeOptions) -> Bytes
+
 pub fn orientation(BytesView) -> Int32?
 
 // Errors

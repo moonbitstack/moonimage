@@ -135,6 +135,62 @@ def tiff_samples():
     return out
 
 
+def tiff_tiles():
+    """Pages whose samples are rectangles rather than strips, written by
+    `tifffile`, which pads the tiles at the right and the bottom to the full
+    tile the way the format asks.
+
+    The digest comes from `tifffile`'s own reading rather than from Pillow's:
+    libtiff, which Pillow uses, refuses a page of planes, and the point of these
+    samples is the shape of the page rather than the arithmetic of one reader.
+    """
+    import tifffile
+
+    out = []
+
+    def digest_of(array) -> str:
+        # A page of planes comes back with the planes first; the digest is of a
+        # picture, so the samples go back to one pixel after another.
+        if array.ndim == 3 and array.shape[0] in (3, 4) and array.shape[2] not in (3, 4):
+            array = np.moveaxis(array, 0, 2)
+        if array.dtype == np.uint16:
+            array = np.rint(array.astype(np.float64) * 255 / 65535).astype(np.uint8)
+        if array.ndim == 2:
+            array = np.repeat(array[..., None], 3, axis=2)
+        if array.shape[2] == 3:
+            alpha = np.full(array.shape[:2] + (1,), 255, dtype=np.uint8)
+            array = np.concatenate([array, alpha], axis=2)
+        return moonbit.digest(array.astype(np.uint8).tobytes())
+
+    def save(name, array, **extra):
+        handle = io.BytesIO()
+        tifffile.imwrite(handle, array, tile=(16, 16), **extra)
+        data = handle.getvalue()
+        out.append((name, data, digest_of(tifffile.imread(io.BytesIO(data)))))
+
+    colour = np.asarray(picture(37, 23, alpha=False).convert("RGB"))
+    rgba = np.asarray(picture(37, 23).convert("RGBA"))
+    grey = np.asarray(picture(41, 33).convert("L"))
+    save("tile-none-rgb", colour)
+    save("tile-deflate-rgba", rgba, compression="zlib")
+    save("tile-deflate-grey", grey, compression="zlib")
+    # A page whose last column of tiles holds a single pixel of the picture
+    # rather than a whole tile.
+    save("tile-narrow-edge", np.asarray(picture(33, 17, alpha=False).convert("RGB")))
+    # Planar: every channel in tiles of its own, one plane after another. The
+    # writer takes the array with the planes first, which is how the page stores
+    # them.
+    save("tile-planar-rgb", np.moveaxis(colour, 2, 0), planarconfig="separate")
+    # Sixteen bits a sample, which is the width where the predictor works on
+    # words rather than bytes.
+    wide = np.zeros((18, 35), dtype=np.uint16)
+    for y in range(18):
+        for x in range(35):
+            wide[y, x] = (x * 1800 + y * 700) % 65536
+    save("tile-16bit", wide, compression="zlib")
+    return out
+
+
 def tiff_pages():
     first = picture(6, 4)
     second = picture(6, 4).rotate(180)
@@ -803,7 +859,7 @@ def main() -> None:
 // TIFF files Pillow wrote, each with a digest of the pixels it reads back from
 // the same bytes. The pixel data inside them was compressed by libtiff, which is
 // the implementation every other one is measured against.""",
-        array_of_samples(tiff_samples()),
+        array_of_samples(tiff_samples() + tiff_tiles()),
     )
     data, pages = tiff_pages()
     body = [

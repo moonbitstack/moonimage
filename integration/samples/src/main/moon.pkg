@@ -12,6 +12,7 @@ import {
   "moonbitstack/moonimage/exr",
   "moonbitstack/moonimage/farbfeld",
   "moonbitstack/moonimage/pnm",
+  "moonbitstack/moonimage/tiff",
   "moonbitlang/x/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/debug",

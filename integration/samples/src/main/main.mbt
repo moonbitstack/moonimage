@@ -194,6 +194,20 @@ fn write(format : String, path : String) -> Result[String, String] {
       compression: @exr.Compression::B44a,
       half: true,
     })
+  } else if format == "tiff-tiled" {
+    @tiff.encode_tiled(image, 16, 16)
+  } else if format == "tiff-tiled-lzw" {
+    @tiff.encode_tiled(image, 16, 16, options=@tiff.EncodeOptions::{
+      compression: @tiff.Compression::Lzw,
+      rows_per_strip: 0,
+      predictor: false,
+    })
+  } else if format == "tiff-tiled-deflate" {
+    @tiff.encode_tiled(image, 16, 16, options=@tiff.EncodeOptions::{
+      compression: @tiff.Compression::Deflate,
+      rows_per_strip: 0,
+      predictor: true,
+    })
   } else if format == "exr-dwaa" {
     @exr.encode(image, options=@exr.EncodeOptions::{
       compression: @exr.Compression::Dwaa,
