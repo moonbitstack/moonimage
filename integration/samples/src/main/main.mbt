@@ -210,6 +210,14 @@ fn write(format : String, path : String) -> Result[String, String] {
     @dds.encode(image, block=@dds.Block::Bc5) catch {
       error => return Err("\{format}: \{error}")
     }
+  } else if format == "dds-bc7" {
+    @dds.encode(image, block=@dds.Block::Bc7) catch {
+      error => return Err("\{format}: \{error}")
+    }
+  } else if format == "dds-bc6h" {
+    @dds.encode(image, block=@dds.Block::Bc6h) catch {
+      error => return Err("\{format}: \{error}")
+    }
   } else if format == "tiff-tiled" {
     @tiff.encode_tiled(image, 16, 16)
   } else if format == "tiff-tiled-lzw" {

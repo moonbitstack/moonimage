@@ -84,6 +84,10 @@ WRITTEN = [
     ("dds-bc1", ".dds", 0, ("pillow",)),
     ("dds-bc3", ".dds", 0, ("pillow",)),
     ("dds-bc5", ".dds", 0, ("pillow",)),
+    ("dds-bc7", ".dds", 0, ("pillow",)),
+    # BC6H is light above one, and the reader asked here brings it down to eight
+    # bits; the two round it by a step of one now and then.
+    ("dds-bc6h", ".dds", 1, ("pillow",)),
     ("tiff-tiled", ".tiff", 0, ("pillow",)),
     ("tiff-tiled-lzw", ".tiff", 0, ("pillow",)),
     ("tiff-tiled-deflate", ".tiff", 0, ("pillow",)),

@@ -30,11 +30,13 @@
 /// edge, so that the box a block is fitted to is not stretched by a colour that
 /// is not in the picture.
 ///
-/// BC1, BC2, BC3, BC4 and BC5 are written. BC6H and BC7 are read and not
-/// written: the endpoints of one of their blocks are chosen by a search over
-/// eight modes and sixty-four partitions, and a block fitted by the simple
-/// search used here would be a worse picture than the format exists for. Asking
-/// for one refuses rather than writing a file in some other format.
+/// BC1 to BC5 are written, and so are BC6H and BC7: a block of one of those
+/// takes its colour from two endpoints along a line, which is a line fitted here
+/// by least squares, and the mode chosen is the one with the finest weights —
+/// the sixth of BC7 and the third of BC6H. The other modes spend their bits on
+/// partitions of the square instead, and a search over the sixty-four shapes is
+/// the difference between a good encoder and a great one rather than between a
+/// picture and a refusal.
 pub fn encode(
   image : @raster.Image,
   block? : Block,
@@ -46,16 +48,29 @@ pub fn encode(
 }
 
 ///|
-/// The four-character code that names a block format, or nothing for one this
-/// writer does not produce.
-fn fourcc_of(block : Block) -> Bytes? {
+/// The four-character code that names a block format.
+fn fourcc_of(block : Block) -> Bytes {
   match block {
-    Bc1 | Bc1Opaque => Some(b"DXT1")
-    Bc2 => Some(b"DXT3")
-    Bc3 => Some(b"DXT5")
-    Bc4 => Some(b"ATI1")
-    Bc5 => Some(b"ATI2")
-    _ => None
+    Bc1 | Bc1Opaque => b"DXT1"
+    Bc2 => b"DXT3"
+    Bc3 => b"DXT5"
+    Bc4 => b"ATI1"
+    Bc5 => b"ATI2"
+    // The two block formats the format had no code of its own for: an extension
+    // header names them by number instead.
+    Bc6h | Bc6hSigned | Bc7 => b"DX10"
+  }
+}
+
+///|
+/// The number that names a block format in the extension header, or nought for
+/// one that had a code of its own.
+fn dxgi_of(block : Block) -> Int32 {
+  match block {
+    Bc6h => 95
+    Bc6hSigned => 96
+    Bc7 => 98
+    _ => 0
   }
 }
 
@@ -66,6 +81,7 @@ fn header(
   height : Int32,
   fourcc : Bytes?,
   step : Int32,
+  dxgi : Int32,
 ) -> Bytes {
   let writer = @wire.Writer::new()
   writer.bytes(b"DDS ")
@@ -106,6 +122,15 @@ fn header(
   for _ in 0..<4 {
     writer.u32_le(0)
   }
+  if dxgi > 0 {
+    // The extension header: the format by number, a two-dimensional texture, no
+    // cube face, one surface, and no sRGB note of its own.
+    writer.u32_le(dxgi)
+    writer.u32_le(3)
+    writer.u32_le(0)
+    writer.u32_le(1)
+    writer.u32_le(0)
+  }
   writer.to_bytes()
 }
 
@@ -115,7 +140,7 @@ fn header(
 fn encode_plain(image : @raster.Image) -> Bytes {
   let source = image.convert(@raster.PixelFormat::Rgba8)
   let writer = @wire.Writer::new()
-  writer.bytes(header(source.width, source.height, None, 4))
+  writer.bytes(header(source.width, source.height, None, 4, 0))
   for y in 0..<source.height {
     for x in 0..<source.width {
       let at = y * source.stride + x * 4
@@ -134,19 +159,24 @@ fn encode_blocks(
   image : @raster.Image,
   block : Block,
 ) -> Bytes raise @raster.Refused {
-  let code = match fourcc_of(block) {
-    Some(code) => code
-    None =>
-      raise @raster.Unsupported(
-        at=0,
-        got="a block of a format this writer does not produce",
-      )
+  let code = fourcc_of(block)
+  if block == Bc6h && has_negative(image) {
+    // The unsigned half of the format cannot name a sample below nought —
+    // there is no sign in it — and a picture of one written here would come back
+    // brighter than it went in. The signed half of the format is the one for a
+    // difference between two exposures.
+    raise @raster.Unsupported(
+      at=0,
+      got="a negative sample in a block that has no sign",
+    )
   }
   let step = block_size(block)
   let across = (image.width + 3) / 4
   let down = (image.height + 3) / 4
   let writer = @wire.Writer::new()
-  writer.bytes(header(image.width, image.height, Some(code), step))
+  writer.bytes(
+    header(image.width, image.height, Some(code), step, dxgi_of(block)),
+  )
   let bpp = pixel_bytes(block)
   let pixels = block_pixels(image, block)
   for by in 0..<down {
@@ -163,6 +193,12 @@ fn encode_blocks(
           write_block(writer, colour_bytes(square))
         }
         Bc4 => write_block(writer, single_block(square, 0))
+        Bc7 => write_wide(writer, bc7_pack(square))
+        Bc6h | Bc6hSigned =>
+          write_wide(
+            writer,
+            bc6h_pack(half_square(image, bx, by), block == Bc6hSigned),
+          )
         Bc5 => {
           // The two channels of a BC5 block are the red and the green of the
           // picture: a normal map is stored that way, and the reader puts them
@@ -170,7 +206,6 @@ fn encode_blocks(
           write_block(writer, single_block(square, 0))
           write_block(writer, single_block(square, 1))
         }
-        _ => ()
       }
     }
   }
@@ -185,11 +220,66 @@ fn write_block(writer : @wire.Writer, body : FixedArray[Byte]) -> Unit {
 }
 
 ///|
+/// A block of sixteen bytes, which is what a format named by an extension header
+/// is.
+fn write_wide(writer : @wire.Writer, body : FixedArray[Byte]) -> Unit {
+  for i in 0..<16 {
+    writer.u8(body[i].to_int())
+  }
+}
+
+///|
+/// Whether any sample of the picture is below nought.
+fn has_negative(image : @raster.Image) -> Bool {
+  let floats = image.convert(@raster.PixelFormat::RgbaF32)
+  for i in 0..<(floats.width * floats.height) {
+    for c in 0..<3 {
+      if @raster.float_at(floats.pixels, i * 16 + c * 4) < 0.0F {
+        return true
+      }
+    }
+  }
+  false
+}
+
+///|
+/// The sixteen pixels of a block as the bit patterns of halves, which is what
+/// BC6H stores: the samples of the picture, in the order red, green and blue.
+fn half_square(
+  image : @raster.Image,
+  bx : Int32,
+  by : Int32,
+) -> FixedArray[Int32] {
+  let floats = image.convert(@raster.PixelFormat::RgbaF32)
+  let out : FixedArray[Int32] = FixedArray::make(48, 0)
+  for y in 0..<4 {
+    let mut py = by * 4 + y
+    if py >= floats.height {
+      py = floats.height - 1
+    }
+    for x in 0..<4 {
+      let mut px = bx * 4 + x
+      if px >= floats.width {
+        px = floats.width - 1
+      }
+      let at = py * floats.stride + px * 16
+      for c in 0..<3 {
+        out[(y * 4 + x) * 3 + c] = @raster.float_to_half(
+          @raster.float_at(floats.pixels, at + c * 4),
+        )
+      }
+    }
+  }
+  out
+}
+
+///|
 /// The picture in the layout its blocks speak.
 fn block_pixels(image : @raster.Image, block : Block) -> Bytes {
   match block {
     Bc4 => image.convert(@raster.PixelFormat::Gray8).pixels
     Bc5 => image.convert(@raster.PixelFormat::Rgb8).pixels
+    Bc6h | Bc6hSigned => image.convert(@raster.PixelFormat::RgbaF32).pixels
     _ => image.convert(@raster.PixelFormat::Rgba8).pixels
   }
 }
@@ -200,6 +290,7 @@ fn pixel_bytes(block : Block) -> Int32 {
   match block {
     Bc4 => 1
     Bc5 => 3
+    Bc6h | Bc6hSigned => 16
     _ => 4
   }
 }

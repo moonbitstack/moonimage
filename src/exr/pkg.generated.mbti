@@ -13,6 +13,8 @@ pub fn decode_parts(BytesView, limits? : @raster.Limits) -> Array[@raster.Image]
 
 pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
 
+pub fn encode_parts(Array[(String, @raster.Image)], options? : EncodeOptions) -> Bytes
+
 pub fn float_to_half(Float) -> Int32
 
 pub fn half_to_float(Int32) -> Float
