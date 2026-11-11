@@ -68,10 +68,11 @@ early, `OverLimit` means the caller's limits refused it, `Unknown` means it is n
 a format this library reads, and `Unsupported` means a part of a format it does
 not implement.
 
-`encode` writes the format the caller names, with that format's defaults, and
-raises `Refused` for the one format that is read-only. A caller that wants to
-choose how it is written goes to the format's own package, which takes its
-options record.
+`encode` writes the format the caller names, with that format's defaults. It
+raises `Refused` when a format cannot hold what is asked of it — a block of BC6H
+or BC7, say. A caller that wants to choose how it is written goes to the format's
+own package, which takes its options record: a compression for OpenEXR or TIFF,
+a tile size for TIFF, a block format for a texture.
 
 | Format | Read | Write | Animation | Package |
 |:--|:--:|:--:|:--:|:--|
@@ -343,11 +344,11 @@ A format is implemented when two other implementations agree with this one about
 the same file. Both directions are measured on real pictures.
 
 **Reading.** The test images of libtiff, the pictures of openexr-images and the
-samples of Netpbm — twenty files at pinned commits — are decoded here, by Pillow,
-by the `image` crate, by `tifffile` for pages whose samples are in separate
-planes, and by OpenEXR's own library for that format. Eighteen of them agree to
-within a step of an eight-bit sample, or exactly where the samples are eight
-bits. The other two are refused on purpose, and named:
+samples of Netpbm — twenty-one files at pinned commits — are decoded here, by
+Pillow, by the `image` crate, by `tifffile` for pages whose samples are in
+separate planes, and by OpenEXR's own library for that format. Nineteen of them
+agree to within a step of an eight-bit sample, or exactly where the samples are
+eight bits. The other two are refused on purpose, and named:
 
 | File | Refused because |
 |:--|:--|
