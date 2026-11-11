@@ -96,6 +96,166 @@ def build(width: int, height: int, alpha: bool, kind, compression: str):
         return path.read_bytes(), read_back(path, alpha)
 
 
+def stacked(width: int, height: int, alpha: bool, kind):
+    """The same picture as one array of four samples a pixel, which is the shape
+    the library's part constructor takes."""
+    planes = picture(width, height, alpha, kind)
+    out = np.zeros((height, width, 4), dtype=kind)
+    for index, name in enumerate(["R", "G", "B"]):
+        out[..., index] = planes[name]
+    out[..., 3] = planes["A"] if alpha else 1.0
+    return out
+
+
+def part_pixels(part) -> bytes:
+    """One part's pixels, as the floats this library's decoder produces."""
+    planes = part.channels["RGBA" if "RGBA" in part.channels else "RGB"].pixels
+    height, width = part.height(), part.width()
+    out = bytearray()
+    for y in range(height):
+        for x in range(width):
+            for index in range(4):
+                value = float(planes[y, x, index]) if index < planes.shape[2] else 1.0
+                out += struct.pack("<f", value)
+    return bytes(out)
+
+
+def tiled_cases():
+    """Files whose chunks are tiles rather than runs of scanlines, including
+    tiles that do not divide the window and so are cropped at the edge."""
+    out = []
+    plans = [
+        (41, 23, 16, 16, "zip"),
+        (37, 23, 16, 16, "piz"),
+        (19, 14, 17, 9, "none"),
+        (33, 17, 16, 16, "b44"),
+    ]
+    for width, height, across, down, compression in plans:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tiled.exr"
+            tile = OpenEXR.TileDescription()
+            tile.xSize = across
+            tile.ySize = down
+            tile.mode = OpenEXR.ONE_LEVEL
+            window = ((0, 0), (width - 1, height - 1))
+            header = {
+                "compression": COMPRESSIONS[compression],
+                "type": OpenEXR.tiledimage,
+                "tiles": tile,
+                "dataWindow": window,
+                "displayWindow": window,
+            }
+            OpenEXR.File(header, {"RGBA": stacked(width, height, True, np.float16)}).write(
+                str(path)
+            )
+            name = "tiled-%dx%d-in-%dx%d-%s" % (width, height, across, down, compression)
+            out.append((name, path.read_bytes(), moonbit.digest(part_pixels(OpenEXR.File(str(path)).parts[0]))))
+    return out
+
+
+def tiled_dwa_cases():
+    """A tiled file in a compression that stores frequencies, kept apart for the
+    reason the scanline ones are: two readers of the same coefficients differ by
+    a step of a half, so the pixels travel with the file and are compared with a
+    bound."""
+    out = []
+    width, height, across, down = 33, 17, 16, 16
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "tiled.exr"
+        tile = OpenEXR.TileDescription()
+        tile.xSize = across
+        tile.ySize = down
+        tile.mode = OpenEXR.ONE_LEVEL
+        window = ((0, 0), (width - 1, height - 1))
+        header = {
+            "compression": OpenEXR.DWAA_COMPRESSION,
+            "type": OpenEXR.tiledimage,
+            "tiles": tile,
+            "dataWindow": window,
+            "displayWindow": window,
+        }
+        OpenEXR.File(header, {"RGBA": stacked(width, height, True, np.float16)}).write(
+            str(path)
+        )
+        name = "tiled-%dx%d-in-%dx%d-dwaa" % (width, height, across, down)
+        out.append((name, path.read_bytes(), zlib.compress(part_pixels(OpenEXR.File(str(path)).parts[0]), 9)))
+    return out
+
+
+def multipart_cases():
+    """Files of more than one part: a colour pass and a depth pass of the same
+    shot, with different channel lists, compressions and windows."""
+    out = []
+    window = ((0, 0), (40, 22))
+    first = OpenEXR.Part(
+        {
+            "compression": OpenEXR.ZIP_COMPRESSION,
+            "type": OpenEXR.scanlineimage,
+            "dataWindow": window,
+            "displayWindow": window,
+        },
+        {"RGBA": stacked(41, 23, True, np.float16)},
+        "colour",
+    )
+    depth_window = ((0, 0), (20, 11))
+    depth = np.zeros((12, 21, 3), dtype=np.float32)
+    depth[..., 0] = np.arange(21)[None, :] / 8.0
+    depth[..., 1] = np.arange(12)[:, None] / 8.0
+    depth[..., 2] = 0.75
+    second = OpenEXR.Part(
+        {
+            "compression": OpenEXR.PIZ_COMPRESSION,
+            "type": OpenEXR.scanlineimage,
+            "dataWindow": depth_window,
+            "displayWindow": window,
+        },
+        {"RGB": depth},
+        "depth",
+    )
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "parts.exr"
+        OpenEXR.File([first, second]).write(str(path))
+        file = OpenEXR.File(str(path))
+        digests = [moonbit.digest(part_pixels(part)) for part in file.parts]
+        out.append(("two-parts", path.read_bytes(), digests))
+    # Two tiled parts, whose chunks carry a part number in front of the tile
+    # coordinates.
+    tiled_window = ((0, 0), (24, 15))
+    tile = OpenEXR.TileDescription()
+    tile.xSize = 16
+    tile.ySize = 16
+    tile.mode = OpenEXR.ONE_LEVEL
+    left = OpenEXR.Part(
+        {
+            "compression": OpenEXR.ZIP_COMPRESSION,
+            "type": OpenEXR.tiledimage,
+            "tiles": tile,
+            "dataWindow": tiled_window,
+            "displayWindow": tiled_window,
+        },
+        {"RGBA": stacked(25, 16, True, np.float16)},
+        "left",
+    )
+    right = OpenEXR.Part(
+        {
+            "compression": OpenEXR.ZIP_COMPRESSION,
+            "type": OpenEXR.tiledimage,
+            "tiles": tile,
+            "dataWindow": tiled_window,
+            "displayWindow": tiled_window,
+        },
+        {"RGB": stacked(25, 16, False, np.float16)},
+        "right",
+    )
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "tiled-parts.exr"
+        OpenEXR.File([left, right]).write(str(path))
+        file = OpenEXR.File(str(path))
+        digests = [moonbit.digest(part_pixels(part)) for part in file.parts]
+        out.append(("two-tiled-parts", path.read_bytes(), digests))
+    return out
+
+
 def cases():
     out = []
     plans = [
@@ -162,6 +322,79 @@ def main() -> None:
 //
 // OpenEXR files written by the format's own library, in each compression this
 // reader supports, with the digest of the pixels it read back from them.""",
+        body,
+    )
+
+    rows = []
+    for name, data, digest in tiled_cases():
+        rows.append("  (")
+        rows.append('    "%s",' % name)
+        rows.append("    %s," % moonbit.literal(data))
+        rows.append('    "%s",' % digest)
+        rows.append("  ),")
+    body = "\n".join(
+        [
+            "///|",
+            "let tiled : Array[(String, Bytes, String)] = [",
+            "\n".join(rows),
+            "]",
+        ]
+    )
+    moonbit.write(
+        str(ROOT / "src" / "exr" / "parts_test.mbt"),
+        """// Generated by scripts/fixtures/exr.py. Do not edit.
+//
+// Tiled files, in four compressions, and one file of two parts: written by the
+// format's own library, with the digest of the pixels it read back from each
+// part.""",
+        body,
+    )
+
+    rows = []
+    for name, data, pixels in tiled_dwa_cases():
+        rows.append("  (")
+        rows.append('    "%s",' % name)
+        rows.append("    %s," % moonbit.literal(data))
+        rows.append("    %s," % moonbit.literal(pixels))
+        rows.append("  ),")
+    body = "\n".join(
+        [
+            "///|",
+            "let tiled_dwa : Array[(String, Bytes, Bytes)] = [",
+            "\n".join(rows),
+            "]",
+        ]
+    )
+    moonbit.write(
+        str(ROOT / "src" / "exr" / "parts_dwa_test.mbt"),
+        """// Generated by scripts/fixtures/exr.py. Do not edit.
+//
+// A tiled file whose chunks are frequencies, with the pixels the format's own
+// library reads back from it, deflated.""",
+        body,
+    )
+
+    rows = []
+    for name, data, digests in multipart_cases():
+        rows.append("  (")
+        rows.append('    "%s",' % name)
+        rows.append("    %s," % moonbit.literal(data))
+        rows.append("    [%s]," % ", ".join('"%s"' % d for d in digests))
+        rows.append("  ),")
+    body = "\n".join(
+        [
+            "///|",
+            "let parts : Array[(String, Bytes, Array[String])] = [",
+            "\n".join(rows),
+            "]",
+        ]
+    )
+    moonbit.write(
+        str(ROOT / "src" / "exr" / "parts_data_test.mbt"),
+        """// Generated by scripts/fixtures/exr.py. Do not edit.
+//
+// A file of two parts, with the digest of each part as the format's own library
+// reads it.""",
         body,
     )
 

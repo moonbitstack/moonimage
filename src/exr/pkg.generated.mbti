@@ -9,6 +9,8 @@ import {
 // Values
 pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
 
+pub fn decode_parts(BytesView, limits? : @raster.Limits) -> Array[@raster.Image] raise @raster.Refused
+
 pub fn encode(@raster.Image, options? : EncodeOptions) -> Bytes
 
 pub fn float_to_half(Float) -> Int32

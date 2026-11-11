@@ -124,15 +124,35 @@ priv struct Channel {
 }
 
 ///|
-/// The image in these bytes.
+/// The image in these bytes, which is the first part of the file when it has
+/// more than one.
 ///
-/// Every channel of the file is read; the result is an `RgbaF32` image, with the
+/// Every channel of the part is read; the result is an `RgbaF32` image, with the
 /// channels that were not there filled in — grey becomes equal parts red, green
 /// and blue, and a missing alpha becomes one.
 pub fn decode(
   bytes : BytesView,
   limits? : @raster.Limits,
 ) -> @raster.Image raise @raster.Refused {
+  let parts = match limits {
+    Some(value) => decode_parts(bytes, limits=value)
+    None => decode_parts(bytes)
+  }
+  parts[0]
+}
+
+///|
+/// Every part of the file, in the order the file lists them.
+///
+/// A file of one image has one part. A file of several — a beauty pass and its
+/// depth, two views of the same shot — carries a header for each, and each part
+/// has its own channels, its own compression and its own window. The window of
+/// the first part is the display window of all of them, which is why a picture
+/// with no pixels of its own is still a part.
+pub fn decode_parts(
+  bytes : BytesView,
+  limits? : @raster.Limits,
+) -> Array[@raster.Image] raise @raster.Refused {
   let limits = limits.unwrap_or(@raster.Limits::default())
   if bytes.length() < 8 {
     raise @raster.Truncated(at=0, want=8)
@@ -144,16 +164,78 @@ pub fn decode(
     raise @raster.Unknown(at=0, got=@raster.hex(bytes, 0, 8))
   }
   let flags = le32(bytes, 4)
-  if (flags & 0x200) != 0 {
-    raise @raster.Unsupported(at=4, got="a tiled file")
-  }
   if (flags & 0x800) != 0 {
     raise @raster.Unsupported(at=4, got="a deep file")
   }
-  if (flags & 0x1000) != 0 {
-    raise @raster.Unsupported(at=4, got="a multi-part file")
+  // A multi-part file ends its list of headers with an empty one; a file of a
+  // single image has just the one, and the byte after it is the offset table.
+  let multi = (flags & 0x1000) != 0
+  let parts : Array[Part] = []
+  let mut at = 8
+  if multi {
+    while true {
+      if at >= bytes.length() {
+        raise @raster.Truncated(at~, want=1)
+      }
+      if bytes[at].to_int() == 0 {
+        at = at + 1
+        break
+      }
+      let (part, next) = read_part(bytes, at)
+      parts.push(part)
+      at = next
+    }
+  } else {
+    let (part, next) = read_part(bytes, 8)
+    parts.push(part)
+    at = next
   }
-  let (channels, compression, window, at) = read_header(bytes)
+  if parts.is_empty() {
+    raise @raster.Unexpected(at=8, got="a file with no parts", want="one part")
+  }
+  let images : Array[@raster.Image] = []
+  for index in 0..<parts.length() {
+    let part = parts[index]
+    // The tables are one after another, each as long as its part's chunks.
+    if at.to_int64() + part.chunks.to_int64() * 8L > bytes.length().to_int64() {
+      raise @raster.Truncated(at~, want=part.chunks * 8)
+    }
+    let located = { ..part, table: at, }
+    at = at + part.chunks * 8
+    let number = if multi { Some(index) } else { None }
+    images.push(decode_part(bytes, located, limits, number))
+  }
+  images
+}
+
+///|
+/// One part of a file: what its header says about how its pixels are laid out.
+priv struct Part {
+  channels : Array[Channel]
+  compression : Compression
+  window : (Int32, Int32, Int32, Int32)
+  /// The size of a tile, or nothing when the part holds scanlines. A tiled part
+  /// stores a rectangle of the picture per chunk, and its chunks are in tile
+  /// order rather than in scanline order.
+  tiles : (Int32, Int32)?
+  /// How many entries the part's offset table holds.
+  chunks : Int32
+  /// Where that table starts.
+  table : Int32
+}
+
+///|
+fn decode_part(
+  bytes : BytesView,
+  part : Part,
+  limits : @raster.Limits,
+  number : Int32?,
+) -> @raster.Image raise @raster.Refused {
+  let (channels, compression, window) = (
+    part.channels,
+    part.compression,
+    part.window,
+  )
   let (left, top, right, bottom) = window
   let width = right - left + 1
   let height = bottom - top + 1
@@ -165,15 +247,10 @@ pub fn decode(
     )
   }
   limits.check(width, height)
-  let per_chunk = lines_per_chunk(compression)
-  let chunks = (height + per_chunk - 1) / per_chunk
-  if at.to_int64() + chunks.to_int64() * 8L > bytes.length().to_int64() {
-    raise @raster.Truncated(at~, want=chunks * 8)
-  }
   let row_bytes = row_size(channels, width)
   let sample_row = width * 16
   // A chunk of B44 whose channels ask for the perceptual curve needs a table of
-  // sixty-five thousand entries, and one file's worth of chunks needs one of
+  // sixty-five thousand entries, and one part's worth of chunks needs one of
   // them: it is built here rather than in each chunk.
   let b44_logs = if (compression == B44 || compression == B44a) &&
     b44_needs_table(channels) {
@@ -187,68 +264,15 @@ pub fn decode(
   for i in 0..<(width * height) {
     @raster.put_float(out, i * 16 + 12, 1.0F)
   }
-  for chunk in 0..<chunks {
-    let offset = le64(bytes, at + chunk * 8)
-    if offset < 0 || offset.to_int64() + 8L > bytes.length().to_int64() {
-      raise @raster.Truncated(at=offset, want=8)
-    }
-    let first = le32(bytes, offset)
-    let length = le32(bytes, offset + 4)
-    if length < 0 ||
-      offset.to_int64() + 8L + length.to_int64() > bytes.length().to_int64() {
-      raise @raster.Truncated(at=offset + 4, want=length)
-    }
-    let body = bytes.clamped_view(start=offset + 8, end=offset + 8 + length)
-    let lines = if first + per_chunk > height {
-      height - first
-    } else {
-      per_chunk
-    }
-    let want = row_bytes * lines
-    // A chunk that did not get smaller is stored as it came, whichever
-    // compression the file names: a reader tells the two apart by the length,
-    // because a compressed chunk is always shorter than the pixels it holds.
-    let data = if body.length() >= want {
-      // PIZ stores its words little-endian even when it stores them as they
-      // came, so its uncompressed chunks still need turning over.
-      match compression {
-        Piz => piz_plain(body, want, channels, width, lines)
-        _ => Bytes::from_array(body.to_array())
-      }
-    } else {
-      match compression {
-        None => Bytes::from_array(body.to_array())
-        Rle => unpack_rle(body, want)
-        Piz => piz_unpack(body, want, channels, width, lines)
-        Pxr24 => pxr24_unpack(body, want, channels, width, lines)
-        B44 | B44a => b44_unpack(body, channels, width, lines, logs=b44_logs)
-        Dwaa | Dwab => dwa_unpack(body, channels, width, lines)
-        _ => inflate(body, want, compression)
-      }
-    }
-    for line in 0..<lines {
-      let y = top + first + line - top
-      let source = line * row_bytes
-      let mut at = source
-      for channel in channels {
-        let row = (first + line) * sample_row
-        let give = channel_value(channel.name)
-        for x in 0..<width {
-          let value = sample_of(data, at, channel.sample)
-          at = at + channel.sample
-          if give == 4 {
-            // A luminance channel is the picture in grey, so it fills all three
-            // of red, green and blue.
-            @raster.put_float(out, row + x * 16, value)
-            @raster.put_float(out, row + x * 16 + 4, value)
-            @raster.put_float(out, row + x * 16 + 8, value)
-          } else if give >= 0 {
-            @raster.put_float(out, row + x * 16 + give * 4, value)
-          }
-        }
-      }
-      let _ = y
-    }
+  match part.tiles {
+    Some((tile_width, tile_height)) =>
+      decode_tiles(
+        bytes, part, out, width, height, tile_width, tile_height, number, b44_logs,
+      )
+    None =>
+      decode_scanlines(
+        bytes, part, out, width, height, row_bytes, sample_row, number, b44_logs,
+      )
   }
   @raster.Image::of(
     width,
@@ -256,6 +280,239 @@ pub fn decode(
     @raster.PixelFormat::RgbaF32,
     Bytes::from_array(out.clamped_view()),
   )
+}
+
+///|
+/// A part whose chunks are runs of scanlines: the chunk table says where each
+/// run begins, and the run says which line it starts at.
+fn decode_scanlines(
+  bytes : BytesView,
+  part : Part,
+  out : FixedArray[Byte],
+  width : Int32,
+  height : Int32,
+  row_bytes : Int32,
+  sample_row : Int32,
+  number : Int32?,
+  b44_logs : FixedArray[Int32],
+) -> Unit raise @raster.Refused {
+  let per_chunk = lines_per_chunk(part.compression)
+  let chunks = (height + per_chunk - 1) / per_chunk
+  for chunk in 0..<chunks {
+    let offset = le64(bytes, part.table + chunk * 8)
+    let mut head = offset
+    match number {
+      Some(index) => {
+        if offset < 0 || offset.to_int64() + 12L > bytes.length().to_int64() {
+          raise @raster.Truncated(at=offset, want=12)
+        }
+        if le32(bytes, offset) != index {
+          raise @raster.Unexpected(
+            at=offset,
+            got="a chunk of another part",
+            want="the chunk this part's table points at",
+          )
+        }
+        head = offset + 4
+      }
+      None => ()
+    }
+    if head < 0 || head.to_int64() + 8L > bytes.length().to_int64() {
+      raise @raster.Truncated(at=head, want=8)
+    }
+    let first = le32(bytes, head)
+    let length = le32(bytes, head + 4)
+    if length < 0 ||
+      head.to_int64() + 8L + length.to_int64() > bytes.length().to_int64() {
+      raise @raster.Truncated(at=head + 4, want=length)
+    }
+    if first < 0 || first >= height {
+      raise @raster.Unexpected(
+        at=head,
+        got="a chunk at line \{first}",
+        want="a line inside the picture",
+      )
+    }
+    let lines = if first + per_chunk > height {
+      height - first
+    } else {
+      per_chunk
+    }
+    let body = bytes.clamped_view(start=head + 8, end=head + 8 + length)
+    let data = unpack_chunk(
+      body,
+      part.compression,
+      part.channels,
+      width,
+      lines,
+      row_bytes * lines,
+      b44_logs,
+    )
+    place_region(out, data, part.channels, width, lines, 0, first, sample_row)
+  }
+}
+
+///|
+/// A part whose chunks are tiles: one rectangle of the picture each, in the
+/// order the tiles run, with the tiles at the right and the bottom cropped to
+/// the window rather than padded with whatever was there.
+fn decode_tiles(
+  bytes : BytesView,
+  part : Part,
+  out : FixedArray[Byte],
+  width : Int32,
+  height : Int32,
+  tile_width : Int32,
+  tile_height : Int32,
+  number : Int32?,
+  b44_logs : FixedArray[Int32],
+) -> Unit raise @raster.Refused {
+  let across = (width + tile_width - 1) / tile_width
+  let down = (height + tile_height - 1) / tile_height
+  let sample_row = width * 16
+  for ty in 0..<down {
+    for tx in 0..<across {
+      let index = ty * across + tx
+      // A file with more levels than the first holds their entries after these,
+      // and they are not this reader's: the picture is the first level.
+      if index >= part.chunks {
+        raise @raster.Truncated(at=part.table + index * 8, want=8)
+      }
+      let offset = le64(bytes, part.table + index * 8)
+      let mut head = offset
+      match number {
+        Some(part_index) => {
+          if offset < 0 || offset.to_int64() + 24L > bytes.length().to_int64() {
+            raise @raster.Truncated(at=offset, want=24)
+          }
+          if le32(bytes, offset) != part_index {
+            raise @raster.Unexpected(
+              at=offset,
+              got="a tile of another part",
+              want="the tile this part's table points at",
+            )
+          }
+          head = offset + 4
+        }
+        None => ()
+      }
+      if head < 0 || head.to_int64() + 20L > bytes.length().to_int64() {
+        raise @raster.Truncated(at=head, want=20)
+      }
+      let tile_x = le32(bytes, head)
+      let tile_y = le32(bytes, head + 4)
+      // The two level coordinates that follow say which level of a mipmapped
+      // file the tile belongs to; the first level is the picture.
+      let level_x = le32(bytes, head + 8)
+      let level_y = le32(bytes, head + 12)
+      if tile_x < 0 || tile_x >= across || tile_y < 0 || tile_y >= down {
+        raise @raster.Unexpected(
+          at=head,
+          got="a tile at (\{tile_x}, \{tile_y})",
+          want="a tile inside the picture",
+        )
+      }
+      if level_x != 0 || level_y != 0 {
+        raise @raster.Unsupported(at=head + 8, got="a tile of a lower level")
+      }
+      let length = le32(bytes, head + 16)
+      if length < 0 ||
+        head.to_int64() + 20L + length.to_int64() > bytes.length().to_int64() {
+        raise @raster.Truncated(at=head + 16, want=length)
+      }
+      let x0 = tile_x * tile_width
+      let y0 = tile_y * tile_height
+      let columns = if x0 + tile_width > width {
+        width - x0
+      } else {
+        tile_width
+      }
+      let lines = if y0 + tile_height > height {
+        height - y0
+      } else {
+        tile_height
+      }
+      let body = bytes.clamped_view(start=head + 20, end=head + 20 + length)
+      let data = unpack_chunk(
+        body,
+        part.compression,
+        part.channels,
+        columns,
+        lines,
+        row_size(part.channels, columns) * lines,
+        b44_logs,
+      )
+      place_region(out, data, part.channels, columns, lines, x0, y0, sample_row)
+    }
+  }
+}
+
+///|
+/// A chunk, unpacked into the bytes of the rows it holds.
+fn unpack_chunk(
+  body : BytesView,
+  compression : Compression,
+  channels : Array[Channel],
+  width : Int32,
+  lines : Int32,
+  want : Int32,
+  b44_logs : FixedArray[Int32],
+) -> Bytes raise @raster.Refused {
+  // A chunk that did not get smaller is stored as it came, whichever compression
+  // the file names: a reader tells the two apart by the length, because a
+  // compressed chunk is always shorter than the pixels it holds.
+  if body.length() >= want {
+    // PIZ stores its words little-endian even when it stores them as they came,
+    // so its uncompressed chunks still need turning over.
+    return match compression {
+      Piz => piz_plain(body, want, channels, width, lines)
+      _ => Bytes::from_array(body.to_array())
+    }
+  }
+  match compression {
+    None => Bytes::from_array(body.to_array())
+    Rle => unpack_rle(body, want)
+    Piz => piz_unpack(body, want, channels, width, lines)
+    Pxr24 => pxr24_unpack(body, want, channels, width, lines)
+    B44 | B44a => b44_unpack(body, channels, width, lines, logs=b44_logs)
+    Dwaa | Dwab => dwa_unpack(body, channels, width, lines)
+    _ => inflate(body, want, compression)
+  }
+}
+
+///|
+/// A rectangle of the chunk's bytes written into the picture at the place it
+/// belongs.
+fn place_region(
+  out : FixedArray[Byte],
+  data : BytesView,
+  channels : Array[Channel],
+  width : Int32,
+  lines : Int32,
+  x0 : Int32,
+  y0 : Int32,
+  sample_row : Int32,
+) -> Unit {
+  let mut at = 0
+  for line in 0..<lines {
+    let row = (y0 + line) * sample_row
+    for channel in channels {
+      let give = channel_value(channel.name)
+      for x in 0..<width {
+        let value = sample_of(data, at, channel.sample)
+        at = at + channel.sample
+        if give == 4 {
+          // A luminance channel is the picture in grey, so it fills all three
+          // of red, green and blue.
+          @raster.put_float(out, row + (x0 + x) * 16, value)
+          @raster.put_float(out, row + (x0 + x) * 16 + 4, value)
+          @raster.put_float(out, row + (x0 + x) * 16 + 8, value)
+        } else if give >= 0 {
+          @raster.put_float(out, row + (x0 + x) * 16 + give * 4, value)
+        }
+      }
+    }
+  }
 }
 
 ///|
@@ -301,14 +558,20 @@ fn sample_of(data : BytesView, at : Int32, size : Int32) -> Float {
 }
 
 ///|
-/// The channels, the compression, the data window, and where the offset table
-/// starts.
-fn read_header(
+/// One header, and where the next one begins.
+///
+/// A header is a list of attributes, and a reader skips the ones it does not
+/// know by length. The ones that matter here are the channels, the compression,
+/// the data window, and — for a tiled part — the size of a tile.
+fn read_part(
   bytes : BytesView,
-) -> (Array[Channel], Compression, (Int32, Int32, Int32, Int32), Int32) raise @raster.Refused {
-  let mut at = 8
+  start : Int32,
+) -> (Part, Int32) raise @raster.Refused {
+  let mut at = start
   let mut channels : Array[Channel] = []
   let mut compression = Zip
+  let mut tiles : (Int32, Int32)? = None
+  let mut counted = -1
   let window = (0, 0, -1, -1)
   let mut seen_window = false
   let mut data_window = window
@@ -339,6 +602,9 @@ fn read_header(
         None => raise @raster.Unsupported(at~, got="a compression of \{code}")
       }
     } else if name.0 == "dataWindow" {
+      if body.length() < 16 {
+        raise @raster.Truncated(at~, want=16)
+      }
       data_window = (
         le32(body, 0),
         le32(body, 4),
@@ -346,24 +612,72 @@ fn read_header(
         le32(body, 12),
       )
       seen_window = true
+    } else if name.0 == "tiles" {
+      if body.length() < 9 {
+        raise @raster.Truncated(at~, want=9)
+      }
+      let tile_width = le32(body, 0)
+      let tile_height = le32(body, 4)
+      if tile_width <= 0 || tile_height <= 0 {
+        raise @raster.Unexpected(
+          at~,
+          got="a tile of \{tile_width} by \{tile_height}",
+          want="a tile with pixels in it",
+        )
+      }
+      // The ninth byte is the level mode, and the tenth the rounding of a
+      // level; neither changes where the first level's tiles are.
+      tiles = Some((tile_width, tile_height))
+    } else if name.0 == "chunkCount" {
+      if body.length() < 4 {
+        raise @raster.Truncated(at~, want=4)
+      }
+      counted = le32(body, 0)
+    } else if name.0 == "type" {
+      let kind = ascii(body)
+      if kind != "scanlineimage" && kind != "tiledimage" {
+        raise @raster.Unsupported(at~, got="a part of type \{kind}")
+      }
     }
     at = at + size
   }
   if !seen_window {
     raise @raster.Unexpected(
-      at=8,
+      at=start,
       got="a header with no data window",
       want="a dataWindow attribute",
     )
   }
   if channels.is_empty() {
     raise @raster.Unexpected(
-      at=8,
+      at=start,
       got="a header with no channels",
       want="a channels attribute",
     )
   }
-  (channels, compression, data_window, at)
+  let width = data_window.2 - data_window.0 + 1
+  let height = data_window.3 - data_window.1 + 1
+  let chunks = if counted >= 0 {
+    // A part of a file with several writes how many chunks it has, because a
+    // reader cannot know which compression each part uses until it has read
+    // them all.
+    counted
+  } else {
+    match tiles {
+      Some((tile_width, tile_height)) =>
+        (width + tile_width - 1) /
+        tile_width *
+        ((height + tile_height - 1) / tile_height)
+      None => {
+        let per_chunk = lines_per_chunk(compression)
+        (height + per_chunk - 1) / per_chunk
+      }
+    }
+  }
+  (
+    { channels, compression, window: data_window, tiles, chunks, table: at, },
+    at,
+  )
 }
 
 ///|

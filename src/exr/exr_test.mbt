@@ -56,12 +56,15 @@ test "a half and a float agree on the values both can hold" {
 }
 
 ///|
-test "a tiled file is refused rather than read as scanlines" {
+test "a deep file is refused rather than read as an ordinary one" {
+  // A deep file stores a list of samples per pixel rather than a sample, which
+  // is a different way of reading every channel in it; a reader that took it
+  // for an ordinary file would produce a picture of the wrong samples.
   let image = image_of(2, 2, @raster.PixelFormat::RgbaF32, floats(4))
   let file = @exr.encode(image)
-  let tiled = raise_flag(file, 0x200)
+  let deep = raise_flag(file, 0x800)
   let refused = try {
-    ignore(@exr.decode(tiled))
+    ignore(@exr.decode(deep))
     false
   } catch {
     @raster.Refused::Unsupported(..) => true
