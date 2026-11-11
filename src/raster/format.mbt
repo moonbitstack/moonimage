@@ -295,27 +295,29 @@ fn is_tga(bytes : BytesView) -> Bool {
 }
 
 ///|
-/// A few bytes as hexadecimal, for the `got` field of a refusal.
+/// A few bytes as hexadecimal, for the `got` field of a refusal: two digits a
+/// byte, in lower case, with a space between the bytes so that a reader can see
+/// where one ends and the next begins.
 pub fn hex(bytes : BytesView, at : Int32, count : Int32) -> String {
-  let mut out = ""
-  let end = if at + count > bytes.length() {
+  let start = if at < 0 {
+    0
+  } else if at > bytes.length() {
     bytes.length()
   } else {
-    at + count
+    at
   }
-  for i in at..<end {
-    if i > at {
-      out = out + " "
+  let end = if start + count > bytes.length() {
+    bytes.length()
+  } else {
+    start + count
+  }
+  let digits = @base16.encode(bytes.clamped_view(start~, end~))
+  let out = StringBuilder()
+  for i in 0..<(digits.length() / 2) {
+    if i > 0 {
+      out.write_char(' ')
     }
-    out = out + hex_byte(bytes[i].to_int())
+    out.write_string(digits[i * 2:i * 2 + 2].to_owned())
   }
-  out
-}
-
-///|
-fn hex_byte(value : Int32) -> String {
-  let digits = "0123456789abcdef"
-  let hi = (value >> 4) & 0xF
-  let lo = value & 0xF
-  digits[hi:hi + 1].to_owned() + digits[lo:lo + 1].to_owned()
+  out.to_string()
 }

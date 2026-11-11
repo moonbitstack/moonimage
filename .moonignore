@@ -6,3 +6,8 @@ _build/
 target/
 docs/
 scripts/
+
+# The harness module and the workspace manifest that resolves it to this tree are
+# for the conformance check in CI: a caller downloads the library, not a rig.
+integration/
+moon.work

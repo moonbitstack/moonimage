@@ -1,6 +1,9 @@
 // The conformance harness: it writes files for another implementation to read,
-// and lays the pixels of a file it read out on disk. It is part of the tests, not
-// of the library, and nothing imports it.
+// and lays the pixels of a file it read out on disk.
+//
+// It is a module of its own, under `integration/`, because the library it checks
+// is four backends and only one of them has a file system; a dependency on the
+// file system belongs here rather than in the library's manifest.
 
 pkgtype(kind: "executable")
 

@@ -8,5 +8,6 @@
 // `moonrgba` for a hue, a mix or a name, and comes back as samples.
 import {
   "moonbitlang/core/math",
+  "moonbitstack/moonbase/base16",
   "moonbitstack/moonrgba",
 }

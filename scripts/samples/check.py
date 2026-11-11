@@ -464,18 +464,35 @@ def main() -> int:
 
 
 def build_moon() -> Path:
-    """The harness command, built for the machine this runs on."""
+    """The harness command, built for the machine this runs on.
+
+    The harness lives in the module under `integration/`, which is the only place
+    a file system is available: the library itself is four backends, and three of
+    them have none. The workspace manifest at the root of the repository resolves
+    the harness's dependency on the library to the tree being checked.
+    """
     outcome = subprocess.run(
-        ["moon", "build", "src/tools/samples", "--target", "native", "--release"],
+        ["moon", "work", "sync", "-q"],
         cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if outcome.returncode != 0:
+        sys.exit("cannot resolve the workspace:\n" + outcome.stdout + outcome.stderr)
+    harness = ROOT / "integration" / "samples"
+    outcome = subprocess.run(
+        ["moon", "build", "src/main", "--target", "native", "--release"],
+        cwd=harness,
         capture_output=True,
         text=True,
     )
     if outcome.returncode != 0:
         sys.exit("cannot build the harness:\n" + outcome.stdout + outcome.stderr)
     for candidate in (
-        ROOT / "_build/native/release/build/tools/samples/samples.exe",
-        ROOT / "_build/native/release/build/tools/samples/samples",
+        harness / "_build/native/release/build/main/main.exe",
+        harness / "_build/native/release/build/main/main",
+        ROOT / "_build/native/release/build/moonbitstack/moonimage-samples/main/main.exe",
+        ROOT / "_build/native/release/build/moonbitstack/moonimage-samples/main/main",
     ):
         if candidate.exists():
             return candidate

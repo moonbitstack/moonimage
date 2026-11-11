@@ -8,9 +8,12 @@
 // can be held against this one on real files, which a test cannot do: a test
 // runs on four backends and three of them have no file system.
 //
-//   moon run src/tools/samples -- write png out.png
-//   moon run src/tools/samples -- decode out.png pixels.rgba
-//   moon run src/tools/samples -- decode32 out.exr floats.bin
+//   moon run src/main -- write png out.png
+//   moon run src/main -- decode out.png pixels.rgba
+//   moon run src/main -- decode32 out.exr floats.bin
+//
+// Run from `integration/samples`, which is the module the file system lives in:
+// the library itself imports nothing that touches a disk.
 //
 // `write` always draws the same picture, so a caller knows what the pixels
 // should be without reading anything back.
