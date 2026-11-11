@@ -605,7 +605,7 @@ window with a = 3.</em></li>
       <div class="entry">
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> hex(bytes : BytesView, at : Int32, count : Int32) -&gt; String</code>
-        <div class="doc"><p>A few bytes as hexadecimal, for the <code>got</code> field of a refusal.</p></div>
+        <div class="doc"><p>A few bytes as hexadecimal, for the <code>got</code> field of a refusal: two digits a byte, in lower case, with a space between the bytes so that a reader can see where one ends and the next begins.</p></div>
       </div>
       <div class="entry">
         <span class="kind">function</span>
@@ -684,7 +684,7 @@ divided.</em></li>
     </section>
     <section class="pkg" id="exr">
       <h2>exr <span>OpenEXR</span></h2>
-      <p>Scanline pictures in half or float samples, in all six scanline compressions from none through PIZ and PXR24, with the half-precision conversion the format turns on.</p>
+      <p>Scanline pictures in half or float samples, in all nine scanline compressions: none, RLE, ZIPS, ZIP, PIZ, PXR24, B44, B44A, DWAA and DWAB, with the half-precision conversion the format turns on.</p>
       <div class="entry">
         <span class="kind">enum</span>
         <code class="sig"><span class="kw">pub(all) enum</span> Compression</code>
@@ -696,6 +696,13 @@ divided.</em></li>
           <li>Zip <em>Deflate, sixteen scanlines to a chunk.</em></li>
           <li>Piz <em>A bitmap of the words used, a wavelet, and a Huffman code.</em></li>
           <li>Pxr24 <em>Twenty-four bits of every sample, split by significance and differenced.</em></li>
+          <li>B44 <em>Blocks of four by four halves, fourteen bytes each: four bits of a sample
+kept, everything below them dropped.</em></li>
+          <li>B44a <em>The same, with a block of one value written in three bytes instead.</em></li>
+          <li>Dwaa <em>Eight-by-eight blocks of a picture turned into frequencies and quantized,
+thirty-two scanlines to a chunk.</em></li>
+          <li>Dwab <em>The same with two hundred and fifty-six scanlines to a chunk, which suits a
+photograph better and a strip of a tiled render worse.</em></li>
         </ul>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Compression::code(self : Compression) -&gt; Int32</code>

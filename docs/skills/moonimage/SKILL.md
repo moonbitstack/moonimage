@@ -170,7 +170,8 @@ test {
   said, so that a round trip through `Gray16` is the identity.
 - **`RgbaF32` is not clamped on the way in.** HDR and OpenEXR pictures keep
   values above one; converting to `Rgba8` is what clamps them.
-- **OpenEXR is written in any of its six compressions**, chosen with
-  `exr.EncodeOptions`. `Pxr24` keeps twenty-four bits of every sample, so a float
-  loses its last eight bits of mantissa; the other five are exact. `B44` and the
-  two `Dwa` compressions are refused when reading rather than approximated.
+- **OpenEXR is written in eight of its nine compressions**, chosen with
+  `exr.EncodeOptions`: everything but `Dwaa` and `Dwab`, which are read and not
+  written. `Pxr24` keeps twenty-four bits of every sample, so a float loses its
+  last eight bits of mantissa; `B44` and `B44a` keep four bits of a half in a
+  block of four by four; the rest are exact.

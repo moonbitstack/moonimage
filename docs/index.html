@@ -129,8 +129,9 @@
             <code>encode</code> takes a picture and a format. The same picture
             goes out as PNG, QOI, BMP, TGA, JPEG, GIF, lossless WebP, TIFF, an
             icon, a PNM, farbfeld, Radiance HDR or OpenEXR, without the call
-            site changing. OpenEXR takes all six of its scanline compressions,
-            the wavelet of PIZ and the plane-splitting of PXR24 included.
+            site changing. OpenEXR takes any of its nine scanline compressions,
+            the wavelet of PIZ, the plane-splitting of PXR24, the blocks of B44
+            and the frequencies of DWA included.
           </p>
         </div>
 
@@ -233,9 +234,9 @@
       <p class="note">
         The test images of libtiff, the pictures of openexr-images and the
         samples of Netpbm are decoded here and by the others, and every file has
-        to be held against at least one reader that is not this library. Three
-        files are refused on purpose and named — a tiled TIFF, a LogLuv TIFF and
-        a B44 EXR — as are the shapes a reference reader is known to misread.
+        to be held against at least one reader that is not this library. Two
+        files are refused on purpose and named — a tiled TIFF and a LogLuv
+        TIFF — as are the shapes a reference reader is known to misread.
         The two formats that do not come back exact are the two whose inverse
         transforms are done in different arithmetic.
       </p>

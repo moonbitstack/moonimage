@@ -86,7 +86,7 @@ options record.
 | ICO / CUR | PNG entries and bitmap entries at 1/4/8/24/32 bits with the one-bit mask, every size in the file | PNG entries, at any list of sizes | sizes | `@moonimage/ico` |
 | PNM | PBM, PGM, PPM and PAM, both spellings, any maximum | all four shapes, both spellings | — | `@moonimage/pnm` |
 | Radiance HDR | RGBE, the new run-length code and the flat one, all four origins | RGBE with the run-length code | — | `@moonimage/hdr` |
-| OpenEXR | scanlines in half or float, uncompressed, RLE, ZIPS, ZIP, PIZ or PXR24 | the same six compressions | — | `@moonimage/exr` |
+| OpenEXR | scanlines in half or float, uncompressed, RLE, ZIPS, ZIP, PIZ, PXR24, B44, B44A, DWAA or DWAB | everything but the two DWA | — | `@moonimage/exr` |
 | farbfeld | the whole format | the whole format | — | `@moonimage/farbfeld` |
 | DDS | BC1 to BC7 blocks, and uncompressed surfaces | — | — | `@moonimage/dds` |
 
@@ -341,15 +341,14 @@ the same file. Both directions are measured on real pictures.
 **Reading.** The test images of libtiff, the pictures of openexr-images and the
 samples of Netpbm — twenty files at pinned commits — are decoded here, by Pillow,
 by the `image` crate, by `tifffile` for pages whose samples are in separate
-planes, and by OpenEXR's own library for that format. Seventeen of them agree to
+planes, and by OpenEXR's own library for that format. Eighteen of them agree to
 within a step of an eight-bit sample, or exactly where the samples are eight
-bits. The other three are refused on purpose, and named:
+bits. The other two are refused on purpose, and named:
 
 | File | Refused because |
 |:--|:--|
 | `quad-tile.jpg.tiff` | the page is tiled rather than stripped |
 | `logluv-3c-16b.tiff` | the samples are LogLuv encoded |
-| `Cannon.exr` | the blocks are B44 |
 
 Where a reference reader cannot be used as one, the harness says so rather than
 counting a silent pass: Pillow drops the alpha plane of a separated-plane TIFF,
@@ -358,8 +357,8 @@ the single-channel OpenEXR ramps. Every file has to be held against at least one
 reader that is not this library.
 
 **Writing.** Every format this library produces is written once and read back by
-Pillow and by `image` — by OpenEXR too for the six compressions of that format —
-and the three have to agree about what the file says. A format that is lossy is
+Pillow and by `image` — by OpenEXR too for the eight compressions of that format
+this library writes — and the three have to agree about what the file says. A format that is lossy is
 not required to give back what went in, only to mean the same thing to everyone
 who reads it.
 
@@ -367,20 +366,25 @@ who reads it.
 |:--|:--|
 | PNG, BMP, TGA, GIF, TIFF, ICO, PNM, QOI, farbfeld | none |
 | WebP, lossless | none |
-| OpenEXR, all six compressions | none |
+| OpenEXR, uncompressed, RLE, ZIP, PIZ, PXR24 | none |
+| OpenEXR, B44 | one step, on one sample of three thousand |
 | Radiance HDR | one step |
 | JPEG | three steps |
 
-The two that are not exact are the two whose decoders do an inverse transform
-from different arithmetic: libjpeg's integer DCT and this library's; and a
-Radiance RGBE triplet, which has eight bits of exponent to lose a mantissa in.
+The three that are not exact are the three whose decoders do an inverse
+transform from different arithmetic: libjpeg's integer DCT and this library's; a
+Radiance RGBE triplet, which has eight bits of exponent to lose a mantissa in;
+and a B44 block, whose differences are added back up from the first of the
+sixteen samples and where a rounding at the last bit of a half is a step of an
+eight-bit sample once in a while.
 
 ## What it does not do
 
 - **AVIF.** Decoding one needs a whole AV1 decoder, which is several times the
   size of this library, so it is not planned.
-- **B44 and the two DWA compressions of OpenEXR.** They are refused by name
-  rather than misread; the six around them are read and written.
+- **Writing the two DWA compressions of OpenEXR.** Reading them is done, and so
+  is writing B44 and B44A; a writer of a frequency-domain picture is a quantizer
+  and an entropy coder of its own, and this one has no caller asking for it.
 - **Tiled and multi-part OpenEXR, tiled TIFF.** Both readers take scanlines and
   strips, and say so instead of reading the rows in the wrong order.
 - **Writing tiled TIFF, writing lossy WebP, writing DDS.**
