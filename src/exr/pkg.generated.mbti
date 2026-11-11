@@ -25,6 +25,7 @@ pub(all) enum Compression {
   Zips
   Zip
   Piz
+  Pxr24
 }
 pub fn Compression::code(Self) -> Int32
 pub fn Compression::equal(Self, Self) -> Bool

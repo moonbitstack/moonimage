@@ -37,6 +37,8 @@ pub using @raster {type Image}
 
 pub using @raster {type Intent}
 
+pub using @raster {type Kernel}
+
 pub using @raster {type Limits}
 
 pub using @raster {type Metadata}
