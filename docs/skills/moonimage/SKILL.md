@@ -181,4 +181,10 @@ test {
   returns them all, in the order the file lists them.
 - **A DDS is written by `dds.encode`**, which takes a block format or nothing at
   all for a surface of plain samples — the only lossless choice, and the one
-  `encode` makes. `Bc1` to `Bc5` are written; `Bc6h` and `Bc7` refuse.
+  `encode` makes. `Bc1` to `Bc7` are written; each block is one region fitted by
+  least squares, and BC7 and BC6H take their mode with the finest weights.
+- **A lossy WebP is written by `webp.encode_lossy`**, which takes a quality from
+  nought to a hundred; `encode` writes lossless. The alpha of a lossy picture is
+  kept exactly, in a chunk of its own.
+- **An OpenEXR of several parts is written by `encode_parts`**, which takes the
+  pictures with the names they go by. `encode` writes one.

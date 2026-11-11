@@ -240,7 +240,11 @@ exr: 444 bytes</code></pre>
           <code>encode</code> and as tiles by <code>encode_tiled</code>, which
           takes the size of a tile; a texture is written by
           <code>@dds.encode</code>, which takes the block format or none at all
-          for a surface of plain samples.
+          for a surface of plain samples; a WebP is written as lossless bits by
+          <code>encode</code> and as a lossy frame by
+          <code>@webp.encode_lossy</code>, which takes a quality. An OpenEXR of
+          several pictures goes through <code>encode_parts</code>, which takes
+          each picture with the name it goes by.
         </p>
       </article>
 

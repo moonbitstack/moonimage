@@ -69,10 +69,11 @@ a format this library reads, and `Unsupported` means a part of a format it does
 not implement.
 
 `encode` writes the format the caller names, with that format's defaults. It
-raises `Refused` when a format cannot hold what is asked of it — a block of BC6H
-or BC7, say. A caller that wants to choose how it is written goes to the format's
-own package, which takes its options record: a compression for OpenEXR or TIFF,
-a tile size for TIFF, a block format for a texture.
+raises `Refused` when a format cannot hold what is asked of it — a negative
+sample in an unsigned BC6H block, say. A caller that wants to choose how it is
+written goes to the format's own package, which takes its options record: a
+compression for OpenEXR or TIFF, a tile size for TIFF, a block format for a
+texture, a quality for a lossy WebP.
 
 | Format | Read | Write | Animation | Package |
 |:--|:--:|:--:|:--:|:--|
@@ -82,14 +83,14 @@ a tile size for TIFF, a block format for a texture.
 | TGA | colour mapped, true colour and grey, run lengths, 8/15/16/24/32 bits, both row orders | 24 and 32 bits, run lengths on request | — | `@moonimage/tga` |
 | JPEG | baseline and progressive, every subsampling, greyscale, EXIF orientation | baseline, quality 1–100, three subsamplings | — | `@moonimage/jpeg` |
 | GIF | palettes, transparency, interlace, run lengths | palette by exact colours or median cut, dithering | yes | `@moonimage/gif` |
-| WebP | lossless (VP8L) with its four transforms, and lossy (VP8) with its boolean coder, predictors, loop filter and chroma upsampling; alpha in either; animated files | lossless, with a predictor transform and LZ77 | yes | `@moonimage/webp` |
+| WebP | lossless (VP8L) with its four transforms, and lossy (VP8) with its boolean coder, predictors, loop filter and chroma upsampling; alpha in either; animated files | lossless by `encode`, lossy by `encode_lossy`, which takes a quality | yes | `@moonimage/webp` |
 | TIFF | strips or tiles, LZW, PackBits, deflate or none, horizontal prediction, grey, grey with alpha, RGB, RGBA and palette at 1 to 16 bits, planar or chunky, every page | 8 and 16 bits, three compressions, prediction on request, several pages, tiles on request | pages | `@moonimage/tiff` |
 | ICO / CUR | PNG entries and bitmap entries at 1/4/8/24/32 bits with the one-bit mask, every size in the file | PNG entries, at any list of sizes | sizes | `@moonimage/ico` |
 | PNM | PBM, PGM, PPM and PAM, both spellings, any maximum | all four shapes, both spellings | — | `@moonimage/pnm` |
 | Radiance HDR | RGBE, the new run-length code and the flat one, all four origins | RGBE with the run-length code | — | `@moonimage/hdr` |
-| OpenEXR | scanlines or tiles, one part or several, in half or float, uncompressed, RLE, ZIPS, ZIP, PIZ, PXR24, B44, B44A, DWAA or DWAB | scanlines, all nine compressions | — | `@moonimage/exr` |
+| OpenEXR | scanlines or tiles, one part or several, in half or float, uncompressed, RLE, ZIPS, ZIP, PIZ, PXR24, B44, B44A, DWAA or DWAB | scanlines, all nine compressions, one part or several | — | `@moonimage/exr` |
 | farbfeld | the whole format | the whole format | — | `@moonimage/farbfeld` |
-| DDS | BC1 to BC7 blocks, and uncompressed surfaces | BC1 to BC5 blocks, and uncompressed surfaces | — | `@moonimage/dds` |
+| DDS | BC1 to BC7 blocks, and uncompressed surfaces | BC1 to BC7 blocks, and uncompressed surfaces | — | `@moonimage/dds` |
 
 Both halves of WebP are read; the lossless one, VP8L, is also written. VP8 is the
 intra frame of a video codec, so its picture is rebuilt rather than decoded: a
@@ -363,8 +364,8 @@ reader that is not this library.
 
 **Writing.** Every format this library produces is written once and read back by
 Pillow and by `image` — by OpenEXR too for the nine compressions of that format,
-and by `tifffile` for the tiles of a page — and they have to agree about what the
-file says. A format that is lossy is
+by `tifffile` for the tiles of a page, and by libwebp through Pillow for a lossy
+WebP — and they have to agree about what the file says. A format that is lossy is
 not required to give back what went in, only to mean the same thing to everyone
 who reads it.
 
@@ -375,7 +376,9 @@ who reads it.
 | OpenEXR, uncompressed, RLE, ZIP, PIZ, PXR24 | none |
 | OpenEXR, B44 | one step, on one sample of three thousand |
 | DDS, uncompressed | none |
-| DDS, BC1 to BC5 | none, between two readers of the same blocks |
+| DDS, BC1 to BC7 | none, between two readers of the same blocks |
+| WebP, lossy | none, between libwebp and this reader |
+| OpenEXR, several parts | none |
 | Radiance HDR | one step |
 | JPEG | three steps |
 
@@ -384,22 +387,22 @@ transform from different arithmetic: libjpeg's integer DCT and this library's; a
 Radiance RGBE triplet, which has eight bits of exponent to lose a mantissa in;
 and a B44 block, whose differences are added back up from the first of the
 sixteen samples and where a rounding at the last bit of a half is a step of an
-eight-bit sample once in a while.
+eight-bit sample once in a while. A lossy WebP is exact between readers because
+the reader is libwebp's own arithmetic in both cases: what this library writes is
+a frame that library reconstructs, not an approximation of one.
 
 ## What it does not do
 
-- **AVIF.** Decoding one needs a whole AV1 decoder, which is several times the
-  size of this library, so it is not planned.
-- **Writing lossy WebP.** The lossless half is written; the lossy half needs a VP8
-  intra encoder — a forward transform, a quantizer, a mode decision and the
-  boolean coder's other side — which is a codec in itself rather than a page of
-  arithmetic.
-- **Writing BC6H and BC7 blocks of a DDS.** Reading them is done, and BC1 to BC5
-  are written; the endpoints of one of their blocks are chosen by a search over
-  eight modes and sixty-four partitions, and a block fitted by the simple search
-  this writer uses would be a worse picture than those formats exist for.
-- **Writing several parts of an OpenEXR.** Reading them is done; a file this
-  library writes holds one picture, which is what a caller of `encode` has.
+- **AVIF.** Reading one needs a whole AV1 decoder: the intra half of a codec whose
+  tables alone are larger than this library. It is the one format here that is
+  neither read nor written, and it is not a matter of effort but of a second
+  codec living inside the first.
+- **Writing a partitioned block of a DDS.** BC1 to BC7 are all written; the
+  encoder fits one region per block, and a search over the sixty-four shapes of
+  the partitioned modes would win a few tenths of a decibel on a photograph.
+- **Writing a lossless AVIF, a lossy animation, or a mipmap chain.** The first
+  needs the same AV1 encoder the last section refuses; the other two are
+  containers this library writes one shape of.
 
 ## Interface
 
