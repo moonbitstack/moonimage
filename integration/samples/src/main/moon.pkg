@@ -15,7 +15,9 @@ import {
   "moonbitstack/moonimage/tiff",
   "moonbitstack/moonimage/webp",
   "moonbitstack/moonimage/dds",
+  "moonbitstack/moonimage/avif",
   "moonbitlang/x/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/debug",
+  "moonbitlang/core/buffer",
 }

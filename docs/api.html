@@ -55,6 +55,7 @@
     <nav aria-label="Packages">
         <a href="#moonimage" title="Every format, one door">moonimage<span>4</span></a>
         <a href="#raster" title="Pictures and pixels">raster<span>78</span></a>
+        <a href="#avif" title="AVIF">avif<span>49</span></a>
         <a href="#bmp" title="Windows bitmap">bmp<span>5</span></a>
         <a href="#dds" title="DirectDraw surface">dds<span>3</span></a>
         <a href="#exr" title="OpenEXR">exr<span>11</span></a>
@@ -191,6 +192,7 @@ animation without a repeat count means in all three formats.</em></li>
           <li>Pcx <em>ZSoft PCX, the paintbrush format of the DOS years.</em></li>
           <li>Sgi <em>Silicon Graphics images, one channel after another.</em></li>
           <li>Ras <em>Sun raster, with its palette planes and padded rows.</em></li>
+          <li>Avif <em>AVIF: a still picture in an AV1 bitstream, in a HEIF container.</em></li>
         </ul>
         <div class="entry method">
           <code class="sig"><span class="kw">pub fn</span> Format::extension(self : Format) -&gt; String</code>
@@ -614,6 +616,426 @@ window with a = 3.</em></li>
         <span class="kind">function</span>
         <code class="sig"><span class="kw">pub fn</span> put_float(data : FixedArray[Byte], offset : Int32, value : Float) -&gt; Unit</code>
         <div class="doc"><p>Store a little-endian float, the inverse of <code>float_at</code>.</p></div>
+      </div>
+    </section>
+    <section class="pkg" id="avif">
+      <h2>avif <span>AVIF</span></h2>
+      <p>Still pictures in an AV1 bitstream: the arithmetic coder and its CDF tables, the partition tree, thirteen intra predictors, chroma from luma, the transforms, deblocking and CDEF.</p>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> CodecConfig</code>
+        <div class="doc"><p>What the <code>av1C</code> property says about the AV1 stream inside the item.</p></div>
+        <ul class="fields">
+          <li><b>profile</b><span>Int32</span></li>
+          <li><b>level</b><span>Int32</span></li>
+          <li><b>tier</b><span>Int32</span></li>
+          <li><b>high_bitdepth</b><span>Bool</span></li>
+          <li><b>twelve_bit</b><span>Bool</span></li>
+          <li><b>monochrome</b><span>Bool</span></li>
+          <li><b>chroma_subsampling_x</b><span>Bool</span></li>
+          <li><b>chroma_subsampling_y</b><span>Bool</span></li>
+          <li><b>chroma_sample_position</b><span>Int32</span></li>
+          <li><b>delay_present</b><span>Bool</span></li>
+          <li><b>delay</b><span>Int32</span></li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> CoefResult</code>
+        <div class="doc"><p>What the decoder learned about one transform block.</p></div>
+        <ul class="fields">
+          <li><b>eob</b><span>Int32</span></li>
+          <li><b>txtp</b><span>Int32</span></li>
+          <li><b>ctx</b><span>Int32</span></li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Ctx</code>
+        <div class="doc"><p>The neighbour state along one edge of the block being decoded.</p></div>
+        <ul class="fields">
+          <li><b>mode</b><span>FixedArray[Int32]</span></li>
+          <li><b>lcoef</b><span>FixedArray[Int32]</span></li>
+          <li><b>ccoef0</b><span>FixedArray[Int32]</span></li>
+          <li><b>ccoef1</b><span>FixedArray[Int32]</span></li>
+          <li><b>seg_pred</b><span>FixedArray[Int32]</span></li>
+          <li><b>skip</b><span>FixedArray[Int32]</span></li>
+          <li><b>skip_mode</b><span>FixedArray[Int32]</span></li>
+          <li><b>intra</b><span>FixedArray[Int32]</span></li>
+          <li><b>tx_intra</b><span>FixedArray[Int32]</span></li>
+          <li><b>tx</b><span>FixedArray[Int32]</span></li>
+          <li><b>uvmode</b><span>FixedArray[Int32]</span></li>
+          <li><b>pal_sz</b><span>FixedArray[Int32]</span></li>
+          <li><b>partition</b><span>FixedArray[Int32]</span></li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Frame</code>
+        <div class="doc"><p>What the frame header says about the one picture in a still AVIF.</p></div>
+        <ul class="fields">
+          <li><b>disable_cdf_update</b><span>Bool</span></li>
+          <li><b>allow_screen_content</b><span>Bool</span></li>
+          <li><b>allow_intrabc</b><span>Bool</span></li>
+          <li><b>uniform</b><span>Bool</span></li>
+          <li><b>cols</b><span>Int32</span></li>
+          <li><b>rows</b><span>Int32</span></li>
+          <li><b>n_bytes</b><span>Int32</span></li>
+          <li><b>yac</b><span>Int32</span></li>
+          <li><b>ydc_delta</b><span>Int32</span></li>
+          <li><b>udc_delta</b><span>Int32</span></li>
+          <li><b>uac_delta</b><span>Int32</span></li>
+          <li><b>vdc_delta</b><span>Int32</span></li>
+          <li><b>vac_delta</b><span>Int32</span></li>
+          <li><b>qm</b><span>Bool</span></li>
+          <li><b>qm_y</b><span>Int32</span></li>
+          <li><b>qm_u</b><span>Int32</span></li>
+          <li><b>qm_v</b><span>Int32</span></li>
+          <li><b>segmentation</b><span>Bool</span></li>
+          <li><b>delta_q_present</b><span>Bool</span></li>
+          <li><b>delta_q_res</b><span>Int32</span></li>
+          <li><b>delta_lf_present</b><span>Bool</span></li>
+          <li><b>delta_lf_res</b><span>Int32</span></li>
+          <li><b>delta_lf_multi</b><span>Bool</span></li>
+          <li><b>all_lossless</b><span>Bool</span></li>
+          <li><b>lf_y0</b><span>Int32</span></li>
+          <li><b>lf_y1</b><span>Int32</span></li>
+          <li><b>lf_u</b><span>Int32</span></li>
+          <li><b>lf_v</b><span>Int32</span></li>
+          <li><b>sharpness</b><span>Int32</span></li>
+          <li><b>mode_ref_delta_enabled</b><span>Bool</span></li>
+          <li><b>ref_delta</b><span>FixedArray[Int32]</span></li>
+          <li><b>mode_delta</b><span>FixedArray[Int32]</span></li>
+          <li><b>cdef_damping</b><span>Int32</span></li>
+          <li><b>cdef_bits</b><span>Int32</span></li>
+          <li><b>cdef_y</b><span>FixedArray[Int32]</span></li>
+          <li><b>cdef_uv</b><span>FixedArray[Int32]</span></li>
+          <li><b>txfm_mode</b><span>Int32</span></li>
+          <li><b>reduced_txtp_set</b><span>Bool</span></li>
+          <li><b>tile_at</b><span>Int32</span></li>
+          <li><b>tile_length</b><span>Int32</span></li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> FrameBuffer</code>
+        <div class="doc"><p>The three planes of a picture, and the shape of its chroma.</p></div>
+        <ul class="fields">
+          <li><b>y</b><span>Plane</span></li>
+          <li><b>u</b><span>Plane</span></li>
+          <li><b>v</b><span>Plane</span></li>
+          <li><b>width</b><span>Int32</span></li>
+          <li><b>height</b><span>Int32</span></li>
+          <li><b>ss_hor</b><span>Int32</span></li>
+          <li><b>ss_ver</b><span>Int32</span></li>
+          <li><b>monochrome</b><span>Bool</span></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> FrameBuffer::new(width : Int32, height : Int32, ss_hor : Int32, ss_ver : Int32, monochrome : Bool) -&gt; FrameBuffer</code>
+        </div>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Headers</code>
+        <div class="doc"><p>The picture's headers and the tile data they frame.</p></div>
+        <ul class="fields">
+          <li><b>sequence</b><span>Sequence</span></li>
+          <li><b>frame</b><span>Frame</span></li>
+          <li><b>tile</b><span>Bytes</span></li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Item</code>
+        <div class="doc"><p>The primary item: its AV1 bytes and the properties the container declares.</p></div>
+        <ul class="fields">
+          <li><b>data</b><span>Bytes</span></li>
+          <li><b>width</b><span>Int32</span></li>
+          <li><b>height</b><span>Int32</span></li>
+          <li><b>channels</b><span>Int32</span></li>
+          <li><b>bits</b><span>Int32</span></li>
+          <li><b>config</b><span>CodecConfig</span></li>
+          <li><b>primaries</b><span>Int32</span></li>
+          <li><b>transfer</b><span>Int32</span></li>
+          <li><b>matrix</b><span>Int32</span></li>
+          <li><b>full_range</b><span>Bool</span></li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Msac</code>
+        <ul class="fields">
+          <li><b>data</b><span>BytesView</span></li>
+          <li><b>mut pos</b><span>Int32</span></li>
+          <li><b>mut dif</b><span>UInt64</span></li>
+          <li><b>mut rng</b><span>Int32</span></li>
+          <li><b>mut cnt</b><span>Int32</span></li>
+          <li><b>allow_update</b><span>Bool</span></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::bool(self : Msac, probability : Int32) -&gt; Int32</code>
+          <div class="doc"><p>One bit at <code>probability/32768</code> of being one.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::bool_adapt(self : Msac, cdfs : FixedArray[Int32], at : Int32) -&gt; Int32</code>
+          <div class="doc"><p>A two-symbol CDF, specialised in the reference and here alike.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::bool_equi(self : Msac) -&gt; Int32</code>
+          <div class="doc"><p>One bit at even odds.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::bools(self : Msac, count : Int32) -&gt; Int32</code>
+          <div class="doc"><p><code>bits</code> bits, most significant first.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::debug_state(self : Msac) -&gt; String</code>
+          <div class="doc"><p>The arithmetic state as the reference harness prints it, for the vector test. Nothing in the decoder reads this.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::hi_tok(self : Msac, cdfs : FixedArray[Int32], at : Int32) -&gt; Int32</code>
+          <div class="doc"><p>A coefficient above the base range: up to four three-symbol reads.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::new(data : BytesView, allow_update? : Bool) -&gt; Msac</code>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::norm(self : Msac, dif : UInt64, range : Int32) -&gt; Unit</code>
+          <div class="doc"><p>Renormalise after a symbol: both ends of the interval move up by the same shift, and a refill follows when the window has fewer bits left than that.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::refill(self : Msac) -&gt; Unit</code>
+          <div class="doc"><p>Fill the window from the tile. Past the end the remaining bits read as ones, which is what a decoder that asks for a byte or two beyond the last symbol sees; the encoder is allowed not to have written them.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::subexp(self : Msac, reference : Int32, n : Int32, k : Int32) -&gt; Int32</code>
+          <div class="doc"><p>A small number around a reference, with <code>n &gt;&gt; k == 8</code>.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::symbol(self : Msac, cdfs : FixedArray[Int32], at : Int32, n_symbols : Int32) -&gt; Int32</code>
+          <div class="doc"><p>A symbol from the CDF beginning at <code>at</code>, with <code>n_symbols</code> alternatives. The entry at <code>at + n_symbols</code> is the adaptation count, not a probability.</p></div>
+        </div>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Msac::uniform(self : Msac, n : Int32) -&gt; Int32</code>
+          <div class="doc"><p>A number from nought to <code>n - 1</code>, with no probability table at all.</p></div>
+        </div>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Plane</code>
+        <div class="doc"><p>A plane of samples, with the index of its top-left pixel.</p></div>
+        <ul class="fields">
+          <li><b>data</b><span>FixedArray[Int32]</span></li>
+          <li><b>stride</b><span>Int32</span></li>
+          <li><b>width</b><span>Int32</span></li>
+          <li><b>height</b><span>Int32</span></li>
+          <li><b>origin</b><span>Int32</span></li>
+        </ul>
+        <div class="entry method">
+          <code class="sig"><span class="kw">pub fn</span> Plane::allocate(width : Int32, height : Int32) -&gt; Plane</code>
+          <div class="doc"><p>A plane with room for blocks that stick out of the picture.</p></div>
+        </div>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Sequence</code>
+        <div class="doc"><p>What the sequence header says about every frame that follows it.</p></div>
+        <ul class="fields">
+          <li><b>profile</b><span>Int32</span></li>
+          <li><b>still</b><span>Bool</span></li>
+          <li><b>reduced</b><span>Bool</span></li>
+          <li><b>width</b><span>Int32</span></li>
+          <li><b>height</b><span>Int32</span></li>
+          <li><b>width_n_bits</b><span>Int32</span></li>
+          <li><b>height_n_bits</b><span>Int32</span></li>
+          <li><b>sb128</b><span>Bool</span></li>
+          <li><b>filter_intra</b><span>Bool</span></li>
+          <li><b>intra_edge_filter</b><span>Bool</span></li>
+          <li><b>super_res</b><span>Bool</span></li>
+          <li><b>cdef</b><span>Bool</span></li>
+          <li><b>restoration</b><span>Bool</span></li>
+          <li><b>hbd</b><span>Int32</span></li>
+          <li><b>monochrome</b><span>Bool</span></li>
+          <li><b>color_range</b><span>Bool</span></li>
+          <li><b>ss_hor</b><span>Int32</span></li>
+          <li><b>ss_ver</b><span>Int32</span></li>
+          <li><b>chroma_position</b><span>Int32</span></li>
+          <li><b>primaries</b><span>Int32</span></li>
+          <li><b>transfer</b><span>Int32</span></li>
+          <li><b>matrix</b><span>Int32</span></li>
+          <li><b>separate_uv_delta_q</b><span>Bool</span></li>
+          <li><b>film_grain</b><span>Bool</span></li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="kind">struct</span>
+        <code class="sig"><span class="kw">pub(all) struct</span> Tile</code>
+        <div class="doc"><p>Everything one tile's decoding needs: the bit reader, the frame's copy of the probability tables, the samples, and the state of the block being read.</p></div>
+        <ul class="fields">
+          <li><b>msac</b><span>Msac</span></li>
+          <li><b>cdf</b><span>FixedArray[Int32]</span></li>
+          <li><b>fb</b><span>FrameBuffer</span></li>
+          <li><b>seq</b><span>Sequence</span></li>
+          <li><b>frame</b><span>Frame</span></li>
+          <li><b>bw</b><span>Int32</span></li>
+          <li><b>bh</b><span>Int32</span></li>
+          <li><b>mut bx</b><span>Int32</span></li>
+          <li><b>mut by</b><span>Int32</span></li>
+          <li><b>above</b><span>Array[Ctx]</span></li>
+          <li><b>left</b><span>Ctx</span></li>
+          <li><b>decoded_y</b><span>FixedArray[Int32]</span></li>
+          <li><b>decoded_uv</b><span>FixedArray[Int32]</span></li>
+          <li><b>cf</b><span>FixedArray[Int32]</span></li>
+          <li><b>levels</b><span>FixedArray[Int32]</span></li>
+          <li><b>edges</b><span>FixedArray[Byte]</span></li>
+          <li><b>block</b><span>FixedArray[Byte]</span></li>
+          <li><b>ac</b><span>FixedArray[Int32]</span></li>
+          <li><b>dq</b><span>FixedArray[Int32]</span></li>
+          <li><b>txw_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>txh_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>uv_txw_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>uv_txh_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>cdef_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>skip_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>lf_v_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>lf_h_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>lf_u_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>lf_w_map</b><span>FixedArray[Int32]</span></li>
+          <li><b>mut last_qidx</b><span>Int32</span></li>
+          <li><b>last_delta_lf</b><span>FixedArray[Int32]</span></li>
+          <li><b>lf</b><span>FixedArray[Int32]</span></li>
+          <li><b>mut skip</b><span>Bool</span></li>
+          <li><b>mut y_mode</b><span>Int32</span></li>
+          <li><b>mut y_angle</b><span>Int32</span></li>
+          <li><b>mut uv_mode</b><span>Int32</span></li>
+          <li><b>mut uv_angle</b><span>Int32</span></li>
+          <li><b>mut tx</b><span>Int32</span></li>
+          <li><b>mut uvtx</b><span>Int32</span></li>
+          <li><b>mut cfl_alpha</b><span>FixedArray[Int32]</span></li>
+          <li><b>mut seg_pred</b><span>Int32</span></li>
+          <li><b>mut pal_sz_y</b><span>Int32</span></li>
+          <li><b>mut pal_sz_uv</b><span>Int32</span></li>
+          <li><b>mut cdef_idx</b><span>FixedArray[Int32]</span></li>
+          <li><b>mut cdef_at</b><span>Int32</span></li>
+        </ul>
+      </div>
+      <div class="group"><span class="kind">functions</span></div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> cdf_context(field : Int32, context : Int32, width : Int32) -&gt; Int32</code>
+        <div class="doc"><p>Where a context's CDF begins in the flat working table.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> cdf_fresh() -&gt; FixedArray[Int32]</code>
+        <div class="doc"><p>A fresh, mutable copy of the defaults: the frame's working CDFs.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> cdf_offset(field : Int32) -&gt; Int32</code>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView) -&gt; @raster.Image raise @raster.Refused</code>
+        <div class="doc"><p>The picture as eight-bit RGBA, which is what the rest of this library hands back.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode_coefs(msac : Msac, cdf : FixedArray[Int32], a : FixedArray[Int32], a_at : Int32, l : FixedArray[Int32], l_at : Int32, tx : Int32, bs : Int32, plane : Int32, intra : Bool, y_mode : Int32, y_angle : Int32, uv_mode : Int32, reduced_txtp : Bool, lossless : Bool, qidx : Int32, dq_dc : Int32, dq_ac : Int32, cf : FixedArray[Int32], levels : FixedArray[Int32], ss_hor : Int32, ss_ver : Int32, qm_at : Int32) -&gt; CoefResult</code>
+        <div class="doc"><p>The coefficient block of one transform: its transform type, its end of block, and the coefficients themselves in the order the transform reads them.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode_frame(headers : Headers) -&gt; FrameBuffer raise @raster.Refused</code>
+        <div class="doc"><p>Decode the one frame of a still image.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> decode_planes(bytes : BytesView) -&gt; FrameBuffer raise @raster.Refused</code>
+        <div class="doc"><p>Decode the primary item of an AVIF file into planes.</p>
+<p>Seven streams are reproduced sample for sample against libdav1d, and the fixture in <code>decode_wbtest.mbt</code> checks each whole plane. All of them are eight-bit 4:2:0 that fit in one tile, which is what a still picture written by libavif at its defaults is; <code>Format::Avif</code> routes a file here, so the entry point in the package root reads one as readily as it reads a PNG.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> floor_log2(value : Int32) -&gt; Int32</code>
+        <div class="doc"><p>The position of the highest set bit: <code>ulog2</code> in the reference.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> inv_recenter(reference : Int32, value : Int32) -&gt; Int32</code>
+        <div class="doc"><p><code>inv_recenter</code>, the reflection a subexponential code uses around a reference.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> inv_txfm_add(dst : FixedArray[Int32], dst_at : Int32, dst_stride : Int32, coeff : FixedArray[Int32], eob : Int32, tx : Int32, txtp : Int32) -&gt; Unit</code>
+        <div class="doc"><p>Add the inverse-transformed residual to <code>dst</code>. <code>coeff</code> holds the levels at the positions the scan table names; <code>eob</code> is the last non-zero position.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> itx_1d(kind : Int32, size : Int32, c : FixedArray[Int32], at : Int32, stride : Int32, min : Int32, max : Int32) -&gt; Unit</code>
+        <div class="doc"><p>One one-dimensional inverse transform. <code>size</code> is the log2 of the width divided by four (0 is four coefficients, 4 is sixty-four); <code>kind</code> is the reference decoder's Tx1dType: DCT, ADST, identity, flipADST.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> itx_last_nonzero_col(tx : Int32, eob : Int32) -&gt; Int32</code>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> itx_scan(tx : Int32, n : Int32) -&gt; Int32</code>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> norm_shift(range : Int32) -&gt; Int32</code>
+        <div class="doc"><p>How far a range has to be shifted to put it back in [32768, 65536).</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> predict(dst : FixedArray[Byte], stride : Int32, edges : FixedArray[Byte], corner : Int32, width : Int32, height : Int32, mode : Int32, angle_in : Int32) -&gt; Unit</code>
+        <div class="doc"><p>The block predicted from the edges.</p>
+<p><code>angle</code> carries three things in one integer, as the format packs them: the angle itself in the low nine bits, whether the block is small enough for the smoothing strength in bit nine, and whether the edge may be filtered at all in bit ten. The zones are chosen from the angle, the way a caller of the reference picks the predictor: below ninety is the first, between the first and the second, above a hundred and eighty the third.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> prepare_edges(plane : Plane, px : Int32, py : Int32, frame_w : Int32, frame_h : Int32, tw : Int32, th : Int32, mode_in : Int32, angle_in : Int32, have_top : Bool, have_left : Bool, have_topright : Bool, have_bottomleft : Bool, filter_edge : Bool, edges : FixedArray[Byte]) -&gt; (Int32, Int32)</code>
+        <div class="doc"><p>Fill the edges one transform block is predicted from, and answer which predictor and angle it ends up with.</p>
+<p><code>tw</code> and <code>th</code> are the transform's size in pixels; <code>have_top</code> and <code>have_left</code> say whether the row above and the column to the left hold decoded samples, and <code>have_topright</code> and <code>have_bottomleft</code> whether the block diagonally past the edge was decoded before this one — which is not the same as existing.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> read_headers(item : Item) -&gt; Headers raise @raster.Refused</code>
+      </div>
+      <div class="entry">
+        <span class="kind">function</span>
+        <code class="sig"><span class="kw">pub fn</span> read_item(bytes : BytesView) -&gt; Item raise @raster.Refused</code>
+        <div class="doc"><p>The primary AV1 item of an AVIF file.</p></div>
+      </div>
+      <div class="group"><span class="kind">values</span></div>
+      <div class="entry">
+        <span class="kind">value</span>
+        <code class="sig"><span class="kw">pub let</span> cdf_lengths : FixedArray[Int32]</code>
+      </div>
+      <div class="entry">
+        <span class="kind">value</span>
+        <code class="sig"><span class="kw">pub let</span> cdf_names : Array[String]</code>
+      </div>
+      <div class="entry">
+        <span class="kind">value</span>
+        <code class="sig"><span class="kw">pub let</span> cdf_reference_digest : String</code>
+        <div class="doc"><p>The FNV-1a of every entry as two little-endian bytes, in the order below. The test that holds the compiled table to the reference source.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">value</span>
+        <code class="sig"><span class="kw">pub let</span> cdf_widths : FixedArray[Int32]</code>
+        <div class="doc"><p>How wide one context of each element is, in entries, count included. The reference pads a row so that a context can be addressed without a multiply by the number of symbols, and the offsets follow the padding.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">value</span>
+        <code class="sig"><span class="kw">pub let</span> itx_available : FixedArray[Int32]</code>
+        <div class="doc"><p>Which transform types exist for each size, as a bit mask.</p></div>
+      </div>
+      <div class="entry">
+        <span class="kind">value</span>
+        <code class="sig"><span class="kw">pub let</span> itx_table_digest : String</code>
       </div>
     </section>
     <section class="pkg" id="bmp">

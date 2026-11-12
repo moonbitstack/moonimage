@@ -32,6 +32,7 @@ fn main {
     "decode" => decode(arguments[2], arguments[3], false)
     "decode32" => decode(arguments[2], arguments[3], true)
     "decode16" => decode(arguments[2], arguments[3], false, sixteen=true)
+    "avif-planes" => avif_planes(arguments[2], arguments[3])
     "resize" =>
       if arguments.length() < 9 {
         Err(
@@ -78,6 +79,7 @@ fn usage() -> String {
   "       samples decode <path> <out>\n" +
   "       samples decode32 <path> <out>\n" +
   "       samples decode16 <path> <out>\n" +
+  "       samples avif-planes <in.avif> <out.yuv>\n" +
   "       samples resize <in.rgba> <w> <h> <to-w> <to-h> <filter> <out.rgba>\n" +
   "       samples blur <in.rgba> <w> <h> <radius> <kernel> <out.rgba>\n" +
   "formats: " +
@@ -444,4 +446,38 @@ fn decode(
     error => return Err("writing \{out}: \{@debug.Debug::to_repr(error)}")
   }
   Ok("\{image.width} \{image.height} \{image.format}")
+}
+
+///|
+/// The three planes of an AVIF, luma first and chroma after it, laid out with
+/// no padding so that another decoder's raw output can be differenced against
+/// it sample for sample.
+fn avif_planes(path : String, out : String) -> Result[String, String] {
+  let bytes = @fs.read_file_to_bytes(path) catch {
+    error => return Err("reading \{path}: \{@debug.Debug::to_repr(error)}")
+  }
+  let planes = @avif.decode_planes(bytes) catch {
+    error => return Err("\{path}: \{error}")
+  }
+  let samples = @buffer.Buffer(size_hint=planes.width * planes.height * 3 / 2)
+  let put = fn(plane : @avif.Plane, w : Int32, h : Int32) {
+    for y in 0..<h {
+      for x in 0..<w {
+        samples.write_byte(
+          plane.data[plane.origin + y * plane.stride + x].to_byte(),
+        )
+      }
+    }
+  }
+  put(planes.y, planes.width, planes.height)
+  if !planes.monochrome {
+    let cw = (planes.width + planes.ss_hor) >> planes.ss_hor
+    let ch = (planes.height + planes.ss_ver) >> planes.ss_ver
+    put(planes.u, cw, ch)
+    put(planes.v, cw, ch)
+  }
+  @fs.write_bytes_to_file(out, samples.to_bytes()) catch {
+    error => return Err("writing \{out}: \{@debug.Debug::to_repr(error)}")
+  }
+  Ok("\{planes.width} \{planes.height}")
 }

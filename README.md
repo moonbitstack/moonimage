@@ -1,6 +1,6 @@
 # moonimage
 
-Image codecs for MoonBit: sixteen formats read, fifteen written, and the pixel
+Image codecs for MoonBit: eighteen formats read, seventeen written, and the pixel
 arithmetic that sits between them.
 
 <p>
@@ -97,6 +97,7 @@ texture, a quality for a lossy WebP.
 | PCX | 1, 2, 4 and 8 bits a pixel, one to four planes, the header palette and the one at the end, run lengths | 8 bits a plane, three planes or four, run lengths | — | `@moonimage/pcx` |
 | SGI | one, three or four channels, eight or sixteen bits a sample, stored plain | eight bits a sample, three or four channels | — | `@moonimage/sgi` |
 | Sun raster | 1, 8, 24 and 32 bits a pixel, a colour map of three planes, rows padded to a word, byte-encoded runs | 24 bits, or 32 with this library's alpha in the fourth byte | — | `@moonimage/ras` |
+| AVIF | still pictures of one tile: the AV1 bitstream, its arithmetic coder, the partition tree, thirteen intra predictors, chroma from luma, the transforms and their quantisation matrices, deblocking and CDEF | — | — | `@moonimage/avif` |
 
 Both halves of WebP are read; the lossless one, VP8L, is also written. VP8 is the
 intra frame of a video codec, so its picture is rebuilt rather than decoded: a
@@ -106,6 +107,16 @@ residual carried as quantised coefficients, a loop filter along every macroblock
 and transform edge, and chroma interpolated between the two rows it sits between.
 What comes out is the reconstruction the format defines, sample for sample — a
 lossy decoder that is "nearly right" is one with a bug in it.
+
+An AVIF is AV1 in a HEIF container, so reading one means reading a still AV1
+frame: a multi-symbol arithmetic coder over its own CDF tables, ten ways of
+splitting a superblock, thirteen intra predictors with an edge filter and an
+angle delta between them, chroma from luma with an alpha for each plane, the
+transform types and their quantisation matrices, coefficients coded as tokens
+with their own classes, deblocking, CDEF, and the colour matrix the container
+names. AV1 is normative, so the picture is not "close enough": seven streams
+written by libavif are decoded by libdav1d and every plane is compared with this
+decoder's, sample for sample.
 
 A lossy picture has no alpha in VP8 itself, so a transparent one carries a
 separate `ALPH` chunk beside the picture. That is read too, in a still picture and
@@ -368,6 +379,12 @@ which `tifffile` confirms exactly, and the `image` crate refuses those pages and
 the single-channel OpenEXR ramps. Every file has to be held against at least one
 reader that is not this library.
 
+An AVIF is held to libdav1d rather than to a picture of its own: the seven
+streams of `scripts/fixtures/avif_samples.py` — flat, gradient, pattern and
+noise, from sixteen by sixteen to sixty-four by forty-eight — are decoded by
+libavif and libdav1d, and the whole of each plane is compared with this
+decoder's. Eleven thousand five hundred and twenty samples, all equal.
+
 **Writing.** Every format this library produces is written once and read back by
 Pillow and by `image` — by OpenEXR too for the nine compressions of that format,
 by `tifffile` for the tiles of a page, and by libwebp through Pillow for a lossy
@@ -476,10 +493,11 @@ that can see a difference of one at the halfway point.
 
 ## What it does not do
 
-- **AVIF.** Reading one needs a whole AV1 decoder: the intra half of a codec whose
-  tables alone are larger than this library. It is the one format here that is
-  neither read nor written, and it is not a matter of effort but of a second
-  codec living inside the first.
+- **Writing an AVIF.** Reading one is an AV1 decoder; writing one is that and an
+  encoder on top: a mode search, a rate model and a quantiser. The reader is
+  narrow in ways it says out loud rather than approximating — eight bits a
+  sample, 4:2:0 or 4:4:4, one tile, no segmentation, no film grain, no super
+  resolution and no intra block copy, each refused by name.
 - **Writing a partitioned block of a DDS.** BC1 to BC7 are all written; the
   encoder fits one region per block, and a search over the sixty-four shapes of
   the partitioned modes would win a few tenths of a decibel on a photograph.
@@ -540,6 +558,7 @@ that can see a difference of one at the halfway point.
 | `exr.decode`, `exr.encode`, `exr.EncodeOptions`, `exr.Compression`, `exr.half_to_float`, `exr.float_to_half` | OpenEXR, and the half-precision conversion it turns on |
 | `farbfeld.decode`, `farbfeld.encode` | farbfeld |
 | `dds.decode`, `dds.Block` | block-compressed textures, read |
+| `avif.decode`, `avif.decode_planes`, `avif.decode_frame` | AVIF, as RGBA or as the three planes the bitstream carries |
 
 ## Licence
 

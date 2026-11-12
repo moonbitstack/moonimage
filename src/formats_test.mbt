@@ -178,3 +178,26 @@ test "the name and the media type of each format" {
   assert_true(@moonimage.Format::Tiff.is_animated())
   assert_true(!@moonimage.Format::Pnm.is_animated())
 }
+
+///|
+test "an AVIF is recognised by its brand, and is not written" {
+  // A HEIF file names itself with a brand inside the `ftyp` box rather than a
+  // magic number at the front, so the four bytes at eight are what to read.
+  let header = b"\x00\x00\x00 ftypavif\x00\x00\x00\x00avifmif1miaf"
+  assert_eq(@moonimage.Format::of(header), @moonimage.Format::Avif)
+  let sequence = b"\x00\x00\x00 ftypavis\x00\x00\x00\x00avisavif"
+  assert_eq(@moonimage.Format::of(sequence), @moonimage.Format::Avif)
+  assert_eq(@moonimage.Format::Avif.extension(), "avif")
+  assert_eq(@moonimage.Format::Avif.mime(), "image/avif")
+  assert_false(@moonimage.Format::Avif.is_animated())
+  // Reading is one direction: an AV1 encoder is a great deal more than this
+  // library carries, so the writer says so rather than writing something else.
+  let mut refused = false
+  let _ = @moonimage.encode(plate(), @moonimage.Format::Avif) catch {
+    _ => {
+      refused = true
+      b""
+    }
+  }
+  assert_true(refused)
+}

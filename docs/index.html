@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 
 <title>moonimage — image codecs for MoonBit</title>
-<meta name="description" content="Sixteen image formats read and written in pure MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO, PNM, HDR, OpenEXR, farbfeld, DDS, PCX, SGI and Sun raster, with conversion, geometry, filters and colour between them.">
+<meta name="description" content="Eighteen image formats read in pure MoonBit, seventeen of them written: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO, PNM, HDR, OpenEXR, farbfeld, DDS, PCX, SGI, Sun raster and AVIF, with conversion, geometry, filters and colour between them.">
 <script>
   // The stock is chosen before the first paint, so nothing flashes the wrong
   // colour while the stylesheet loads.
@@ -46,11 +46,11 @@
     <section class="hero">
       <div>
         <p class="eyebrow">Image codecs, in pure MoonBit</p>
-        <h1>Sixteen image formats, read and written.</h1>
+        <h1>Eighteen image formats, seventeen of them written.</h1>
         <p class="lede">
           PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO, PNM, Radiance HDR,
-          OpenEXR, farbfeld, textures, PCX, SGI and Sun raster, with the pixel
-          arithmetic between them: layouts,
+          OpenEXR, farbfeld, textures, PCX, SGI, Sun raster and AVIF, with the
+          pixel arithmetic between them: layouts,
           transparency, rotation, cropping, scaling, blurring, colour. One
           package, no C bindings.
         </p>
@@ -107,7 +107,7 @@
           <div class="drop">
             Drop any image on this panel — PNG, JPEG, GIF, WebP, BMP, TGA, QOI,
             TIFF, an icon, a PNM, farbfeld, Radiance HDR, OpenEXR, a texture, a
-            PCX, an SGI or a Sun raster — and it is read the same way.
+            PCX, an SGI, a Sun raster or an AVIF — and it is read the same way.
           </div>
         </div>
       </div>
@@ -118,13 +118,13 @@
     <div class="wrap">
       <div class="band-head">
         <h2>What it does</h2>
-        <p>one package, sixteen codecs, the arithmetic between them</p>
+        <p>one package, eighteen codecs, the arithmetic between them</p>
       </div>
 
       <div class="grid">
         <div class="card">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/></svg>
-          <h3>Sixteen formats, one call</h3>
+          <h3>Eighteen formats, one call</h3>
           <p>
             <code>decode</code> looks at the first bytes and picks the codec;
             <code>encode</code> takes a picture and a format. The same picture
@@ -134,7 +134,9 @@
             the wavelet of PIZ, the plane-splitting of PXR24, the blocks of B44
             and the frequencies of DWA included; a TIFF can be written as strips
             or as tiles; a texture as plain samples or as blocks of BC1 to BC7;
-            a WebP as lossless bits or as a lossy frame.
+            a WebP as lossless bits or as a lossy frame. An AVIF is the one
+            that goes the other way: an AV1 bitstream is read whole, plane for
+            plane against libdav1d, and never written.
           </p>
         </div>
 

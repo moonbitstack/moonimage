@@ -58,6 +58,8 @@ keywords = [
   "sgi",
   "sun-raster",
   "sunos",
+  "avif",
+  "av1",
   "bc1",
   "bc3",
   "bc5",
@@ -95,7 +97,7 @@ keywords = [
   "moonbit",
 ]
 
-description = "Image codecs for MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO, PNM, Radiance HDR, OpenEXR, farbfeld, DDS, PCX, SGI and Sun raster, read and written, with the pixel arithmetic, filters and colour between them."
+description = "Image codecs for MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO, PNM, Radiance HDR, OpenEXR, farbfeld, DDS, PCX, SGI and Sun raster read and written, and AVIF read, with the pixel arithmetic, filters and colour between them."
 
 source = "src"
 

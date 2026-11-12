@@ -1,6 +1,6 @@
 ---
 name: moonimage
-description: "Read and write image files in MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO and CUR, PNM, Radiance HDR, OpenEXR, farbfeld, block-compressed DDS, PCX, SGI and Sun raster. Use it to decode an upload, convert between formats, resize or crop a picture, apply colour adjustments, or walk the frames of an animation."
+description: "Read and write image files in MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO and CUR, PNM, Radiance HDR, OpenEXR, farbfeld, block-compressed DDS, PCX, SGI, Sun raster, and AVIF for reading. Use it to decode an upload, convert between formats, resize or crop a picture, apply colour adjustments, or walk the frames of an animation."
 ---
 
 # moonimage
@@ -197,6 +197,13 @@ test {
 - **An SGI is stored bottom row first**, and a Sun raster's rows are padded to a
   word: both matter if you write a reader of your own, and neither shows up in a
   picture that decodes.
+- **AVIF is read and not written.** Reading one is a whole AV1 decoder, and an
+  encoder on top of that is a second codec; `encode` refuses `Format::Avif` by
+  name. The reader takes what libavif writes at its defaults — eight bits a
+  sample, 4:2:0 or 4:4:4, one tile — and refuses high bit depth, several tiles,
+  segmentation, film grain, super resolution and intra block copy by name rather
+  than approximating them. `avif.decode_planes` hands back the luma and two
+  chroma planes when the colour conversion is not the one you want.
 - **A Sun raster has no alpha channel.** Writing a picture with transparency
   puts the alpha in the fourth byte of each thirty-two bit pixel, where every
   other reader sees padding; this library reads it back, and everyone else sees

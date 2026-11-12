@@ -119,6 +119,14 @@ println(<span class="tok-str">"\{file.length()} bytes of PNG, read back as \{bac
           <code>@qoi.encode(image)</code>, and so on. Both routes end in the same
           function.
         </p>
+        <p>
+          One format goes only one way. An AVIF is AV1 in a HEIF container, so
+          reading one runs a whole AV1 decoder: the arithmetic coder, the
+          partition tree, thirteen predictors, chroma from luma, the transforms
+          and both loop filters. <code>decode</code> returns one as readily as a
+          PNG; <code>encode</code> refuses it by name, because an encoder on top
+          of that is a second codec and this library has no half of one.
+        </p>
       </article>
 
       <article class="step" id="pixels">

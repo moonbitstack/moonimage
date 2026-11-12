@@ -49,6 +49,8 @@ pub(all) enum Format {
   Sgi
   /// Sun raster, with its palette planes and padded rows.
   Ras
+  /// AVIF: a still picture in an AV1 bitstream, in a HEIF container.
+  Avif
 }
 
 ///|
@@ -88,6 +90,7 @@ pub fn Format::extension(self : Format) -> String {
     Pcx => "pcx"
     Sgi => "sgi"
     Ras => "ras"
+    Avif => "avif"
   }
 }
 
@@ -113,6 +116,7 @@ pub fn Format::mime(self : Format) -> String {
     Pcx => "image/x-pcx"
     Sgi => "image/x-sgi"
     Ras => "image/x-sun-raster"
+    Avif => "image/avif"
   }
 }
 
@@ -162,6 +166,15 @@ pub fn Format::of(bytes : BytesView) -> Format raise Refused {
   }
   if length >= 4 && bytes.has_prefix(b"DDS ") {
     return Dds
+  }
+  // A HEIF file says what it is with a brand rather than a magic number: the
+  // box type `ftyp` at the front, and the brand four bytes into it. `avif` is a
+  // still picture and `avis` a sequence; both are AV1 in a HEIF container, and
+  // both are this format.
+  if length >= 12 &&
+    bytes[4:8].equal_to_bytes(b"ftyp") &&
+    (bytes[8:12].equal_to_bytes(b"avif") || bytes[8:12].equal_to_bytes(b"avis")) {
+    return Avif
   }
   if length >= 2 && bytes.has_prefix(b"BM") {
     return Bmp

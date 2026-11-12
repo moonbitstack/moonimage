@@ -49,14 +49,6 @@ pub fn decode(
   limits? : @raster.Limits,
 ) -> @raster.Image raise @raster.Refused {
   let limits = limits.unwrap_or(@raster.Limits::default())
-  // An AVIF is a HEIF container of AV1 still pictures. Naming it is worth the
-  // four bytes it costs even though there is no AV1 decoder here: "unknown
-  // format" would send a caller looking for a typo in the file.
-  if bytes.length() >= 12 &&
-    bytes[4:8].equal_to_bytes(b"ftyp") &&
-    (bytes[8:12].equal_to_bytes(b"avif") || bytes[8:12].equal_to_bytes(b"avis")) {
-    raise @raster.Unsupported(at=4, got="an AVIF, which needs an AV1 decoder")
-  }
   let image = match @raster.Format::of(bytes) {
     Png => @png.decode(bytes, limits~)
     Qoi => @qoi.decode(bytes, limits~)
@@ -76,6 +68,7 @@ pub fn decode(
     Pcx => @pcx.decode(bytes, limits~)
     Sgi => @sgi.decode(bytes, limits~)
     Ras => @ras.decode(bytes, limits~)
+    Avif => @avif.decode(bytes)
   }
   match format {
     Some(target) => image.convert(target)
@@ -220,6 +213,11 @@ pub fn encode(
     Pcx => @pcx.encode(image)
     Sgi => @sgi.encode(image)
     Ras => @ras.encode(image)
+    Avif =>
+      raise @raster.Unsupported(
+        at=0,
+        got="an AVIF, which this library reads and does not write",
+      )
   }
 }
 

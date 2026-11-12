@@ -1190,13 +1190,17 @@ fn reconstruct_chroma(t : Tile, bs : Int32, w4 : Int32, h4 : Int32) -> Unit {
   }
 
   for pl in 0..<2 {
+    // A plane whose alpha came out zero was not predicted with the luma above:
+    // the format predicts it from its own edges instead, as plain DC, and only
+    // a plane that actually has an alpha skips the predictor here.
+    let has_alpha = cfl && t.cfl_alpha[pl] != 0
+    let mode = if cfl { 0 } else { t.uv_mode }
     let mut y = 0
     while y < ch4 {
       let mut x = 0
       while x < cw4 {
         let px = px0 + (x << 2)
         let py = py0 + (y << 2)
-        let skip_predict = cfl
         reconstruct_one_chroma(
           t,
           pl,
@@ -1209,7 +1213,8 @@ fn reconstruct_chroma(t : Tile, bs : Int32, w4 : Int32, h4 : Int32) -> Unit {
           uvtx,
           bs,
           uv_across,
-          skip_predict,
+          has_alpha,
+          mode,
         )
         x = x + tw4
       }
@@ -1232,6 +1237,7 @@ fn reconstruct_one_chroma(
   bs : Int32,
   uv_across : Int32,
   skip_predict : Bool,
+  mode : Int32,
 ) -> Unit {
   reconstruct_one_core(
     t,
@@ -1242,7 +1248,7 @@ fn reconstruct_one_chroma(
     y_off,
     tw4,
     th4,
-    t.uv_mode,
+    mode,
     t.uv_angle,
     uvtx,
     bs,

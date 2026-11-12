@@ -23,6 +23,7 @@ import {
   "moonbitstack/moonimage/pcx",
   "moonbitstack/moonimage/sgi",
   "moonbitstack/moonimage/ras",
+  "moonbitstack/moonimage/avif",
 }
 
 import {

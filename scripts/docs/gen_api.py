@@ -28,6 +28,7 @@ OUT = ROOT / "docs" / "api.html"
 PACKAGES = [
     ("moonimage", "Every format, one door", "Format detection, decoding, encoding and animation, all of it delegating to the packages below."),
     ("raster", "Pictures and pixels", "The picture itself: layouts, conversion, geometry, turning, scaling, blurring by kernel or by three box passes, sharpening, colour adjustments, compositing, animation frames, metadata, limits and the one error type."),
+    ("avif", "AVIF", "Still pictures in an AV1 bitstream: the arithmetic coder and its CDF tables, the partition tree, thirteen intra predictors, chroma from luma, the transforms, deblocking and CDEF."),
     ("bmp", "Windows bitmap", "Every header version, one to thirty-two bits a pixel, the two run-length encodings and both row orders."),
     ("dds", "DirectDraw surface", "Block-compressed textures from BC1 to BC7, read a block at a time: eight-bit colour in the first five, and light in halves in BC6H."),
     ("exr", "OpenEXR", "Scanline pictures in half or float samples, in all nine scanline compressions: none, RLE, ZIPS, ZIP, PIZ, PXR24, B44, B44A, DWAA and DWAB, with the half-precision conversion the format turns on."),

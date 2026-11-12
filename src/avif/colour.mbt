@@ -14,21 +14,29 @@
 /// red difference goes to red, how much of each difference is taken away from
 /// green, and how much of the blue difference goes to blue.
 fn colour_matrix(matrix : Int32) -> FixedArray[Int32] {
-  // Kr and Kb of the three matrices that appear in practice.
+  // Kr and Kb of the three matrices that appear in practice, in ten-thousandths
+  // the way the format states them: 0.299 and 0.114 for BT.601, 0.2126 and
+  // 0.0722 for BT.709, 0.2627 and 0.0593 for BT.2020.
   let (kr, kb) = if matrix == 1 {
     (2126, 722) // BT.709
   } else if matrix == 9 {
     (2627, 593) // BT.2020
   } else {
-    (299, 114) // BT.601, which is also what an unlabelled file means
+    (2990, 1140) // BT.601, which is also what an unlabelled file means
   }
   let kg = 10000 - kr - kb
-  let scale = 4096
+  // Each multiplier is 2ab/10000c in twelve-bit fixed point, and the product of
+  // the middle terms runs past what a thirty-two bit integer holds — a thousand
+  // times nine thousand times four thousand is thirty-six thousand million — so
+  // it is computed sixty-four bits wide and narrowed once.
+  fn scaled(a : Int32, b : Int32, c : Int32) -> Int32 {
+    (2L * a.to_int64() * b.to_int64() * 4096L / (10000L * c.to_int64())).to_int()
+  }
   FixedArray::from_array([
-    2 * (10000 - kr) * scale / 10000,
-    2 * kb * (10000 - kb) * scale / (10000 * kg),
-    2 * kr * (10000 - kr) * scale / (10000 * kg),
-    2 * (10000 - kb) * scale / 10000,
+    scaled(10000 - kr, 10000, 10000),
+    scaled(kb, 10000 - kb, kg),
+    scaled(kr, 10000 - kr, kg),
+    scaled(10000 - kb, 10000, 10000),
   ])
 }
 

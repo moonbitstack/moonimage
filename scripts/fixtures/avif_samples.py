@@ -33,24 +33,18 @@ import moonbit  # noqa: E402
 import sources  # noqa: E402
 from PIL import Image  # noqa: E402
 
-# The shapes this decoder reproduces exactly. The four below them are the ones
-# it does not yet: each is a stream whose blocks run past the first sixteen
-# pixels, and at the third or fourth block the arithmetic decoder's state drifts
-# from the reference's while the symbols it reads still come out the same. They
-# are kept here, commented out rather than deleted, because they are the test
-# that has to pass next.
-# Six streams this decoder reproduces sample for sample, and one it does not yet:
-# a sixty-four by forty-eight pattern whose bottom-right sixteen by eight comes
-# out a few steps off, with a chroma block under it left unwritten. That is the
-# test the next round has to pass, so it is kept here commented out rather than
-# deleted.
+# The shapes this decoder reproduces exactly: a flat field, a gradient, a hard
+# diagonal, and noise, at four sizes. Between them they cover all four block
+# sizes an eight-bit 4:2:0 stream can use, blocks clipped by the right and the
+# bottom edge, chroma from luma with and without an alpha, and both of the
+# arithmetic coder's two ways of spelling a binary decision.
 SAMPLES = [
     ("flat-16", (16, 16), "flat", dict(quality=50, speed=9)),
     ("flat-32", (32, 24), "flat", dict(quality=50, speed=9)),
     ("gradient-16", (16, 16), "gradient", dict(quality=60, speed=9)),
     ("gradient-32", (32, 24), "gradient", dict(quality=45, speed=8)),
     ("pattern-48", (48, 32), "pattern", dict(quality=40, speed=8)),
-    # ("pattern-64", (64, 48), "pattern", dict(quality=75, speed=8)),
+    ("pattern-64", (64, 48), "pattern", dict(quality=75, speed=8)),
     ("noise-32", (32, 32), "noise", dict(quality=30, speed=8)),
 ]
 
