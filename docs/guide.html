@@ -214,7 +214,11 @@ ico: 138 bytes
 pnm: 113 bytes
 farbfeld: 112 bytes
 hdr: 93 bytes
-exr: 444 bytes</code></pre>
+exr: 443 bytes
+dds: 176 bytes
+pcx: 183 bytes
+sgi: 560 bytes
+ras: 80 bytes</code></pre>
         <p>
           BMP is uncompressed, so it is the size of the pixels plus a header;
           JPEG carries its tables in every file, which for a picture this small
@@ -223,7 +227,10 @@ exr: 444 bytes</code></pre>
           samples, and nothing else; HDR is smaller still because a shared
           exponent is one byte where farbfeld spends four; OpenEXR is larger
           because every sample is a half or a float and the header lists its
-          channels by name.
+          channels by name. SGI stores a plane at a time with no compression at
+          all, so it is the largest here; PCX and DDS are smaller than the raw
+          pixels; a Sun raster of this size fits in eighty bytes because its
+          rows are padded to a word and there is no header to speak of.
         </p>
         <p>
           Formats with options take them as a record with a default:

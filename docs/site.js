@@ -23,6 +23,9 @@ const FORMATS = [
   { key: "farbfeld", name: "farbfeld" },
   { key: "hdr", name: "HDR" },
   { key: "exr", name: "OpenEXR" },
+  { key: "pcx", name: "PCX" },
+  { key: "sgi", name: "SGI" },
+  { key: "ras", name: "Sun raster" },
 ];
 
 const stage = document.getElementById("stage");

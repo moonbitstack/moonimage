@@ -121,6 +121,10 @@ fn main raise {
     (@moonimage.Format::Farbfeld, "farbfeld"),
     (@moonimage.Format::Hdr, "hdr"),
     (@moonimage.Format::Exr, "exr"),
+    (@moonimage.Format::Dds, "dds"),
+    (@moonimage.Format::Pcx, "pcx"),
+    (@moonimage.Format::Sgi, "sgi"),
+    (@moonimage.Format::Ras, "ras"),
   ]
   for entry in formats {
     let (format, name) = entry

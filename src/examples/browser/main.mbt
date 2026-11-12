@@ -45,6 +45,9 @@ fn named(name : String) -> @raster.Format? {
     "farbfeld" => Some(@raster.Format::Farbfeld)
     "hdr" => Some(@raster.Format::Hdr)
     "exr" => Some(@raster.Format::Exr)
+    "pcx" => Some(@raster.Format::Pcx)
+    "sgi" => Some(@raster.Format::Sgi)
+    "ras" => Some(@raster.Format::Ras)
     _ => None
   }
 }
