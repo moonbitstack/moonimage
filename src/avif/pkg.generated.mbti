@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonbitstack/moonimage/avif"
 
+import {
+  "moonbitstack/moonimage/raster",
+}
+
 // Values
 pub fn cdf_fresh() -> FixedArray[Int32]
 
@@ -18,9 +22,78 @@ pub fn inv_recenter(Int32, Int32) -> Int32
 
 pub fn norm_shift(Int32) -> Int32
 
+pub fn read_headers(Item) -> Headers raise @raster.Refused
+
+pub fn read_item(BytesView) -> Item raise @raster.Refused
+
 // Errors
 
 // Types and methods
+pub(all) struct CodecConfig {
+  profile : Int32
+  level : Int32
+  tier : Int32
+  high_bitdepth : Bool
+  twelve_bit : Bool
+  monochrome : Bool
+  chroma_subsampling_x : Bool
+  chroma_subsampling_y : Bool
+  chroma_sample_position : Int32
+  delay_present : Bool
+  delay : Int32
+}
+
+pub(all) struct Frame {
+  disable_cdf_update : Bool
+  allow_intrabc : Bool
+  uniform : Bool
+  cols : Int32
+  rows : Int32
+  n_bytes : Int32
+  yac : Int32
+  ydc_delta : Int32
+  udc_delta : Int32
+  uac_delta : Int32
+  vdc_delta : Int32
+  vac_delta : Int32
+  qm : Bool
+  qm_y : Int32
+  qm_u : Int32
+  qm_v : Int32
+  segmentation : Bool
+  all_lossless : Bool
+  lf_y0 : Int32
+  lf_y1 : Int32
+  lf_u : Int32
+  lf_v : Int32
+  sharpness : Int32
+  cdef_damping : Int32
+  cdef_bits : Int32
+  txfm_mode : Int32
+  reduced_txtp_set : Bool
+  tile_at : Int32
+  tile_length : Int32
+}
+
+pub(all) struct Headers {
+  sequence : Sequence
+  frame : Frame
+  tile : Bytes
+}
+
+pub(all) struct Item {
+  data : Bytes
+  width : Int32
+  height : Int32
+  channels : Int32
+  bits : Int32
+  config : CodecConfig
+  primaries : Int32
+  transfer : Int32
+  matrix : Int32
+  full_range : Bool
+}
+
 pub(all) struct Msac {
   data : BytesView
   mut pos : Int32
@@ -41,6 +114,33 @@ pub fn Msac::refill(Self) -> Unit
 pub fn Msac::subexp(Self, Int32, Int32, Int32) -> Int32
 pub fn Msac::symbol(Self, FixedArray[Int32], Int32, Int32) -> Int32
 pub fn Msac::uniform(Self, Int32) -> Int32
+
+pub(all) struct Sequence {
+  profile : Int32
+  still : Bool
+  reduced : Bool
+  width : Int32
+  height : Int32
+  width_n_bits : Int32
+  height_n_bits : Int32
+  sb128 : Bool
+  filter_intra : Bool
+  intra_edge_filter : Bool
+  super_res : Bool
+  cdef : Bool
+  restoration : Bool
+  hbd : Int32
+  monochrome : Bool
+  color_range : Bool
+  ss_hor : Int32
+  ss_ver : Int32
+  chroma_position : Int32
+  primaries : Int32
+  transfer : Int32
+  matrix : Int32
+  separate_uv_delta_q : Bool
+  film_grain : Bool
+}
 
 // Type aliases
 
