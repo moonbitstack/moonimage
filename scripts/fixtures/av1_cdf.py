@@ -303,6 +303,22 @@ def write_moonbit(tables: dict[str, list[int]], out: Path) -> str:
         "]",
         "",
         "///|",
+        "/// The index of each syntax element's table, so the tile decoder names",
+        "/// what it is reading rather than counting fields in a struct.",
+        "\n".join(
+            '///|\npub const CDF_%s : Int32 = %d' % (
+                n.upper().replace("-", "_"), i
+            )
+            for i, n in enumerate(names)
+        ),
+        "",
+        "///|",
+        "/// Where a context's CDF begins in the flat working table.",
+        "pub fn cdf_context(field : Int32, context : Int32, width : Int32) -> Int32 {",
+        "  cdf_offsets[field] + context * width",
+        "}",
+        "",
+        "///|",
         "/// A fresh, mutable copy of the defaults: the frame's working CDFs.",
         "pub fn cdf_fresh() -> FixedArray[Int32] {",
         "  let out : FixedArray[Int32] = FixedArray::make(cdf_all.length(), 0)",
@@ -314,7 +330,8 @@ def write_moonbit(tables: dict[str, list[int]], out: Path) -> str:
         "",
     ]
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("\n".join(parts), encoding="utf-8")
+    with out.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n".join(parts))
     return hexdigest
 
 

@@ -345,7 +345,8 @@ def write_moonbit(stream, cdfs, ops, results, hashes, states, final, out: Path) 
         "",
     ]
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("\n".join(parts), encoding="utf-8")
+    with out.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n".join(parts))
 
 
 def fetch_source(cache: Path) -> Path:

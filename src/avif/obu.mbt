@@ -20,7 +20,7 @@ priv struct Bits {
 
 ///|
 fn Bits::new(data : BytesView) -> Bits {
-  { data, pos: 0 }
+  { data, pos: 0, }
 }
 
 ///|
@@ -53,7 +53,7 @@ fn Bits::signed(self : Bits, count : Int32) -> Int32 {
 ///|
 /// Skip to the next byte boundary, and answer how many bytes were used.
 fn Bits::align(self : Bits) -> Int32 {
-  self.pos = ((self.pos + 7) >> 3) << 3
+  self.pos = (self.pos + 7) >> 3 << 3
   self.pos >> 3
 }
 
@@ -134,15 +134,13 @@ fn read_sequence(bits : Bits) -> Sequence raise @raster.Refused {
     } else if profile == 1 {
       ss_hor = 0
       ss_ver = 0
-    } else {
-      if hbd == 2 {
-        ss_hor = bits.bit()
-        if ss_hor == 1 {
-          ss_ver = bits.bit()
-        }
-      } else {
-        ss_hor = 1
+    } else if hbd == 2 {
+      ss_hor = bits.bit()
+      if ss_hor == 1 {
+        ss_ver = bits.bit()
       }
+    } else {
+      ss_hor = 1
     }
     if ss_hor == 1 && ss_ver == 1 {
       chroma_position = bits.bits(2)
@@ -216,7 +214,7 @@ pub(all) struct Frame {
 /// `tile_log2(sz, tgt)`: the smallest k with `sz << k >= tgt`.
 fn tile_log2(size : Int32, target : Int32) -> Int32 {
   let mut k = 0
-  while (size << k) < target {
+  while size << k < target {
     k = k + 1
   }
   k
@@ -224,17 +222,29 @@ fn tile_log2(size : Int32, target : Int32) -> Int32 {
 
 ///|
 fn min_of(a : Int32, b : Int32) -> Int32 {
-  if a < b { a } else { b }
+  if a < b {
+    a
+  } else {
+    b
+  }
 }
 
 ///|
 fn max_of(a : Int32, b : Int32) -> Int32 {
-  if a > b { a } else { b }
+  if a > b {
+    a
+  } else {
+    b
+  }
 }
 
 ///|
 /// The frame header of a reduced still picture, and where its tile data begins.
-fn read_frame(bits : Bits, seq : Sequence, length : Int32) -> Frame raise @raster.Refused {
+fn read_frame(
+  bits : Bits,
+  seq : Sequence,
+  length : Int32,
+) -> Frame raise @raster.Refused {
   let disable_cdf_update = bits.bit() == 1
   let allow_screen_content = bits.bit() == 1
   if allow_screen_content {
@@ -261,8 +271,10 @@ fn read_frame(bits : Bits, seq : Sequence, length : Int32) -> Frame raise @raste
     raise @raster.Unsupported(at=0, got="a frame with non-uniform tiles")
   }
   let sbsz_log2 = 6 + (if seq.sb128 { 1 } else { 0 })
-  let sbw = (seq.width + (64 << (if seq.sb128 { 1 } else { 0 })) - 1) >> sbsz_log2
-  let sbh = (seq.height + (64 << (if seq.sb128 { 1 } else { 0 })) - 1) >> sbsz_log2
+  let sbw = (seq.width + (64 << (if seq.sb128 { 1 } else { 0 })) - 1) >>
+    sbsz_log2
+  let sbh = (seq.height + (64 << (if seq.sb128 { 1 } else { 0 })) - 1) >>
+    sbsz_log2
   let min_log2_cols = tile_log2(4096 >> sbsz_log2, sbw)
   let max_log2_cols = tile_log2(1, min_of(sbw, 64))
   let max_log2_rows = tile_log2(1, min_of(sbh, 64))
@@ -340,8 +352,12 @@ fn read_frame(bits : Bits, seq : Sequence, length : Int32) -> Frame raise @raste
       ignore(bits.bit())
     }
   }
-  let all_lossless = yac == 0 && ydc_delta == 0 && udc_delta == 0 &&
-    uac_delta == 0 && vdc_delta == 0 && vac_delta == 0
+  let all_lossless = yac == 0 &&
+    ydc_delta == 0 &&
+    udc_delta == 0 &&
+    uac_delta == 0 &&
+    vdc_delta == 0 &&
+    vac_delta == 0
 
   // Per-superblock quantiser and loop-filter deltas.
   if yac != 0 {
@@ -487,7 +503,7 @@ fn read_obus(bytes : BytesView) -> Array[Obu] {
     } else {
       bytes.length() - at
     }
-    out.push({ kind, at, length })
+    out.push({ kind, at, length, })
     at = at + length
     if has_size == 0 {
       break
@@ -510,10 +526,7 @@ pub fn read_headers(item : Item) -> Headers raise @raster.Refused {
   let mut sequence : Sequence? = None
   let mut headers : Headers? = None
   for obu in obus {
-    let body = item.data.clamped_view(
-      start=obu.at,
-      end=obu.at + obu.length,
-    )
+    let body = item.data.clamped_view(start=obu.at, end=obu.at + obu.length)
     if obu.kind == 1 {
       sequence = Some(read_sequence(Bits::new(body)))
     } else if obu.kind == 6 {
@@ -529,12 +542,16 @@ pub fn read_headers(item : Item) -> Headers raise @raster.Refused {
       let bits = Bits::new(body)
       let frame = read_frame(bits, seq, obu.length)
       let tile = body.clamped_view(start=frame.tile_at, end=obu.length)
-      headers = Some({ sequence: seq, frame, tile: tile.to_owned() })
+      headers = Some({ sequence: seq, frame, tile: tile.to_owned(), })
     }
   }
   match headers {
     Some(value) => value
     None =>
-      raise @raster.Unexpected(at=0, got="an AV1 stream with no frame", want="one")
+      raise @raster.Unexpected(
+        at=0,
+        got="an AV1 stream with no frame",
+        want="one",
+      )
   }
 }

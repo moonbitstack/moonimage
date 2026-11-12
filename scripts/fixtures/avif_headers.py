@@ -426,7 +426,8 @@ def main() -> None:
         "]",
         "",
     ]
-    OUT.write_text("\n".join(lines), encoding="utf-8")
+    with OUT.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n".join(lines))
     print(
         "wrote %s: %d AVIF files, %d bytes in total"
         % (OUT, len(cases), sum(len(c[1]) for c in cases))

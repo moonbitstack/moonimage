@@ -48,3 +48,22 @@ test "the offsets walk the tables without a gap" {
   }
   assert_true(cdf_offsets[cdf_offsets.length() - 1] < cdf_all.length())
 }
+
+///|
+test "a named field points at the table the reference source gave it" {
+  assert_eq(cdf_names[CDF_M_UV_MODE], "m_uv_mode")
+  assert_eq(cdf_names[CDF_M_PARTITION], "m_partition")
+  assert_eq(cdf_names[CDF_M_TXSZ], "m_txsz")
+  assert_eq(cdf_names[CDF_KFYM], "kfym")
+  assert_eq(cdf_names[CDF_COEF0_SKIP], "coef0_skip")
+  assert_eq(cdf_names[CDF_COEF0_BASE_TOK], "coef0_base_tok")
+  // A context's CDF starts at the field's offset plus the context's row, and
+  // the last one still fits inside the field.
+  for field in 0..<cdf_offsets.length() {
+    let row = cdf_lengths[field] / 16
+    if row > 0 {
+      let at = cdf_context(field, row - 1, 16)
+      assert_true(at + 16 <= cdf_offset(field) + cdf_lengths[field])
+    }
+  }
+}

@@ -121,7 +121,7 @@ pub fn Msac::norm(self : Msac, dif : UInt64, range : Int32) -> Unit {
 pub fn Msac::bool_equi(self : Msac) -> Int32 {
   let r = self.rng
   let dif = self.dif
-  let mut v = ((r >> 8) << 7) + ec_min_prob
+  let mut v = (r >> 8 << 7) + ec_min_prob
   let vw = v.to_uint64() << (ec_win_size - 16)
   let taken = if dif >= vw { 1 } else { 0 }
   let dif = if taken == 1 { dif - vw } else { dif }
@@ -135,8 +135,10 @@ pub fn Msac::bool_equi(self : Msac) -> Int32 {
 pub fn Msac::bool(self : Msac, probability : Int32) -> Int32 {
   let r = self.rng
   let dif = self.dif
-  let mut v = (((r >> 8) * (probability >> ec_prob_shift)) >>
-    (7 - ec_prob_shift)) + ec_min_prob
+  let mut v = (
+      ((r >> 8) * (probability >> ec_prob_shift)) >> (7 - ec_prob_shift)
+    ) +
+    ec_min_prob
   let vw = v.to_uint64() << (ec_win_size - 16)
   let taken = if dif >= vw { 1 } else { 0 }
   let dif = if taken == 1 { dif - vw } else { dif }
@@ -196,7 +198,11 @@ pub fn Msac::symbol(
 
 ///|
 /// A two-symbol CDF, specialised in the reference and here alike.
-pub fn Msac::bool_adapt(self : Msac, cdfs : FixedArray[Int32], at : Int32) -> Int32 {
+pub fn Msac::bool_adapt(
+  self : Msac,
+  cdfs : FixedArray[Int32],
+  at : Int32,
+) -> Int32 {
   let bit = self.bool(cdfs[at])
   if self.allow_update {
     let count = cdfs[at + 1]
@@ -246,7 +252,7 @@ pub fn Msac::uniform(self : Msac, n : Int32) -> Int32 {
 ///|
 /// `inv_recenter`, the reflection a subexponential code uses around a reference.
 pub fn inv_recenter(reference : Int32, value : Int32) -> Int32 {
-  if value > (reference << 1) {
+  if value > reference << 1 {
     value
   } else if (value & 1) == 0 {
     (value >> 1) + reference
@@ -257,7 +263,12 @@ pub fn inv_recenter(reference : Int32, value : Int32) -> Int32 {
 
 ///|
 /// A small number around a reference, with `n >> k == 8`.
-pub fn Msac::subexp(self : Msac, reference : Int32, n : Int32, k : Int32) -> Int32 {
+pub fn Msac::subexp(
+  self : Msac,
+  reference : Int32,
+  n : Int32,
+  k : Int32,
+) -> Int32 {
   let mut width = k
   let mut a = 0
   if self.bool_equi() == 1 {
@@ -284,6 +295,11 @@ pub fn Msac::debug_state(self : Msac) -> String {
     let nibble = ((self.dif >> ((15 - place) * 4)) & 0xFUL).to_int()
     out = out + digits[nibble:nibble + 1].to_owned()
   }
-  out + ":" + self.rng.to_string() + ":" + self.cnt.to_string() + ":" +
+  out +
+  ":" +
+  self.rng.to_string() +
+  ":" +
+  self.cnt.to_string() +
+  ":" +
   self.pos.to_string()
 }

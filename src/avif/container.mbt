@@ -41,7 +41,11 @@ fn be_of(bytes : BytesView, at : Int32, count : Int32) -> Int32 {
 
 ///|
 /// The boxes directly inside a span.
-fn boxes(bytes : BytesView, from : Int32, to : Int32) -> Array[Box] raise @raster.Refused {
+fn boxes(
+  bytes : BytesView,
+  from : Int32,
+  to : Int32,
+) -> Array[Box] raise @raster.Refused {
   let out : Array[Box] = []
   let mut at = from
   while at + 8 <= to {
@@ -57,14 +61,14 @@ fn boxes(bytes : BytesView, from : Int32, to : Int32) -> Array[Box] raise @raste
       size
     }
     if total < head || at.to_int64() + total.to_int64() > to.to_int64() {
-      raise @raster.Truncated(at=at, want=total)
+      raise @raster.Truncated(at~, want=total)
     }
     let body = at + head
     if name == "uuid" {
       // A uuid box carries sixteen more bytes before its own children.
-      out.push({ name, at: body + 16, end: at + total })
+      out.push({ name, at: body + 16, end: at + total, })
     } else {
-      out.push({ name, at: body, end: at + total })
+      out.push({ name, at: body, end: at + total, })
     }
     at = at + total
   }
@@ -187,7 +191,7 @@ fn read_iloc(bytes : BytesView, at : Int32, end : Int32) -> Array[Extent] {
       cursor = cursor + offset_size
       let length = be_of(bytes, cursor, length_size)
       cursor = cursor + length_size
-      out.push({ id, at: base + offset, length })
+      out.push({ id, at: base + offset, length, })
     }
     if cursor > end {
       break
@@ -198,7 +202,12 @@ fn read_iloc(bytes : BytesView, at : Int32, end : Int32) -> Array[Extent] {
 
 ///|
 /// Which of the properties in `ipco` belong to the primary item.
-fn read_ipma(bytes : BytesView, at : Int32, end : Int32, id : Int32) -> Array[Int32] {
+fn read_ipma(
+  bytes : BytesView,
+  at : Int32,
+  end : Int32,
+  id : Int32,
+) -> Array[Int32] {
   let version = bytes[at].to_int()
   let flags = be_of(bytes, at + 1, 3)
   let count = be32(bytes, at + 4)
@@ -275,7 +284,11 @@ pub fn read_item(bytes : BytesView) -> Item raise @raster.Refused {
   let meta = match meta {
     Some(value) => value
     None =>
-      raise @raster.Unexpected(at=0, got="an AVIF without a meta box", want="one")
+      raise @raster.Unexpected(
+        at=0,
+        got="an AVIF without a meta box",
+        want="one",
+      )
   }
   // A full box: four bytes of version and flags before its children.
   let children = boxes(bytes, meta.at + 4, meta.end)
@@ -299,12 +312,20 @@ pub fn read_item(bytes : BytesView) -> Item raise @raster.Refused {
     }
   }
   if primary < 0 {
-    raise @raster.Unexpected(at=0, got="an AVIF without a primary item", want="one")
+    raise @raster.Unexpected(
+      at=0,
+      got="an AVIF without a primary item",
+      want="one",
+    )
   }
   let location = match iloc {
     Some(value) => value
     None =>
-      raise @raster.Unexpected(at=0, got="an AVIF without an iloc box", want="one")
+      raise @raster.Unexpected(
+        at=0,
+        got="an AVIF without an iloc box",
+        want="one",
+      )
   }
   let mut at = -1
   let mut length = 0
@@ -315,7 +336,7 @@ pub fn read_item(bytes : BytesView) -> Item raise @raster.Refused {
     }
   }
   if at < 0 || at.to_int64() + length.to_int64() > bytes.length().to_int64() {
-    raise @raster.Truncated(at=at, want=length)
+    raise @raster.Truncated(at~, want=length)
   }
   let mut width = 0
   let mut height = 0
@@ -357,7 +378,11 @@ pub fn read_item(bytes : BytesView) -> Item raise @raster.Refused {
   let config = match config {
     Some(value) => value
     None =>
-      raise @raster.Unexpected(at=0, got="an AVIF item without av1C", want="one")
+      raise @raster.Unexpected(
+        at=0,
+        got="an AVIF item without av1C",
+        want="one",
+      )
   }
   {
     data: bytes[at:at + length].to_owned(),
