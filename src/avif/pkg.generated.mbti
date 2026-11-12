@@ -12,9 +12,35 @@ pub fn cdf_offset(Int32) -> Int32
 
 pub let cdf_reference_digest : String
 
+pub fn floor_log2(Int32) -> Int32
+
+pub fn inv_recenter(Int32, Int32) -> Int32
+
+pub fn norm_shift(Int32) -> Int32
+
 // Errors
 
 // Types and methods
+pub(all) struct Msac {
+  data : BytesView
+  mut pos : Int32
+  mut dif : UInt64
+  mut rng : Int32
+  mut cnt : Int32
+  allow_update : Bool
+}
+pub fn Msac::bool(Self, Int32) -> Int32
+pub fn Msac::bool_adapt(Self, FixedArray[Int32], Int32) -> Int32
+pub fn Msac::bool_equi(Self) -> Int32
+pub fn Msac::bools(Self, Int32) -> Int32
+pub fn Msac::debug_state(Self) -> String
+pub fn Msac::hi_tok(Self, FixedArray[Int32], Int32) -> Int32
+pub fn Msac::new(BytesView, allow_update? : Bool) -> Self
+pub fn Msac::norm(Self, UInt64, Int32) -> Unit
+pub fn Msac::refill(Self) -> Unit
+pub fn Msac::subexp(Self, Int32, Int32, Int32) -> Int32
+pub fn Msac::symbol(Self, FixedArray[Int32], Int32, Int32) -> Int32
+pub fn Msac::uniform(Self, Int32) -> Int32
 
 // Type aliases
 
