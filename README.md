@@ -462,6 +462,9 @@ written down as a curiosity.
 | A JPEG block's coefficients are read in raster order | `jpeg_test.mbt`, every sample |
 | The Lanczos window is two lobes wide instead of three | `filter_check_test.mbt`, scaling against Pillow |
 | A Radiance pixel is read one power of two too bright | `hdr_test.mbt`, the floats the generator computed |
+| A PCX run is read as seven bits of count where the format gives six | `pcx_test.mbt`, every sample |
+| An SGI is read top down where the format stores it bottom first | `sgi_test.mbt`, every sample |
+| A Sun raster row loses the padding keeping it on a word | `ras_test.mbt`, every sample |
 
 The B44 entry is the one that was not caught when the catalogue was first run.
 Its block tests are held to a bound of a whole step, because that is what the
