@@ -402,7 +402,7 @@ the picture that went in:
 
 | Format | Same file: largest | vs fixture: largest | vs fixture: PSNR |
 |:--|--:|--:|--:|
-| PNG, QOI, BMP, TGA, WebP lossless, TIFF, tiled TIFF, DDS, ICO, PNM, farbfeld, EXR uncompressed and lossless | 0 | 0 | exact |
+| PNG, QOI, BMP, TGA, WebP lossless, TIFF, tiled TIFF, DDS plain, ICO, PNM, EXR uncompressed, RLE, ZIPS, ZIP, PIZ, PXR24, several parts | 0 | 0 | exact |
 | WebP lossy, quality 90 | 0 | 145 | 22.72 dB |
 | WebP lossy, quality 20 | 0 | 201 | 20.53 dB |
 | JPEG | 2 | 147 | 19.81 dB |
@@ -419,7 +419,10 @@ Thirty-three files on a thirty-seven by twenty-three fixture: twenty-seven read
 the same by both libraries, twenty lossless to the sample. The one step on a
 B44, a DWA and a BC6H block is the reference and this library rounding the same
 arithmetic differently at the last bit; the five formats with a large number in
-the third column are the five that are lossy by design.
+the third column are the nine that are lossy by design. Two formats are counted
+and not scored: neither Pillow nor OpenEXR's library reads a farbfeld or a
+Radiance HDR, and an unread file is named as such rather than filled in with a
+zero.
 
 ## Mutation
 
