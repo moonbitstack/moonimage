@@ -19,10 +19,13 @@
 /// eight-bit 4:2:0 that fit in one tile, which is what a still picture written
 /// by libavif at its defaults is; `Format::Avif` routes a file here, so the
 /// entry point in the package root reads one as readily as it reads a PNG.
-pub fn decode_planes(bytes : BytesView) -> FrameBuffer raise @raster.Refused {
+pub fn decode_planes(
+  bytes : BytesView,
+  limits? : @raster.Limits,
+) -> FrameBuffer raise @raster.Refused {
   let item = read_item(bytes)
   let headers = read_headers(item)
-  decode_frame(headers)
+  decode_frame(headers, limits?)
 }
 
 ///|
@@ -59,10 +62,18 @@ fn check_supported(seq : Sequence, frame : Frame) -> Unit raise @raster.Refused 
 
 ///|
 /// Decode the one frame of a still image.
-pub fn decode_frame(headers : Headers) -> FrameBuffer raise @raster.Refused {
+pub fn decode_frame(
+  headers : Headers,
+  limits? : @raster.Limits,
+) -> FrameBuffer raise @raster.Refused {
   let seq = headers.sequence
   let frame = headers.frame
   check_supported(seq, frame)
+  // Three planes of sixteen-bit samples are what the decoder allocates before
+  // it reads a single coefficient, so the shape is checked first.
+  let limits = limits.unwrap_or(@raster.Limits::default())
+  limits.check(seq.width, seq.height)
+  limits.check_bytes(seq.width * seq.height * 6)
   if frame.cols * frame.rows != 1 {
     raise @raster.Unsupported(at=0, got="an AVIF split into more than one tile")
   }
@@ -116,9 +127,12 @@ fn decode_tile(tile : Tile) -> Unit raise @raster.Refused {
 ///|
 /// The picture as eight-bit RGBA, which is what the rest of this library hands
 /// back.
-pub fn decode(bytes : BytesView) -> @raster.Image raise @raster.Refused {
+pub fn decode(
+  bytes : BytesView,
+  limits? : @raster.Limits,
+) -> @raster.Image raise @raster.Refused {
   let item = read_item(bytes)
-  let planes = decode_planes(bytes)
+  let planes = decode_planes(bytes, limits?)
   let matrix = if item.matrix != 0 { item.matrix } else { 6 }
   let full = item.full_range
   let width = planes.width

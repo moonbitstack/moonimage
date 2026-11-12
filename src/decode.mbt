@@ -68,7 +68,7 @@ pub fn decode(
     Pcx => @pcx.decode(bytes, limits~)
     Sgi => @sgi.decode(bytes, limits~)
     Ras => @ras.decode(bytes, limits~)
-    Avif => @avif.decode(bytes)
+    Avif => @avif.decode(bytes, limits~)
   }
   match format {
     Some(target) => image.convert(target)

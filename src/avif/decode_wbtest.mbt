@@ -67,3 +67,19 @@ test "AVIF decodes to the samples the reference produced" {
     )
   }
 }
+
+///|
+test "an AVIF larger than the limits is refused before it is decoded" {
+  // The planes are allocated from the sequence header, so the shape is the one
+  // thing a caller reading uploads wants checked before anything is written.
+  let (_, _, _, bytes, _) = avif_samples[0]
+  let tight = @raster.Limits::{ width: 8, height: 8, pixels: 64, bytes: 4096, }
+  let refused = try {
+    ignore(decode_planes(bytes, limits=tight))
+    false
+  } catch {
+    @raster.Refused::OverLimit(..) => true
+    _ => false
+  }
+  assert_true(refused)
+}

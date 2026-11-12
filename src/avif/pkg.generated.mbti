@@ -246,13 +246,13 @@ pub let cdf_reference_digest : String
 
 pub let cdf_widths : FixedArray[Int32]
 
-pub fn decode(BytesView) -> @raster.Image raise @raster.Refused
+pub fn decode(BytesView, limits? : @raster.Limits) -> @raster.Image raise @raster.Refused
 
 pub fn decode_coefs(Msac, FixedArray[Int32], FixedArray[Int32], Int32, FixedArray[Int32], Int32, Int32, Int32, Int32, Bool, Int32, Int32, Int32, Bool, Bool, Int32, Int32, Int32, FixedArray[Int32], FixedArray[Int32], Int32, Int32, Int32) -> CoefResult
 
-pub fn decode_frame(Headers) -> FrameBuffer raise @raster.Refused
+pub fn decode_frame(Headers, limits? : @raster.Limits) -> FrameBuffer raise @raster.Refused
 
-pub fn decode_planes(BytesView) -> FrameBuffer raise @raster.Refused
+pub fn decode_planes(BytesView, limits? : @raster.Limits) -> FrameBuffer raise @raster.Refused
 
 pub fn floor_log2(Int32) -> Int32
 
