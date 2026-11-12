@@ -140,7 +140,7 @@ def build_dumper(source: Path, fields_mode, fields_coef, fields_mv) -> str:
     for name, dims in fields_mv:
         dump("mv_" + name, "default_cdf.mv.comp." + name, dims)
     dump("mv_joint", "default_cdf.mv.joint")
-    dump("kfym", "default_cdf.kfym", "[N_INTRA_PRED_MODES][N_INTRA_PRED_MODES]")
+    dump("kfym", "default_cdf.kfym", "[5][5][N_INTRA_PRED_MODES + 3]")
     for q in range(4):
         for name, dims in fields_coef:
             dump("coef%d_%s" % (q, name), "default_coef_cdf[%d].%s" % (q, name), dims)

@@ -151,8 +151,8 @@ let skip_ctx : FixedArray[Int32] = [
 ///|
 /// The four taps, as a pair of offsets, of each CDEF direction.
 let cdef_directions : FixedArray[Int32] = [
-  12, 24, 12, 23, -11, -22, 1, -10, 1, 2, 1, 14, 13, 26, 12, 25, 12, 24, 12, 23,
-  -11, -22, 1, -10,
+  1, 0, 2, 0, 1, 0, 2, -1, -1, 1, -2, 2, 0, 1, -1, 2, 0, 1, 0, 2, 0, 1, 1, 2, 1,
+  1, 2, 2, 1, 0, 2, 1, 1, 0, 2, 0, 1, 0, 2, -1, -1, 1, -2, 2, 0, 1, -1, 2,
 ]
 
 ///|

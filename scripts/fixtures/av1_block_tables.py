@@ -109,8 +109,15 @@ int main(void) {
             printf("%d\n", dav1d_skip_ctx[y][x]);
 
     tag("cdef_directions");
-    for (int i = 0; i < 12; i++) printf("%d %d\n", dav1d_cdef_directions[i][0],
-                                        dav1d_cdef_directions[i][1]);
+    /* The reference packs each offset as dy * 12 + dx, against a twelve-wide
+       scratch buffer; here the two steps are separated, because nothing in this
+       port has a twelve-wide buffer to add them to. */
+    for (int i = 0; i < 12; i++)
+        for (int k = 0; k < 2; k++) {
+            const int off = dav1d_cdef_directions[i][k];
+            const int dy = (off + (off < 0 ? -6 : 6)) / 12;
+            printf("%d %d\n", dy, off - dy * 12);
+        }
 
     tag("txtp_from_uvmode");
     for (int i = 0; i < N_UV_INTRA_PRED_MODES; i++)

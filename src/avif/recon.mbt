@@ -230,7 +230,10 @@ pub fn prepare_edges(
     } else {
       b'\x80'
     }
-    if mode == 7 && tw + th >= 6 && filter_edge {
+    // The threshold is in units of four samples, as the reference's edge buffer
+    // is: a corner is filtered only when the transform spans more than
+    // twenty-four samples either way, which is a sixteen by eight and up.
+    if mode == 7 && tw + th >= 24 && filter_edge {
       edges[edge_corner] = ((
         (edges[edge_corner - 1].to_int() + edges[edge_corner + 1].to_int()) * 5 +
         edges[edge_corner].to_int() * 6 +

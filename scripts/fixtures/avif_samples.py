@@ -39,14 +39,19 @@ from PIL import Image  # noqa: E402
 # from the reference's while the symbols it reads still come out the same. They
 # are kept here, commented out rather than deleted, because they are the test
 # that has to pass next.
+# Six streams this decoder reproduces sample for sample, and one it does not yet:
+# a sixty-four by forty-eight pattern whose bottom-right sixteen by eight comes
+# out a few steps off, with a chroma block under it left unwritten. That is the
+# test the next round has to pass, so it is kept here commented out rather than
+# deleted.
 SAMPLES = [
     ("flat-16", (16, 16), "flat", dict(quality=50, speed=9)),
     ("flat-32", (32, 24), "flat", dict(quality=50, speed=9)),
     ("gradient-16", (16, 16), "gradient", dict(quality=60, speed=9)),
-    # ("gradient-32", (32, 24), "gradient", dict(quality=45, speed=8)),
-    # ("pattern-48", (48, 32), "pattern", dict(quality=40, speed=8)),
+    ("gradient-32", (32, 24), "gradient", dict(quality=45, speed=8)),
+    ("pattern-48", (48, 32), "pattern", dict(quality=40, speed=8)),
     # ("pattern-64", (64, 48), "pattern", dict(quality=75, speed=8)),
-    # ("noise-32", (32, 32), "noise", dict(quality=30, speed=8)),
+    ("noise-32", (32, 32), "noise", dict(quality=30, speed=8)),
 ]
 
 

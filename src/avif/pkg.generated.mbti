@@ -350,6 +350,8 @@ pub(all) struct Frame {
   lf_v : Int32
   sharpness : Int32
   mode_ref_delta_enabled : Bool
+  ref_delta : FixedArray[Int32]
+  mode_delta : FixedArray[Int32]
   cdef_damping : Int32
   cdef_bits : Int32
   cdef_y : FixedArray[Int32]

@@ -362,10 +362,14 @@ fn put(
   offset : Int32,
   value : Int32,
 ) -> Unit {
-  if across {
-    plane.set(bx + offset, by, value)
-  } else {
-    plane.set(bx, by + offset, value)
+  // A sample outside the picture is not written. The reference filters into the
+  // padding its planes are allocated with, which no reader ever sees; clamping
+  // the write instead would land those samples on the last visible row and
+  // change pixels the format says are outside the filter.
+  let x = if across { bx + offset } else { bx }
+  let y = if across { by } else { by + offset }
+  if x >= 0 && x < plane.width && y >= 0 && y < plane.height {
+    plane.set(x, y, value)
   }
 }
 
@@ -416,7 +420,7 @@ fn deblock(t : Tile) -> Unit {
   )
   if !t.fb.monochrome {
     let cw = (t.bw + t.fb.ss_hor) >> t.fb.ss_hor
-    let ch = (t.bw + t.fb.ss_ver) >> t.fb.ss_ver
+    let ch = (t.bh + t.fb.ss_ver) >> t.fb.ss_ver
     // The transform sizes of a chroma plane are kept on the chroma grid and the
     // filter levels on the luma one, so the two maps need two strides.
     deblock_plane(
@@ -491,11 +495,14 @@ fn deblock_plane(
         let here = txw[at]
         let left = txw[at - (1 << tx_ss_hor)]
         if (x & ((1 << here) - 1)) == 0 || (x & ((1 << left) - 1)) == 0 {
-          let idx = min_i32(min_i32(here, left), 2)
+          let idx = min_i32(here, left)
           let wd = if chroma { 4 + 2 * idx } else { 4 << idx }
           let mut level = map_level(
             levels_across, lf_stride, lf_ss_hor, lf_ss_ver, x, y,
           )
+          if chroma && idx > 1 {
+            level = 0
+          }
           if level == 0 {
             level = map_level(
               levels_across,
@@ -533,11 +540,14 @@ fn deblock_plane(
         let here = txh[at]
         let above = txh[at - tx_stride]
         if (y & ((1 << here) - 1)) == 0 || (y & ((1 << above) - 1)) == 0 {
-          let idx = min_i32(min_i32(here, above), 2)
+          let idx = min_i32(here, above)
           let wd = if chroma { 4 + 2 * idx } else { 4 << idx }
           let mut level = map_level(
             levels_down, lf_stride, lf_ss_hor, lf_ss_ver, x, y,
           )
+          if chroma && idx > 1 {
+            level = 0
+          }
           if level == 0 {
             level = map_level(
               levels_down,

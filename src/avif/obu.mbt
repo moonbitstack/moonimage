@@ -209,6 +209,8 @@ pub(all) struct Frame {
   lf_v : Int32
   sharpness : Int32
   mode_ref_delta_enabled : Bool
+  ref_delta : FixedArray[Int32]
+  mode_delta : FixedArray[Int32]
   cdef_damping : Int32
   cdef_bits : Int32
   cdef_y : FixedArray[Int32]
@@ -389,6 +391,13 @@ fn read_frame(
   let mut lf_v = 0
   let mut sharpness = 0
   let mut mode_ref_delta_enabled = false
+  // The reference's mode and reference deltas, which the stream only carries
+  // when it changes them. The intra reference starts at one, which lifts every
+  // level in an intra frame by one unless the frame says otherwise.
+  let ref_delta : FixedArray[Int32] = FixedArray::from_array([
+    1, 0, 0, 0, -1, 0, -1, -1,
+  ])
+  let mode_delta : FixedArray[Int32] = FixedArray::from_array([0, 0])
   if !all_lossless && !allow_intrabc {
     lf_y0 = bits.bits(6)
     lf_y1 = bits.bits(6)
@@ -397,16 +406,18 @@ fn read_frame(
       lf_v = bits.bits(6)
     }
     sharpness = bits.bits(3)
-    if bits.bit() == 1 && bits.bit() == 1 {
-      mode_ref_delta_enabled = true
-      for _ in 0..<8 {
+    // The two bits are read whether or not any level is set: the reference
+    // does, and a stream whose levels are both nought still carries them.
+    mode_ref_delta_enabled = bits.bit() == 1
+    if mode_ref_delta_enabled && bits.bit() == 1 {
+      for i in 0..<8 {
         if bits.bit() == 1 {
-          ignore(bits.signed(7))
+          ref_delta[i] = bits.signed(7)
         }
       }
-      for _ in 0..<2 {
+      for i in 0..<2 {
         if bits.bit() == 1 {
-          ignore(bits.signed(7))
+          mode_delta[i] = bits.signed(7)
         }
       }
     }
@@ -472,6 +483,8 @@ fn read_frame(
     lf_v,
     sharpness,
     mode_ref_delta_enabled,
+    ref_delta,
+    mode_delta,
     cdef_damping,
     cdef_bits,
     cdef_y,

@@ -131,6 +131,51 @@ fn adjust_strength(strength : Int32, variance : Int32) -> Int32 {
 }
 
 ///|
+/// Where one tap of a direction lands: a step along x and a step along y.
+///
+/// The reference packs the two into one number against a scratch buffer it
+/// filters in, twelve samples wide; there is no such buffer here, so the table
+/// is dumped with the steps apart.
+fn cdef_step(row : Int32, k : Int32) -> (Int32, Int32) {
+  let at = (row * 2 + k) * 2
+  (cdef_directions[at + 1], cdef_directions[at])
+}
+
+///|
+/// Add one neighbour's contribution to a sample: its constrained difference, and
+/// its part in the range the result is held to.
+///
+/// A neighbour outside the picture contributes nothing at all. The reference
+/// fills those cells of its scratch buffer with a value that is out of range in
+/// both directions — nought when the difference is taken, never the smallest or
+/// the largest when the range is — which is the same as not reading them.
+fn add_tap(
+  acc : FixedArray[Int32],
+  src : Plane,
+  hx : Int32,
+  hy : Int32,
+  dx : Int32,
+  dy : Int32,
+  weight : Int32,
+  threshold : Int32,
+  shift : Int32,
+) -> Unit {
+  let x = hx + dx
+  let y = hy + dy
+  if x >= 0 && x < src.width && y >= 0 && y < src.height {
+    let centre = acc[3]
+    let value = src.get(x, y)
+    acc[0] = acc[0] + weight * constrain(value - centre, threshold, shift)
+    if value < acc[1] {
+      acc[1] = value
+    }
+    if value > acc[2] {
+      acc[2] = value
+    }
+  }
+}
+
+///|
 /// Filter one block: the primary taps along the direction, the secondary ones
 /// either side of it.
 fn cdef_block(
@@ -152,65 +197,41 @@ fn cdef_block(
   }
   let sec_shift = damping - floor_log2(sec)
   let pri_tap = 4 - (pri & 1)
+  let acc : FixedArray[Int32] = FixedArray::make(4, 0)
   for y in 0..<h {
     for x in 0..<w {
-      let here_x = px + x
-      let here_y = py + y
-      let centre = src.get(here_x, here_y)
-      let mut sum = 0
-      let mut lowest = centre
-      let mut highest = centre
-      let mut tap = pri_tap
+      let hx = px + x
+      let hy = py + y
+      let centre = src.get(hx, hy)
+      acc[0] = 0
+      acc[1] = centre
+      acc[2] = centre
+      acc[3] = centre
+      // Along the direction, the two taps at four and at two samples out; then
+      // either side of it, at two and at one.
       for k in 0..<2 {
-        let primary = cdef_directions[(dir + 2) * 2 + k]
-        let p0 = src.get(
-          clamp_x(src, here_x + primary),
-          clamp_y(src, here_y + primary),
-        )
-        let p1 = src.get(
-          clamp_x(src, here_x - primary),
-          clamp_y(src, here_y - primary),
-        )
-        sum = sum + tap * constrain(p0 - centre, pri, pri_shift)
-        sum = sum + tap * constrain(p1 - centre, pri, pri_shift)
-        tap = (tap & 3) | 2
-        lowest = min_i32(min_i32(p0, p1), lowest)
-        highest = max_i32(max_i32(p0, p1), highest)
-        let second = cdef_directions[(dir + 4) * 2 + k]
-        let third = cdef_directions[dir * 2 + k]
-        let s0 = src.get(
-          clamp_x(src, here_x + second),
-          clamp_y(src, here_y + second),
-        )
-        let s1 = src.get(
-          clamp_x(src, here_x - second),
-          clamp_y(src, here_y - second),
-        )
-        let s2 = src.get(
-          clamp_x(src, here_x + third),
-          clamp_y(src, here_y + third),
-        )
-        let s3 = src.get(
-          clamp_x(src, here_x - third),
-          clamp_y(src, here_y - third),
-        )
-        let sec_tap = 2 - k
-        sum = sum + sec_tap * constrain(s0 - centre, sec, sec_shift)
-        sum = sum + sec_tap * constrain(s1 - centre, sec, sec_shift)
-        sum = sum + sec_tap * constrain(s2 - centre, sec, sec_shift)
-        sum = sum + sec_tap * constrain(s3 - centre, sec, sec_shift)
-        lowest = min_i32(min_i32(min_i32(s0, s1), min_i32(s2, s3)), lowest)
-        highest = max_i32(max_i32(max_i32(s0, s1), max_i32(s2, s3)), highest)
+        let (dx, dy) = cdef_step(dir + 2, k)
+        let weight = if k == 0 { pri_tap } else { (pri_tap & 3) | 2 }
+        add_tap(acc, src, hx, hy, dx, dy, weight, pri, pri_shift)
+        add_tap(acc, src, hx, hy, -dx, -dy, weight, pri, pri_shift)
+        let sec_weight = 2 - k
+        let (sx, sy) = cdef_step(dir + 4, k)
+        add_tap(acc, src, hx, hy, sx, sy, sec_weight, sec, sec_shift)
+        add_tap(acc, src, hx, hy, -sx, -sy, sec_weight, sec, sec_shift)
+        let (tx, ty) = cdef_step(dir, k)
+        add_tap(acc, src, hx, hy, tx, ty, sec_weight, sec, sec_shift)
+        add_tap(acc, src, hx, hy, -tx, -ty, sec_weight, sec, sec_shift)
       }
+      let sum = acc[0]
       let value = centre + ((sum - (if sum < 0 { 1 } else { 0 }) + 8) >> 4)
-      let clipped = if value < lowest {
-        lowest
-      } else if value > highest {
-        highest
+      let clipped = if value < acc[1] {
+        acc[1]
+      } else if value > acc[2] {
+        acc[2]
       } else {
         value
       }
-      dst.set(here_x, here_y, clipped)
+      dst.set(hx, hy, clipped)
     }
   }
 }
@@ -289,8 +310,11 @@ fn cdef_filter(t : Tile) -> Unit {
             }
             let adjusted = adjust_strength(pri, variance)
             if adjusted != 0 || sec != 0 {
-              let cw = 4 >> t.fb.ss_hor
-              let ch = 4 >> t.fb.ss_ver
+              // An eight-by-eight of luma is a four-by-four of chroma when the
+              // colour is subsampled, and the chroma filter runs one step
+              // gentler: the difference it is undoing was halved with it.
+              let cw = 8 >> t.fb.ss_hor
+              let ch = 8 >> t.fb.ss_ver
               cdef_block(
                 t.fb.u,
                 u_src,
@@ -298,10 +322,14 @@ fn cdef_filter(t : Tile) -> Unit {
                 by << 2 >> t.fb.ss_ver,
                 cw,
                 ch,
-                dir,
+                if pri != 0 {
+                  dir
+                } else {
+                  0
+                },
                 adjusted,
                 sec,
-                damping,
+                damping - 1,
               )
               cdef_block(
                 t.fb.v,
@@ -310,10 +338,14 @@ fn cdef_filter(t : Tile) -> Unit {
                 by << 2 >> t.fb.ss_ver,
                 cw,
                 ch,
-                dir,
+                if pri != 0 {
+                  dir
+                } else {
+                  0
+                },
                 adjusted,
                 sec,
-                damping,
+                damping - 1,
               )
             }
           }

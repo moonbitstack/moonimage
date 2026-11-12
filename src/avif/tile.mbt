@@ -238,16 +238,28 @@ fn quantiser_at(
 }
 
 ///|
-/// One filter level after a superblock's delta.
-fn filter_level(base : Int32, delta : Int32) -> Int32 {
-  let value = base + delta
+/// One filter level: the frame's, moved by a superblock's delta and then by the
+/// reference delta the frame carries for the picture it is coding.
+///
+/// An intra picture is reference zero, whose delta starts at one — so an intra
+/// frame filters one step harder than its header says unless the frame uses the
+/// bit it has to say otherwise.
+fn filter_level(frame : Frame, base : Int32, delta : Int32) -> Int32 {
+  let mut value = base + delta
   if value < 0 {
-    0
+    value = 0
   } else if value > 63 {
-    63
-  } else {
-    value
+    value = 63
   }
+  if frame.mode_ref_delta_enabled {
+    value = value + (frame.ref_delta[0] << (if value >= 32 { 1 } else { 0 }))
+    if value < 0 {
+      value = 0
+    } else if value > 63 {
+      value = 63
+    }
+  }
+  value
 }
 
 ///|
@@ -373,11 +385,13 @@ fn partition_ctx(t : Tile, bl : Int32) -> Int32 {
 fn gather_top_prob(t : Tile, bl : Int32) -> Int32 {
   let at = cdf_row(t.cdf, CDF_M_PARTITION, bl * 4 + partition_ctx(t, bl))
   let cdf = t.cdf
-  // The block is cut across when it takes the horizontal partition, the split
-  // or one of the two T shapes that put two halves on top; the entries of a
-  // cumulative distribution make that the difference between the first of those
-  // and the one past the last.
-  let mut out = cdf[at + 1] - cdf[at + 5]
+  // The block is cut across when it takes the vertical partition, the split or
+  // the T shape that leaves two halves on top, and the two shapes that put four
+  // strips across. The cumulative entries are neighbours in the order the
+  // format lists the partitions, so each run of them is one subtraction rather
+  // than a sum — and only the blocks below a hundred and twenty-eight have the
+  // fourth strip.
+  let mut out = cdf[at + 1] - cdf[at + 4]
   out = out + cdf[at + 5]
   if bl != 0 {
     out = out + cdf[at + 8] - cdf[at + 7]
@@ -392,7 +406,7 @@ fn gather_left_prob(t : Tile, bl : Int32) -> Int32 {
   let mut out = cdf[at] - cdf[at + 1]
   out = out + cdf[at + 2] - cdf[at + 6]
   if bl != 0 {
-    out = out + cdf[at + 8] - cdf[at + 9]
+    out = out + cdf[at + 7] - cdf[at + 8]
   }
   out
 }
@@ -408,23 +422,40 @@ fn decode_sb(t : Tile, bl : Int32) -> Unit raise @raster.Refused {
     return
   }
 
-  let mut bp = 0
-  if have_h_split && have_v_split {
-    bp = sym(
-      t,
-      CDF_M_PARTITION,
-      bl * 4 + partition_ctx(t, bl),
-      partition_type_count[bl],
-    )
-  } else if have_h_split {
-    // Only a cut across is possible, so the stream carries one bit: whether the
-    // block splits into two superblocks side by side or is one block.
-    let split = t.msac.bool(gather_top_prob(t, bl))
-    bp = if split == 1 { 3 } else { 1 }
-  } else {
-    let split = t.msac.bool(gather_left_prob(t, bl))
-    bp = if split == 1 { 3 } else { 2 }
+  // A block that runs past the frame's edge has only one direction left to
+  // split in, so the stream carries a single bit instead of a partition symbol:
+  // whether it splits along that direction or is one block. Splitting here is
+  // two halves, not four quadrants — the other direction is cut off by the
+  // frame, so there is nothing on the far side to split into.
+  if have_h_split && !have_v_split {
+    if t.msac.bool(gather_top_prob(t, bl)) == 1 {
+      decode_sb(t, bl + 1)
+      t.bx = t.bx + hsz
+      decode_sb(t, bl + 1)
+      t.bx = t.bx - hsz
+    } else {
+      decode_b(t, block_sizes[(bl * 10 + 1) * 2], 1)
+    }
+    return
   }
+  if have_v_split && !have_h_split {
+    if t.msac.bool(gather_left_prob(t, bl)) == 1 {
+      decode_sb(t, bl + 1)
+      t.by = t.by + hsz
+      decode_sb(t, bl + 1)
+      t.by = t.by - hsz
+    } else {
+      decode_b(t, block_sizes[(bl * 10 + 2) * 2], 2)
+    }
+    return
+  }
+
+  let bp = sym(
+    t,
+    CDF_M_PARTITION,
+    bl * 4 + partition_ctx(t, bl),
+    partition_type_count[bl],
+  )
 
   let bs = block_sizes[(bl * 10 + bp) * 2]
   if bp == 0 {
@@ -464,37 +495,42 @@ fn decode_sb(t : Tile, bl : Int32) -> Unit raise @raster.Refused {
       t.by = t.by - hsz
     }
   } else if bp == 4 {
-    // Two blocks across the top, one under them.
-    let upper = block_sizes[bl * 10 * 2]
+    // Two blocks across the top, one under them. The pair in the table is the
+    // half-width block the top two take and the full-width one below.
+    let upper = block_sizes[(bl * 10 + 4) * 2]
+    let lower = block_sizes[(bl * 10 + 4) * 2 + 1]
     decode_b(t, upper, bp)
     t.bx = t.bx + hsz
     decode_b(t, upper, bp)
     t.bx = t.bx - hsz
     t.by = t.by + hsz
-    decode_b(t, block_sizes[(bl * 10 + 1) * 2], bp)
+    decode_b(t, lower, bp)
     t.by = t.by - hsz
   } else if bp == 5 {
-    decode_b(t, block_sizes[(bl * 10 + 1) * 2], bp)
+    let upper = block_sizes[(bl * 10 + 5) * 2]
+    let lower = block_sizes[(bl * 10 + 5) * 2 + 1]
+    decode_b(t, upper, bp)
     t.by = t.by + hsz
-    let lower = block_sizes[bl * 10 * 2]
     decode_b(t, lower, bp)
     t.bx = t.bx + hsz
     decode_b(t, lower, bp)
     t.bx = t.bx - hsz
     t.by = t.by - hsz
   } else if bp == 6 {
-    let side = block_sizes[(bl * 10 + 2) * 2]
-    decode_b(t, side, bp)
+    let tall = block_sizes[(bl * 10 + 6) * 2]
+    let side = block_sizes[(bl * 10 + 6) * 2 + 1]
+    decode_b(t, tall, bp)
     t.by = t.by + hsz
-    decode_b(t, side, bp)
+    decode_b(t, tall, bp)
     t.by = t.by - hsz
     t.bx = t.bx + hsz
-    decode_b(t, block_sizes[(bl * 10 + 2) * 2], bp)
+    decode_b(t, side, bp)
     t.bx = t.bx - hsz
   } else if bp == 7 {
-    decode_b(t, block_sizes[(bl * 10 + 2) * 2], bp)
+    let tall = block_sizes[(bl * 10 + 7) * 2]
+    let side = block_sizes[(bl * 10 + 7) * 2 + 1]
+    decode_b(t, tall, bp)
     t.bx = t.bx + hsz
-    let side = block_sizes[(bl * 10 + 2) * 2]
     decode_b(t, side, bp)
     t.by = t.by + hsz
     decode_b(t, side, bp)
@@ -660,16 +696,19 @@ fn decode_b(t : Tile, bs : Int32, bp : Int32) -> Unit raise @raster.Refused {
     // The filter levels of this superblock: the frame's, shifted by whatever
     // deltas the superblock carried.
     let multi = t.frame.delta_lf_multi
-    t.lf[0] = filter_level(t.frame.lf_y0, t.last_delta_lf[0])
+    t.lf[0] = filter_level(t.frame, t.frame.lf_y0, t.last_delta_lf[0])
     t.lf[1] = filter_level(
+      t.frame,
       t.frame.lf_y1,
       t.last_delta_lf[if multi { 1 } else { 0 }],
     )
     t.lf[2] = filter_level(
+      t.frame,
       t.frame.lf_u,
       t.last_delta_lf[if multi { 2 } else { 0 }],
     )
     t.lf[3] = filter_level(
+      t.frame,
       t.frame.lf_v,
       t.last_delta_lf[if multi { 3 } else { 0 }],
     )
@@ -678,12 +717,6 @@ fn decode_b(t : Tile, bs : Int32, bp : Int32) -> Unit raise @raster.Refused {
   mark_value(t.lf_h_map, t.bw, t.bx, t.by, w4, h4, t.lf[1])
   mark_value(t.lf_u_map, t.bw, t.bx, t.by, w4, h4, t.lf[2])
   mark_value(t.lf_w_map, t.bw, t.bx, t.by, w4, h4, t.lf[3])
-  if t.frame.mode_ref_delta_enabled {
-    raise @raster.Unsupported(
-      at=0,
-      got="a frame with mode and reference filter deltas",
-    )
-  }
   // The block's mode.
   let ymode_ctx = intra_mode_context[above_of(t, t.bx).mode[bx4]] * 5 +
     intra_mode_context[t.left.mode[by4]]
@@ -953,12 +986,12 @@ fn reconstruct_one(
   let ctx_at = if plane_index == 0 {
     (t.bx + x_off) & 31
   } else {
-    ((t.bx + x_off) >> t.fb.ss_hor) & 31
+    ((t.bx + x_off) & 31) >> t.fb.ss_hor
   }
   let ctx_at_l = if plane_index == 0 {
     (t.by + y_off) & 31
   } else {
-    ((t.by + y_off) >> t.fb.ss_ver) & 31
+    ((t.by + y_off) & 31) >> t.fb.ss_ver
   }
   let above_coef = if plane_index == 0 {
     above.lcoef
@@ -1072,10 +1105,13 @@ fn reconstruct_chroma(t : Tile, bs : Int32, w4 : Int32, h4 : Int32) -> Unit {
   let py0 = t.by >> ss_ver << 2
   let uv_across = ((t.bw + ss_hor) >> ss_hor) + 1
   // The deblocking filter needs to know how large the chroma transforms are, to
-  // tell a transform edge from a boundary inside one.
+  // tell a transform edge from a boundary inside one. Its map is one column per
+  // chroma four-block — the width of the plane — while the coefficient contexts
+  // need a spare entry past the last block, so the two use different strides.
+  let uv_stride = (t.bw + ss_hor) >> ss_hor
   mark_value(
     t.uv_txw_map,
-    uv_across,
+    uv_stride,
     t.bx >> ss_hor,
     t.by >> ss_ver,
     cw4,
@@ -1084,7 +1120,7 @@ fn reconstruct_chroma(t : Tile, bs : Int32, w4 : Int32, h4 : Int32) -> Unit {
   )
   mark_value(
     t.uv_txh_map,
-    uv_across,
+    uv_stride,
     t.bx >> ss_hor,
     t.by >> ss_ver,
     cw4,
@@ -1249,8 +1285,8 @@ fn reconstruct_one_core(
   let above = above_of(t, t.bx)
   let above_coef = if plane_index == 1 { above.ccoef0 } else { above.ccoef1 }
   let left_coef = if plane_index == 1 { t.left.ccoef0 } else { t.left.ccoef1 }
-  let ctx_at = ((t.bx + x_off) >> t.fb.ss_hor) & 31
-  let ctx_at_l = ((t.by + y_off) >> t.fb.ss_ver) & 31
+  let ctx_at = ((t.bx + x_off) & 31) >> t.fb.ss_hor
+  let ctx_at_l = ((t.by + y_off) & 31) >> t.fb.ss_ver
   if t.skip {
     for i in 0..<tw4 {
       above_coef[ctx_at + i] = 0x40

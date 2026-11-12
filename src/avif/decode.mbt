@@ -14,14 +14,12 @@
 ///|
 /// Decode the primary item of an AVIF file into planes.
 ///
-/// **This is not finished.** Three shapes decode to the sample of the reference
-/// decoder — a flat picture at two sizes and a sixteen by sixteen gradient, all
-/// of them inside one sixteen by sixteen partition — and the fixture in
-/// `decode_samples_wbtest.mbt` holds them to it. A stream whose blocks run
-/// further than that drifts: at the third or fourth block the arithmetic
-/// decoder's state parts company with the reference's while the symbols it
-/// returns still agree, so the picture comes out plausible and wrong. Nothing in
-/// `Format` routes an AVIF here yet, and nothing should until that is found.
+/// Six streams are reproduced sample for sample against libdav1d, the fixture in
+/// `decode_wbtest.mbt` checks each whole plane, and all of them are eight-bit
+/// 4:2:0 that fit in one tile. A seventh — a sixty-four by forty-eight pattern —
+/// still comes out a few steps off in one corner, so this is a decoder that is
+/// nearly there rather than one that is done. Nothing in `Format` routes a file
+/// here yet, which is why a caller cannot reach it by accident.
 pub fn decode_planes(bytes : BytesView) -> FrameBuffer raise @raster.Refused {
   let item = read_item(bytes)
   let headers = read_headers(item)
