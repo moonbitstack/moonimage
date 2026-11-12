@@ -1,0 +1,5 @@
+// AVIF: an ISOBMFF container of AV1 still pictures.
+//
+// The tables in this package come from the reference decoder; everything that
+// reads them is written here. A still picture is one intra frame, so this is
+// the intra half of AV1 and nothing of the inter half.
