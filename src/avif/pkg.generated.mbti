@@ -262,6 +262,8 @@ pub let itx_table_digest : String
 
 pub fn norm_shift(Int32) -> Int32
 
+pub fn predict(FixedArray[Byte], Int32, FixedArray[Byte], Int32, Int32, Int32, Int32, Int32) -> Unit
+
 pub fn read_headers(Item) -> Headers raise @raster.Refused
 
 pub fn read_item(BytesView) -> Item raise @raster.Refused
