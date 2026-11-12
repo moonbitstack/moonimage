@@ -210,10 +210,10 @@
       </div>
 
       <div class="figures">
-        <div class="figure"><b>20</b><span>official pictures at pinned commits</span></div>
-        <div class="figure"><b>6</b><span>OpenEXR compressions</span></div>
-        <div class="figure"><b>4</b><span>independent readers</span></div>
-        <div class="figure"><b>39</b><span>checks in continuous integration</span></div>
+        <div class="figure"><b>21</b><span>official pictures at pinned commits</span></div>
+        <div class="figure"><b>9</b><span>OpenEXR compressions</span></div>
+        <div class="figure"><b>33</b><span>formats counted against Pillow</span></div>
+        <div class="figure"><b>8</b><span>mutations, every one caught</span></div>
       </div>
 
       <table class="formats" style="margin-top: 26px;">
@@ -241,6 +241,15 @@
         a reference reader is known to misread. The formats that do not come back
         exact are the ones whose inverse transforms are done in different
         arithmetic.
+      </p>
+      <p class="note">
+        Agreement is the floor, so it is counted as well as bounded. Every format
+        the writer produces is written once and read back by Pillow: twenty-seven
+        of thirty-three files are read the same by both libraries, and twenty are
+        lossless to the sample — the rest are the ones that are lossy by design,
+        from 10.01 dB for a BC5 block to 53.32 dB for a DWA one. Separately, one
+        line of the library is broken at a time in a way that still compiles, and
+        the suite has to notice: eight changes, eight caught, run on every push.
       </p>
     </div>
   </section>

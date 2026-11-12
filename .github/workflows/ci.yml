@@ -143,3 +143,46 @@ jobs:
             echo ""
             cat "$RUNNER_TEMP/filters.txt"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Two questions per format, in numbers rather than in a tolerance: what
+      # Pillow says about the file this library wrote, and what the format cost.
+      - name: the difference from Pillow, counted
+        run: |
+          python3 scripts/samples/delta.py --report "$RUNNER_TEMP/delta.md"
+          {
+            echo "### moonimage — every format it writes, against Pillow"
+            echo ""
+            cat "$RUNNER_TEMP/delta.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # A test that passes is worth what it notices. Each of these breaks one line of
+  # the library in a way that still compiles and runs the package that line
+  # belongs to; a change the suite does not notice is a gap in the suite, and the
+  # job fails so the gap is written down rather than found later.
+  mutation:
+    permissions:
+      contents: read
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: install-unix
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: post install
+        run: |
+          moon version --all
+          moon update
+
+      - name: every mutation is caught
+        run: |
+          python3 scripts/mutation/run.py --report "$RUNNER_TEMP/mutation.md"
+          {
+            echo "### moonimage — one broken line at a time"
+            echo ""
+            cat "$RUNNER_TEMP/mutation.md"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -12,7 +12,10 @@ arithmetic that sits between them.
 </p>
 
 No I/O, all four backends, and two dependencies: the deflate stream a PNG needs
-and the colour package a hue rotation needs.
+and the colour package a hue rotation needs. Nothing here imports
+`moonbitlang/x`; the only place in this repository that does is the conformance
+harness, which lives in a module of its own under `integration/` because a file
+system belongs beside the check rather than in the library.
 
 ```moonbit
 test {
@@ -390,6 +393,68 @@ sixteen samples and where a rounding at the last bit of a half is a step of an
 eight-bit sample once in a while. A lossy WebP is exact between readers because
 the reader is libwebp's own arithmetic in both cases: what this library writes is
 a frame that library reconstructs, not an approximation of one.
+
+**Counted, not described.** A tolerance says whether two implementations agree;
+it does not say by how much they were apart. `scripts/samples/delta.py` writes
+one fixture in every format the writer produces and counts the difference twice
+— between Pillow and this library about the same bytes, and between the file and
+the picture that went in:
+
+| Format | Same file: largest | vs fixture: largest | vs fixture: PSNR |
+|:--|--:|--:|--:|
+| PNG, QOI, BMP, TGA, WebP lossless, TIFF, tiled TIFF, DDS, ICO, PNM, farbfeld, EXR uncompressed and lossless | 0 | 0 | exact |
+| WebP lossy, quality 90 | 0 | 145 | 22.72 dB |
+| WebP lossy, quality 20 | 0 | 201 | 20.53 dB |
+| JPEG | 2 | 147 | 19.81 dB |
+| GIF | 0 | 63 | 22.64 dB |
+| DDS BC1 | 0 | 167 | 19.58 dB |
+| DDS BC3 | 0 | 167 | 22.32 dB |
+| DDS BC5 | 0 | 255 | 10.01 dB |
+| DDS BC6H | 1 | 237 | 21.75 dB |
+| DDS BC7 | 0 | 213 | 25.42 dB |
+| OpenEXR B44, B44A | 1 | 32 | 39.21 dB |
+| OpenEXR DWAA, DWAB | 1 | 4 | 53.32 dB |
+
+Thirty-three files on a thirty-seven by twenty-three fixture: twenty-seven read
+the same by both libraries, twenty lossless to the sample. The one step on a
+B44, a DWA and a BC6H block is the reference and this library rounding the same
+arithmetic differently at the last bit; the five formats with a large number in
+the third column are the five that are lossy by design.
+
+## Mutation
+
+A test that passes is worth what it notices. Each entry below is one line of the
+library changed into a plausible mistake that still compiles, applied on its own,
+with the package's tests run and the change reverted:
+
+```
+python scripts/mutation/run.py
+```
+
+The catalogue lives in that script, one literal replacement per entry, so a
+refactor cannot quietly move a mutation onto a different function: the text to
+find has to appear exactly once. Continuous integration runs all of them on every
+push, and a change the suite does not notice fails the job instead of being
+written down as a curiosity.
+
+| Change | Caught by |
+|:--|:--|
+| The Paeth predictor takes the pixel above when the gradient is a tie | `png_test.mbt`, the pngsuite decode |
+| QOI's running index is thirty-two slots instead of sixty-four | `qoi_test.mbt`, a fixture decoded against the reference |
+| GIF's interlaced flag is read from the bit beside it | `gif_test.mbt`, the still samples |
+| A BC1 two-thirds weight is divided by four | `encode_test.mbt`, a block that follows a gradient |
+| A B44 shift rounds at half a step instead of at the halfway point | `b44_wbtest.mbt`, the ties-to-even table |
+| A JPEG block's coefficients are read in raster order | `jpeg_test.mbt`, every sample |
+| The Lanczos window is two lobes wide instead of three | `filter_check_test.mbt`, scaling against Pillow |
+| A Radiance pixel is read one power of two too bright | `hdr_test.mbt`, the floats the generator computed |
+
+The B44 entry is the one that was not caught when the catalogue was first run.
+Its block tests are held to a bound of a whole step, because that is what the
+format costs, and a rounding rule that is wrong only at an exact tie stays inside
+that bound on every picture in the suite. What catches it now is a white-box
+test that names sixteen values and the number each one has to become — written
+from the definition, not from the implementation — which is the only kind of test
+that can see a difference of one at the halfway point.
 
 ## What it does not do
 
