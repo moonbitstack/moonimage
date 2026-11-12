@@ -88,6 +88,22 @@ MUTATIONS = [
         "what": "the Lanczos window is two lobes wide instead of three",
     },
     {
+        "id": "exr-piz-wavelet",
+        "package": "src/exr",
+        "file": "src/exr/piz.mbt",
+        "find": "  ((a + b) >> 1, a - b)",
+        "replace": "  ((a + b) / 2, a - b)",
+        "what": "the PIZ wavelet takes a rounded mean where the format averages in integers",
+    },
+    {
+        "id": "raster-box-radius",
+        "package": "src/raster",
+        "file": "src/raster/filter.mbt",
+        "find": "  let side = (12.0 * variance + 1.0).sqrt()",
+        "replace": "  let side = (9.0 * variance + 1.0).sqrt()",
+        "what": "three box passes are sized from two thirds of the variance instead of four",
+    },
+    {
         "id": "pcx-run-mask",
         "package": "src/pcx",
         "file": "src/pcx/decode.mbt",
