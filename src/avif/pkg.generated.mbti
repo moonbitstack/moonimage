@@ -248,6 +248,18 @@ pub fn floor_log2(Int32) -> Int32
 
 pub fn inv_recenter(Int32, Int32) -> Int32
 
+pub fn inv_txfm_add(FixedArray[Int32], Int32, Int32, FixedArray[Int32], Int32, Int32, Int32) -> Unit
+
+pub fn itx_1d(Int32, Int32, FixedArray[Int32], Int32, Int32, Int32, Int32) -> Unit
+
+pub let itx_available : FixedArray[Int32]
+
+pub fn itx_last_nonzero_col(Int32, Int32) -> Int32
+
+pub fn itx_scan(Int32, Int32) -> Int32
+
+pub let itx_table_digest : String
+
 pub fn norm_shift(Int32) -> Int32
 
 pub fn read_headers(Item) -> Headers raise @raster.Refused
