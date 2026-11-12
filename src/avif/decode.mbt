@@ -30,6 +30,13 @@ pub fn decode_planes(bytes : BytesView) -> FrameBuffer raise @raster.Refused {
 /// here, at the one place that would otherwise carry on and produce a picture
 /// that looks plausible and is wrong.
 fn check_supported(seq : Sequence, frame : Frame) -> Unit raise @raster.Refused {
+  // Every stream this decoder is held to is 4:2:0. The code paths for the other
+  // two layouts are written — the subsampling is a number everywhere — but they
+  // are not held to a stream, and a decoder that returns a plausible wrong
+  // picture is worse than one that says no.
+  if seq.ss_hor != 1 || seq.ss_ver != 1 {
+    raise @raster.Unsupported(at=0, got="an AVIF that is not 4:2:0")
+  }
   if seq.hbd != 0 {
     raise @raster.Unsupported(at=0, got="an AVIF above eight bits a sample")
   }

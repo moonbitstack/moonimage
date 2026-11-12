@@ -496,8 +496,8 @@ that can see a difference of one at the halfway point.
 - **Writing an AVIF.** Reading one is an AV1 decoder; writing one is that and an
   encoder on top: a mode search, a rate model and a quantiser. The reader is
   narrow in ways it says out loud rather than approximating — eight bits a
-  sample, 4:2:0 or 4:4:4, one tile, no segmentation, no film grain, no super
-  resolution and no intra block copy, each refused by name.
+  sample, 4:2:0, one tile, no segmentation, no film grain, no super resolution
+  and no intra block copy, each refused by name.
 - **Writing a partitioned block of a DDS.** BC1 to BC7 are all written; the
   encoder fits one region per block, and a search over the sixty-four shapes of
   the partitioned modes would win a few tenths of a decibel on a photograph.
