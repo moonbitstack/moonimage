@@ -107,7 +107,7 @@ MUTATIONS = [
         "id": "ras-row-stride",
         "package": "src/ras",
         "file": "src/ras/decode.mbt",
-        "find": "  let stride = ((width * depth + 15) / 16) * 2",
+        "find": "  let stride = (width * depth + 15) / 16 * 2",
         "replace": "  let stride = width * depth / 8",
         "what": "a Sun raster row loses the padding that keeps it on a sixteen-bit boundary",
     },
