@@ -20,6 +20,27 @@
 // in this file, because they are the format's decisions rather than ours.
 
 ///|
+/// The predictors a block can be told to use beyond the thirteen modes: the
+/// three the reference derives from them when an edge is missing, and the
+/// filter that predicts from the block above it.
+///
+/// They are numbered past the thirteen rather than at the three the reference
+/// gives them, because the three the reference gives them are the numbers of
+/// directional modes, and a predictor that took mode three to mean "left of the
+/// edge only" could no longer be handed a diagonal. Nothing outside this package
+/// sees the numbers.
+let filter_pred : Int32 = 13
+
+///|
+let dc_128_pred : Int32 = 14
+
+///|
+let top_dc_pred : Int32 = 15
+
+///|
+let left_dc_pred : Int32 = 16
+
+///|
 /// Which predictor a mode names, as the format numbers them.
 let dc_pred : Int32 = 0
 
@@ -275,6 +296,31 @@ pub fn predict(
   let is_sm = ((angle_in >> 9) & 1) == 1
   let may_filter = angle_in >> 10 != 0
   let angle = angle_in & 511
+  if mode == dc_128_pred {
+    // Neither edge is available, so the block is flat mid-grey.
+    splat(dst, stride, width, height, 128)
+    return
+  }
+  if mode == top_dc_pred {
+    let mut sum = width / 2
+    for i in 0..<width {
+      sum = sum + edges[corner + 1 + i].to_int()
+    }
+    splat(dst, stride, width, height, sum / width)
+    return
+  }
+  if mode == left_dc_pred {
+    let mut sum = height / 2
+    for i in 0..<height {
+      sum = sum + edges[corner - 1 - i].to_int()
+    }
+    splat(dst, stride, width, height, sum / height)
+    return
+  }
+  if mode == filter_pred {
+    filter_intra(dst, stride, edges, corner, width, height, angle)
+    return
+  }
   if mode == dc_pred {
     splat(dst, stride, width, height, dc_value(edges, corner, width, height))
     return
@@ -369,6 +415,74 @@ pub fn predict(
     predict_z3(
       dst, stride, edges, corner, width, height, angle, is_sm, may_filter,
     )
+  }
+}
+
+///|
+/// The five-tap filter that predicts a block from the row above it and the two
+/// samples to its left, four pixels across and two down at a time.
+///
+/// Each group of four by two is filtered from the row above it and the two
+/// samples at its left, and the group's own output becomes that edge for the
+/// group to its right and for the pair of rows below: the block is predicted in
+/// a raster of small squares rather than from one edge all the way down. The
+/// first pair of rows reads the frame's edge; every later one reads the rows
+/// this function has already written.
+fn filter_intra(
+  dst : FixedArray[Byte],
+  stride : Int32,
+  edges : FixedArray[Byte],
+  corner : Int32,
+  width : Int32,
+  height : Int32,
+  filter_index : Int32,
+) -> Unit {
+  let taps = filter_intra_taps
+  let f = (filter_index & 7) * 64
+  let mut y = 0
+  while y < height {
+    let mut x = 0
+    while x < width {
+      let p0 = if y == 0 {
+        edges[corner + x].to_int()
+      } else {
+        dst[(y - 1) * stride + x - 1].to_int()
+      }
+      let p = FixedArray::make(4, 0)
+      for i in 0..<4 {
+        p[i] = if y == 0 {
+          edges[corner + 1 + x + i].to_int()
+        } else {
+          dst[(y - 1) * stride + x + i].to_int()
+        }
+      }
+      let p5 = if x == 0 {
+        edges[corner - 1 - y].to_int()
+      } else {
+        dst[y * stride + x - 1].to_int()
+      }
+      let p6 = if x == 0 {
+        edges[corner - 2 - y].to_int()
+      } else {
+        dst[(y + 1) * stride + x - 1].to_int()
+      }
+      let mut at = f
+      for yy in 0..<2 {
+        for xx in 0..<4 {
+          let acc = taps[at] * p0 +
+            taps[at + 8] * p[0] +
+            taps[at + 16] * p[1] +
+            taps[at + 24] * p[2] +
+            taps[at + 32] * p[3] +
+            taps[at + 40] * p5 +
+            taps[at + 48] * p6
+          dst[(y + yy) * stride + x + xx] = iclip((acc + 8) >> 4, 0, 255).to_byte()
+          at = at + 1
+        }
+      }
+      x = x + 4
+    }
+    y = y + 2
   }
 }
 

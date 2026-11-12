@@ -122,24 +122,34 @@ def build_dumper(source: Path, fields_mode, fields_coef, fields_mv) -> str:
 
     calls = []
 
-    def dump(label: str, expr: str) -> None:
-        calls.append('    DUMP("%s", %s);' % (label, expr))
+    def dump(label: str, expr: str, dims: str = "") -> None:
+        # The row width is what a (field, context) address needs: the C arrays
+        # pad the last dimension, so the number of symbols is not the stride.
+        ranks = dims.count("[")
+        width = {
+            0: "1",
+            1: "sizeof(%s) / sizeof(uint16_t)" % expr,
+            2: "sizeof((%s)[0]) / sizeof(uint16_t)" % expr,
+            3: "sizeof((%s)[0][0]) / sizeof(uint16_t)" % expr,
+            4: "sizeof((%s)[0][0][0]) / sizeof(uint16_t)" % expr,
+        }.get(ranks, "sizeof((%s)[0]) / sizeof(uint16_t)" % expr)
+        calls.append('    DUMP("%s", %s, %s);' % (label, expr, width))
 
-    for name, _ in fields_mode:
-        dump("m_" + name, "default_cdf.m." + name)
-    for name, _ in fields_mv:
-        dump("mv_" + name, "default_cdf.mv.comp." + name)
+    for name, dims in fields_mode:
+        dump("m_" + name, "default_cdf.m." + name, dims)
+    for name, dims in fields_mv:
+        dump("mv_" + name, "default_cdf.mv.comp." + name, dims)
     dump("mv_joint", "default_cdf.mv.joint")
-    dump("kfym", "default_cdf.kfym")
+    dump("kfym", "default_cdf.kfym", "[N_INTRA_PRED_MODES][N_INTRA_PRED_MODES]")
     for q in range(4):
-        for name, _ in fields_coef:
-            dump("coef%d_%s" % (q, name), "default_coef_cdf[%d].%s" % (q, name))
+        for name, dims in fields_coef:
+            dump("coef%d_%s" % (q, name), "default_coef_cdf[%d].%s" % (q, name), dims)
 
     main = """
-#define DUMP(label, field) do {                                        \\
+#define DUMP(label, field, width) do {                                 \\
     const uint16_t *p = (const uint16_t *)(const void *)&(field);       \\
     const size_t n = sizeof(field) / sizeof(uint16_t);                  \\
-    printf("FIELD %s %zu\\n", label, n);                               \\
+    printf("FIELD %s %zu %zu\\n", label, n, (size_t)(width));           \\
     for (size_t i = 0; i < n; i++) printf("%u ", (unsigned)p[i]);       \\
     printf("\\n");                                                      \\
 } while (0)
@@ -152,7 +162,7 @@ __CALLS__
     return preamble + main
 
 
-def compile_and_run(source: Path, cc: str) -> dict[str, list[int]]:
+def compile_and_run(source: Path, cc: str):
     cdf_h = (source / "src/cdf.h").read_text(encoding="utf-8")
     mode = fields_of(cdf_h, "CdfModeContext")
     coef = fields_of(cdf_h, "CdfCoefContext")
@@ -175,24 +185,31 @@ def compile_and_run(source: Path, cc: str) -> dict[str, list[int]]:
 
     lines = run.stdout.splitlines()
     tables: dict[str, list[int]] = {}
+    widths: dict[str, int] = {}
     i = 0
     while i < len(lines):
         head = lines[i].split()
         if head and head[0] == "FIELD":
             name = head[1]
             count = int(head[2])
+            width = int(head[3])
             values = [int(v) for v in lines[i + 1].split()]
             if len(values) != count:
                 sys.exit("field %s: expected %d values, got %d" % (name, count, len(values)))
             if any(v < 0 or v > 0xFFFF for v in values):
                 sys.exit("field %s: a value is outside uint16_t" % name)
             tables[name] = values
+            widths[name] = width
             i += 2
         else:
             i += 1
     if not tables:
         sys.exit("the dumper produced no tables")
-    return tables
+    for name, values in tables.items():
+        if len(values) % widths[name]:
+            sys.exit("field %s: %d entries is not a whole number of rows" %
+                     (name, len(values)))
+    return tables, widths
 
 
 def verify_against_source(source: Path, tables: dict[str, list[int]]) -> int:
@@ -234,7 +251,8 @@ def moonbit_literal(values: list[int]) -> str:
     return "\n".join(rows)
 
 
-def write_moonbit(tables: dict[str, list[int]], out: Path) -> str:
+def write_moonbit(tables: dict[str, list[int]], widths: dict[str, int],
+                  out: Path) -> str:
     """One flat array per syntax element, plus a table of mutable copies."""
     names = list(tables)
     # FNV-1a over the little-endian uint16 entries, which is the digest the
@@ -295,6 +313,14 @@ def write_moonbit(tables: dict[str, list[int]], out: Path) -> str:
         "///|",
         "pub let cdf_lengths : FixedArray[Int32] = [",
         moonbit_literal([len(tables[n]) for n in names]),
+        "]",
+        "",
+        "///|",
+        "/// How wide one context of each element is, in entries, count included.",
+        "/// The reference pads a row so that a context can be addressed without a",
+        "/// multiply by the number of symbols, and the offsets follow the padding.",
+        "pub let cdf_widths : FixedArray[Int32] = [",
+        moonbit_literal([widths[n] for n in names]),
         "]",
         "",
         "///|",
@@ -378,9 +404,9 @@ def main() -> None:
         if not (source / needed).exists():
             sys.exit("the reference source is missing " + needed)
 
-    tables = compile_and_run(source, args.cc)
+    tables, widths = compile_and_run(source, args.cc)
     checked = verify_against_source(source, tables)
-    digest = write_moonbit(tables, args.out)
+    digest = write_moonbit(tables, widths, args.out)
     total = sum(len(v) for v in tables.values())
     print(
         "wrote %s: %d tables, %d entries, %d CDF rows checked, fnv %s"

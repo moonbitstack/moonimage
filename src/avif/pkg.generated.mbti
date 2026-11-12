@@ -244,6 +244,16 @@ pub fn cdf_offset(Int32) -> Int32
 
 pub let cdf_reference_digest : String
 
+pub let cdf_widths : FixedArray[Int32]
+
+pub fn decode(BytesView) -> @raster.Image raise @raster.Refused
+
+pub fn decode_coefs(Msac, FixedArray[Int32], FixedArray[Int32], Int32, FixedArray[Int32], Int32, Int32, Int32, Int32, Bool, Int32, Int32, Int32, Bool, Bool, Int32, Int32, Int32, FixedArray[Int32], FixedArray[Int32], Int32, Int32, Int32) -> CoefResult
+
+pub fn decode_frame(Headers) -> FrameBuffer raise @raster.Refused
+
+pub fn decode_planes(BytesView) -> FrameBuffer raise @raster.Refused
+
 pub fn floor_log2(Int32) -> Int32
 
 pub fn inv_recenter(Int32, Int32) -> Int32
@@ -263,6 +273,8 @@ pub let itx_table_digest : String
 pub fn norm_shift(Int32) -> Int32
 
 pub fn predict(FixedArray[Byte], Int32, FixedArray[Byte], Int32, Int32, Int32, Int32, Int32) -> Unit
+
+pub fn prepare_edges(Plane, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Bool, Bool, Bool, Bool, Bool, FixedArray[Byte]) -> (Int32, Int32)
 
 pub fn read_headers(Item) -> Headers raise @raster.Refused
 
@@ -285,8 +297,31 @@ pub(all) struct CodecConfig {
   delay : Int32
 }
 
+pub(all) struct CoefResult {
+  eob : Int32
+  txtp : Int32
+  ctx : Int32
+}
+
+pub(all) struct Ctx {
+  mode : FixedArray[Int32]
+  lcoef : FixedArray[Int32]
+  ccoef0 : FixedArray[Int32]
+  ccoef1 : FixedArray[Int32]
+  seg_pred : FixedArray[Int32]
+  skip : FixedArray[Int32]
+  skip_mode : FixedArray[Int32]
+  intra : FixedArray[Int32]
+  tx_intra : FixedArray[Int32]
+  tx : FixedArray[Int32]
+  uvmode : FixedArray[Int32]
+  pal_sz : FixedArray[Int32]
+  partition : FixedArray[Int32]
+}
+
 pub(all) struct Frame {
   disable_cdf_update : Bool
+  allow_screen_content : Bool
   allow_intrabc : Bool
   uniform : Bool
   cols : Int32
@@ -303,19 +338,39 @@ pub(all) struct Frame {
   qm_u : Int32
   qm_v : Int32
   segmentation : Bool
+  delta_q_present : Bool
+  delta_q_res : Int32
+  delta_lf_present : Bool
+  delta_lf_res : Int32
+  delta_lf_multi : Bool
   all_lossless : Bool
   lf_y0 : Int32
   lf_y1 : Int32
   lf_u : Int32
   lf_v : Int32
   sharpness : Int32
+  mode_ref_delta_enabled : Bool
   cdef_damping : Int32
   cdef_bits : Int32
+  cdef_y : FixedArray[Int32]
+  cdef_uv : FixedArray[Int32]
   txfm_mode : Int32
   reduced_txtp_set : Bool
   tile_at : Int32
   tile_length : Int32
 }
+
+pub(all) struct FrameBuffer {
+  y : Plane
+  u : Plane
+  v : Plane
+  width : Int32
+  height : Int32
+  ss_hor : Int32
+  ss_ver : Int32
+  monochrome : Bool
+}
+pub fn FrameBuffer::new(Int32, Int32, Int32, Int32, Bool) -> Self
 
 pub(all) struct Headers {
   sequence : Sequence
@@ -357,6 +412,15 @@ pub fn Msac::subexp(Self, Int32, Int32, Int32) -> Int32
 pub fn Msac::symbol(Self, FixedArray[Int32], Int32, Int32) -> Int32
 pub fn Msac::uniform(Self, Int32) -> Int32
 
+pub(all) struct Plane {
+  data : FixedArray[Int32]
+  stride : Int32
+  width : Int32
+  height : Int32
+  origin : Int32
+}
+pub fn Plane::allocate(Int32, Int32) -> Self
+
 pub(all) struct Sequence {
   profile : Int32
   still : Bool
@@ -382,6 +446,54 @@ pub(all) struct Sequence {
   matrix : Int32
   separate_uv_delta_q : Bool
   film_grain : Bool
+}
+
+pub(all) struct Tile {
+  msac : Msac
+  cdf : FixedArray[Int32]
+  fb : FrameBuffer
+  seq : Sequence
+  frame : Frame
+  bw : Int32
+  bh : Int32
+  mut bx : Int32
+  mut by : Int32
+  above : Array[Ctx]
+  left : Ctx
+  decoded_y : FixedArray[Int32]
+  decoded_uv : FixedArray[Int32]
+  cf : FixedArray[Int32]
+  levels : FixedArray[Int32]
+  edges : FixedArray[Byte]
+  block : FixedArray[Byte]
+  ac : FixedArray[Int32]
+  dq : FixedArray[Int32]
+  txw_map : FixedArray[Int32]
+  txh_map : FixedArray[Int32]
+  uv_txw_map : FixedArray[Int32]
+  uv_txh_map : FixedArray[Int32]
+  cdef_map : FixedArray[Int32]
+  skip_map : FixedArray[Int32]
+  lf_v_map : FixedArray[Int32]
+  lf_h_map : FixedArray[Int32]
+  lf_u_map : FixedArray[Int32]
+  lf_w_map : FixedArray[Int32]
+  mut last_qidx : Int32
+  last_delta_lf : FixedArray[Int32]
+  lf : FixedArray[Int32]
+  mut skip : Bool
+  mut y_mode : Int32
+  mut y_angle : Int32
+  mut uv_mode : Int32
+  mut uv_angle : Int32
+  mut tx : Int32
+  mut uvtx : Int32
+  mut cfl_alpha : FixedArray[Int32]
+  mut seg_pred : Int32
+  mut pal_sz_y : Int32
+  mut pal_sz_uv : Int32
+  mut cdef_idx : FixedArray[Int32]
+  mut cdef_at : Int32
 }
 
 // Type aliases

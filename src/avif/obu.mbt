@@ -180,6 +180,7 @@ fn read_sequence(bits : Bits) -> Sequence raise @raster.Refused {
 /// What the frame header says about the one picture in a still AVIF.
 pub(all) struct Frame {
   disable_cdf_update : Bool
+  allow_screen_content : Bool
   allow_intrabc : Bool
   uniform : Bool
   cols : Int32
@@ -196,14 +197,22 @@ pub(all) struct Frame {
   qm_u : Int32
   qm_v : Int32
   segmentation : Bool
+  delta_q_present : Bool
+  delta_q_res : Int32
+  delta_lf_present : Bool
+  delta_lf_res : Int32
+  delta_lf_multi : Bool
   all_lossless : Bool
   lf_y0 : Int32
   lf_y1 : Int32
   lf_u : Int32
   lf_v : Int32
   sharpness : Int32
+  mode_ref_delta_enabled : Bool
   cdef_damping : Int32
   cdef_bits : Int32
+  cdef_y : FixedArray[Int32]
+  cdef_uv : FixedArray[Int32]
   txfm_mode : Int32
   reduced_txtp_set : Bool
   tile_at : Int32
@@ -301,7 +310,6 @@ fn read_frame(
   } else {
     0
   }
-
   // Quantiser.
   let yac = bits.bits(8)
   let ydc_delta = if bits.bit() == 1 { bits.signed(7) } else { 0 }
@@ -330,7 +338,6 @@ fn read_frame(
     qm_u = bits.bits(4)
     qm_v = if seq.separate_uv_delta_q { bits.bits(4) } else { qm_u }
   }
-
   // Segmentation.
   let segmentation = bits.bit() == 1
   if segmentation {
@@ -358,24 +365,30 @@ fn read_frame(
     uac_delta == 0 &&
     vdc_delta == 0 &&
     vac_delta == 0
-
   // Per-superblock quantiser and loop-filter deltas.
+  let mut delta_q_present = false
+  let mut delta_q_res = 0
+  let mut delta_lf_present = false
+  let mut delta_lf_res = 0
+  let mut delta_lf_multi = false
   if yac != 0 {
     if bits.bit() == 1 {
-      ignore(bits.bits(2))
+      delta_q_present = true
+      delta_q_res = bits.bits(2)
       if !allow_intrabc && bits.bit() == 1 {
-        ignore(bits.bits(2))
-        ignore(bits.bit())
+        delta_lf_present = true
+        delta_lf_res = bits.bits(2)
+        delta_lf_multi = bits.bit() == 1
       }
     }
   }
-
   // Loop filter.
   let mut lf_y0 = 0
   let mut lf_y1 = 0
   let mut lf_u = 0
   let mut lf_v = 0
   let mut sharpness = 0
+  let mut mode_ref_delta_enabled = false
   if !all_lossless && !allow_intrabc {
     lf_y0 = bits.bits(6)
     lf_y1 = bits.bits(6)
@@ -385,6 +398,7 @@ fn read_frame(
     }
     sharpness = bits.bits(3)
     if bits.bit() == 1 && bits.bit() == 1 {
+      mode_ref_delta_enabled = true
       for _ in 0..<8 {
         if bits.bit() == 1 {
           ignore(bits.signed(7))
@@ -397,27 +411,30 @@ fn read_frame(
       }
     }
   }
-
   // CDEF.
   let mut cdef_damping = 0
   let mut cdef_bits = 0
+  let cdef_y : FixedArray[Int32] = FixedArray::make(8, 0)
+  let cdef_uv : FixedArray[Int32] = FixedArray::make(8, 0)
   if !all_lossless && seq.cdef && !allow_intrabc {
     cdef_damping = bits.bits(2) + 3
     cdef_bits = bits.bits(2)
-    for _ in 0..<(1 << cdef_bits) {
-      ignore(bits.bits(6))
+    for i in 0..<(1 << cdef_bits) {
+      cdef_y[i] = bits.bits(6)
       if !seq.monochrome {
-        ignore(bits.bits(6))
+        cdef_uv[i] = bits.bits(6)
       }
     }
   }
-
   // Loop restoration. The sequence headers of these vectors have it off; a
   // stream that turns it on is refused rather than read with the wrong offsets.
   if seq.restoration && (!all_lossless || allow_intrabc) {
     raise @raster.Unsupported(at=0, got="a frame with loop restoration")
   }
-  let txfm_mode = if all_lossless { 0 } else { bits.bit() }
+  // The frame's transform mode, numbered the way the reference numbers it: a
+  // lossless frame can only use four-by-four, otherwise the bit says whether the
+  // size is the largest the block allows or chosen by a symbol per block.
+  let txfm_mode = if all_lossless { 0 } else if bits.bit() == 1 { 2 } else { 1 }
   let reduced_txtp_set = bits.bit() == 1
   let _header_bytes = bits.align()
   if cols * rows > 1 {
@@ -426,6 +443,7 @@ fn read_frame(
   let tile_at = bits.align()
   {
     disable_cdf_update,
+    allow_screen_content,
     allow_intrabc,
     uniform,
     cols,
@@ -442,14 +460,22 @@ fn read_frame(
     qm_u,
     qm_v,
     segmentation,
+    delta_q_present,
+    delta_q_res,
+    delta_lf_present,
+    delta_lf_res,
+    delta_lf_multi,
     all_lossless,
     lf_y0,
     lf_y1,
     lf_u,
     lf_v,
     sharpness,
+    mode_ref_delta_enabled,
     cdef_damping,
     cdef_bits,
+    cdef_y,
+    cdef_uv,
     txfm_mode,
     reduced_txtp_set,
     tile_at,

@@ -1098,6 +1098,18 @@ pub let cdf_lengths : FixedArray[Int32] = [
 ]
 
 ///|
+/// How wide one context of each element is, in entries, count included.
+/// The reference pads a row so that a context can be addressed without a
+/// multiply by the number of symbols, and the offsets follow the padding.
+pub let cdf_widths : FixedArray[Int32] = [
+  16, 16, 16, 16, 16, 8, 8, 8, 8, 8, 8, 8, 8, 4, 4, 4, 4, 2, 2, 2, 2, 2, 2, 2, 2,
+  2, 16, 16, 8, 4, 4, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+  16, 2, 2, 4, 2, 2, 4, 2, 1, 80, 8, 8, 8, 8, 16, 16, 16, 4, 4, 4, 2, 2, 2, 8, 8,
+  8, 8, 16, 16, 16, 4, 4, 4, 2, 2, 2, 8, 8, 8, 8, 16, 16, 16, 4, 4, 4, 2, 2, 2, 8,
+  8, 8, 8, 16, 16, 16, 4, 4, 4, 2, 2, 2,
+]
+
+///|
 pub let cdf_names : Array[String] = [
   "m_uv_mode", "m_partition", "m_cfl_alpha", "m_txtp_inter1", "m_txtp_inter2", "m_txtp_intra1",
   "m_txtp_intra2", "m_cfl_sign", "m_angle_delta", "m_filter_intra", "m_seg_id", "m_pal_sz",
