@@ -69,6 +69,14 @@ TOLERANCE = {
     ".ppm": 0,
 }
 
+# Formats whose fourth channel another reader cannot see. A Sun raster has no
+# alpha: the fourth byte of a thirty-two bit pixel is padding to every reader
+# but this one, which writes the picture's alpha there. Comparing that byte
+# against a reader that fills it with 255 counts a difference of sixty steps
+# between two readers that agree about every colour, so those rows are counted
+# over the three channels both of them carry.
+COLOUR_ONLY = {".ras"}
+
 # The formats the writer produces, what to name the file, how far three decoders
 # may differ reading it, and who can be asked to read it.
 WRITTEN = [
@@ -448,7 +456,9 @@ def check_written(arguments, moon: Path, reader: Path, work: Path, report: Repor
                 details.append("pillow: refused")
                 ok = False
                 continue
-            gap, count = widest(ours, theirs)
+            mine = ours[:, :, :3] if suffix in COLOUR_ONLY else ours
+            other = theirs[:, :, :3] if suffix in COLOUR_ONLY else theirs
+            gap, count = widest(mine, other)
             if gap is None:
                 details.append("%s sees %s" % (reader_name, (theirs.shape,)))
                 ok = False

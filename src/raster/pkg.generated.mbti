@@ -97,6 +97,9 @@ pub(all) enum Format {
   Exr
   Farbfeld
   Dds
+  Pcx
+  Sgi
+  Ras
 }
 pub fn Format::equal(Self, Self) -> Bool
 pub fn Format::extension(Self) -> String
