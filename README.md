@@ -491,6 +491,19 @@ that can see a difference of one at the halfway point.
 - **Writing a lossless AVIF, a lossy animation, or a mipmap chain.** The first
   needs the same AV1 encoder the last section refuses; the other two are
   containers this library writes one shape of.
+- **Photoshop, JPEG 2000 and JPEG XL.** Each is a codec of its own rather than a
+  container this library already speaks: PSD wants its layer records and its
+  two-bytes-a-plane run lengths, JPEG 2000 wants wavelets with an embedded
+  block coder, and JPEG XL wants a whole new entropy layer. They are named here
+  rather than listed as supported because a reader that returns the flattened
+  composite of a PSD and nothing else would look complete and be wrong.
+- **Vector formats.** SVG, PDF, EPS and the Windows metafiles are drawings, not
+  pictures: a path has to be flattened and filled before there is a pixel to
+  hand to anything in this library, and text needs a shaper on top of that. The
+  rasterising is a different product, and a half of it would be worse than none.
+- **XBM and XPM.** Both are text, both are trivial to read, and neither is worth
+  a package: an XBM is a C array of bits and an XPM is a C array of strings, and
+  a caller with one of those already has the bytes.
 
 ## Interface
 
