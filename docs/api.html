@@ -936,7 +936,7 @@ window with a = 3.</em></li>
       </div>
       <div class="entry">
         <span class="kind">function</span>
-        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView) -&gt; @raster.Image raise @raster.Refused</code>
+        <code class="sig"><span class="kw">pub fn</span> decode(bytes : BytesView, limits? : @raster.Limits) -&gt; @raster.Image raise @raster.Refused</code>
         <div class="doc"><p>The picture as eight-bit RGBA, which is what the rest of this library hands back.</p></div>
       </div>
       <div class="entry">
@@ -946,12 +946,12 @@ window with a = 3.</em></li>
       </div>
       <div class="entry">
         <span class="kind">function</span>
-        <code class="sig"><span class="kw">pub fn</span> decode_frame(headers : Headers) -&gt; FrameBuffer raise @raster.Refused</code>
+        <code class="sig"><span class="kw">pub fn</span> decode_frame(headers : Headers, limits? : @raster.Limits) -&gt; FrameBuffer raise @raster.Refused</code>
         <div class="doc"><p>Decode the one frame of a still image.</p></div>
       </div>
       <div class="entry">
         <span class="kind">function</span>
-        <code class="sig"><span class="kw">pub fn</span> decode_planes(bytes : BytesView) -&gt; FrameBuffer raise @raster.Refused</code>
+        <code class="sig"><span class="kw">pub fn</span> decode_planes(bytes : BytesView, limits? : @raster.Limits) -&gt; FrameBuffer raise @raster.Refused</code>
         <div class="doc"><p>Decode the primary item of an AVIF file into planes.</p>
 <p>Seven streams are reproduced sample for sample against libdav1d, and the fixture in <code>decode_wbtest.mbt</code> checks each whole plane. All of them are eight-bit 4:2:0 that fit in one tile, which is what a still picture written by libavif at its defaults is; <code>Format::Avif</code> routes a file here, so the entry point in the package root reads one as readily as it reads a PNG.</p></div>
       </div>
