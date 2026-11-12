@@ -1,6 +1,6 @@
 # moonimage
 
-Image codecs for MoonBit: thirteen formats read, twelve written, and the pixel
+Image codecs for MoonBit: sixteen formats read, fifteen written, and the pixel
 arithmetic that sits between them.
 
 <p>
@@ -94,6 +94,9 @@ texture, a quality for a lossy WebP.
 | OpenEXR | scanlines or tiles, one part or several, in half or float, uncompressed, RLE, ZIPS, ZIP, PIZ, PXR24, B44, B44A, DWAA or DWAB | scanlines, all nine compressions, one part or several | — | `@moonimage/exr` |
 | farbfeld | the whole format | the whole format | — | `@moonimage/farbfeld` |
 | DDS | BC1 to BC7 blocks, and uncompressed surfaces | BC1 to BC7 blocks, and uncompressed surfaces | — | `@moonimage/dds` |
+| PCX | 1, 2, 4 and 8 bits a pixel, one to four planes, the header palette and the one at the end, run lengths | 8 bits a plane, three planes or four, run lengths | — | `@moonimage/pcx` |
+| SGI | one, three or four channels, eight or sixteen bits a sample, stored plain | eight bits a sample, three or four channels | — | `@moonimage/sgi` |
+| Sun raster | 1, 8, 24 and 32 bits a pixel, a colour map of three planes, rows padded to a word, byte-encoded runs | 24 bits, or 32 with this library's alpha in the fourth byte | — | `@moonimage/ras` |
 
 Both halves of WebP are read; the lossless one, VP8L, is also written. VP8 is the
 intra frame of a video codec, so its picture is rebuilt rather than decoded: a
@@ -415,14 +418,23 @@ the picture that went in:
 | OpenEXR B44, B44A | 1 | 32 | 39.21 dB |
 | OpenEXR DWAA, DWAB | 1 | 4 | 53.32 dB |
 
-Thirty-three files on a thirty-seven by twenty-three fixture: twenty-seven read
-the same by both libraries, twenty lossless to the sample. The one step on a
+Thirty-six files on a thirty-seven by twenty-three fixture: thirty read the same
+by both libraries, twenty-three lossless to the sample. The one step on a
 B44, a DWA and a BC6H block is the reference and this library rounding the same
 arithmetic differently at the last bit; the five formats with a large number in
 the third column are the nine that are lossy by design. Two formats are counted
 and not scored: neither Pillow nor OpenEXR's library reads a farbfeld or a
 Radiance HDR, and an unread file is named as such rather than filled in with a
 zero.
+
+Two rows of that table are held differently for a reason outside this library.
+Pillow refuses a thirty-two bit PCX by name ("unknown PCX mode"), so the file it
+is handed is the twenty-four bit one, and the four-plane spelling this library
+writes for a picture with transparency is held by its own reader instead. And
+Pillow reads a Sun raster's colour map as three bytes a colour where the format
+says three planes, so the palette samples of that format are held to the builder
+that wrote them; the twenty-four and thirty-two bit samples are read by Pillow
+and counted like the rest.
 
 ## Mutation
 
@@ -468,6 +480,11 @@ that can see a difference of one at the halfway point.
 - **Writing a partitioned block of a DDS.** BC1 to BC7 are all written; the
   encoder fits one region per block, and a search over the sixty-four shapes of
   the partitioned modes would win a few tenths of a decibel on a photograph.
+- **SGI files whose rows are run-length coded.** The header says which of the two
+  storages a file uses, and this library reads the plain one, which is what every
+  current writer produces. The run-length rows are refused by name rather than
+  decoded on trust: no reference here both writes and reads them, so a
+  transcription could not be held to anything.
 - **Writing a lossless AVIF, a lossy animation, or a mipmap chain.** The first
   needs the same AV1 encoder the last section refuses; the other two are
   containers this library writes one shape of.

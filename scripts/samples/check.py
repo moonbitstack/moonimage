@@ -114,6 +114,9 @@ WRITTEN = [
     # picture the display window describes.
     ("exr-parts", ".exr", 1, ("openexr",)),
     ("farbfeld", ".ff", 0, ("image",)),
+    ("pcx-24", ".pcx", 0, ("pillow",)),
+    ("sgi", ".sgi", 0, ("pillow",)),
+    ("ras", ".ras", 0, ("pillow",)),
 ]
 
 

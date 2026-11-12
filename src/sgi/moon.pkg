@@ -1,0 +1,14 @@
+// SGI: the Silicon Graphics image format, read and written.
+//
+// One header of five hundred and twelve bytes, then channels stored one after
+// another: a grey picture has one, a colour picture three or four.
+//
+// https://www.fileformat.info/format/sgiimage/egff.htm
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+}
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"

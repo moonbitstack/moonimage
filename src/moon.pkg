@@ -20,6 +20,9 @@ import {
   "moonbitstack/moonimage/exr",
   "moonbitstack/moonimage/farbfeld",
   "moonbitstack/moonimage/dds",
+  "moonbitstack/moonimage/pcx",
+  "moonbitstack/moonimage/sgi",
+  "moonbitstack/moonimage/ras",
 }
 
 import {

@@ -54,6 +54,10 @@ keywords = [
   "float-image",
   "farbfeld",
   "dds",
+  "pcx",
+  "sgi",
+  "sun-raster",
+  "sunos",
   "bc1",
   "bc3",
   "bc5",
@@ -91,7 +95,7 @@ keywords = [
   "moonbit",
 ]
 
-description = "Image codecs for MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO, PNM, Radiance HDR, OpenEXR, farbfeld and DDS, read and written, with the pixel arithmetic, filters and colour between them."
+description = "Image codecs for MoonBit: PNG, JPEG, GIF, WebP, BMP, TGA, QOI, TIFF, ICO, PNM, Radiance HDR, OpenEXR, farbfeld, DDS, PCX, SGI and Sun raster, read and written, with the pixel arithmetic, filters and colour between them."
 
 source = "src"
 

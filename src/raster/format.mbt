@@ -43,6 +43,12 @@ pub(all) enum Format {
   Farbfeld
   /// DirectDraw surface, read for the block-compressed pictures it carries.
   Dds
+  /// ZSoft PCX, the paintbrush format of the DOS years.
+  Pcx
+  /// Silicon Graphics images, one channel after another.
+  Sgi
+  /// Sun raster, with its palette planes and padded rows.
+  Ras
 }
 
 ///|
@@ -79,6 +85,9 @@ pub fn Format::extension(self : Format) -> String {
     Exr => "exr"
     Farbfeld => "ff"
     Dds => "dds"
+    Pcx => "pcx"
+    Sgi => "sgi"
+    Ras => "ras"
   }
 }
 
@@ -101,6 +110,9 @@ pub fn Format::mime(self : Format) -> String {
     Exr => "image/x-exr"
     Farbfeld => "image/x-farbfeld"
     Dds => "image/vnd-ms.dds"
+    Pcx => "image/x-pcx"
+    Sgi => "image/x-sgi"
+    Ras => "image/x-sun-raster"
   }
 }
 
@@ -170,6 +182,15 @@ pub fn Format::of(bytes : BytesView) -> Format raise Refused {
   if is_tga(bytes) {
     return Tga
   }
+  if is_pcx(bytes) {
+    return Pcx
+  }
+  if is_sgi(bytes) {
+    return Sgi
+  }
+  if is_ras(bytes) {
+    return Ras
+  }
   if length < 8 {
     raise Truncated(at=0, want=8)
   }
@@ -185,6 +206,48 @@ let png_signature : Bytes = b"\x89PNG\r\n\x1a\n"
 /// The four bytes every OpenEXR starts with: the same 20000630 in both byte
 /// orders, chosen so that a reader can tell which one wrote it.
 let exr_magic : Bytes = b"\x76\x2F\x31\x01"
+
+///|
+/// Whether these bytes are a PCX.
+///
+/// The first byte is ZSoft's manufacturer code and the four after it are a
+/// version, an encoding and a depth, which is enough to tell the format from
+/// the ten other things that could begin with the same byte: a file that says
+/// it is a PCX and then says its rows are five bits wide is not one.
+fn is_pcx(bytes : BytesView) -> Bool {
+  if bytes.length() < 128 || bytes[0].to_int() != 0x0A {
+    return false
+  }
+  let version = bytes[1].to_int()
+  let encoding = bytes[2].to_int()
+  let bits = bytes[3].to_int()
+  version >= 0 &&
+  version <= 5 &&
+  (encoding == 0 || encoding == 1) &&
+  (bits == 1 || bits == 2 || bits == 4 || bits == 8)
+}
+
+///|
+/// Whether these bytes are an SGI.
+///
+/// Two magic numbers, one for a file that may hold runs and one for a file that
+/// cannot, in big-endian order at the front of a five-hundred-and-twelve byte
+/// header.
+fn is_sgi(bytes : BytesView) -> Bool {
+  bytes.length() >= 512 &&
+  bytes[0].to_int() == 0x01 &&
+  (bytes[1].to_int() == 0xDA || bytes[1].to_int() == 0xD9)
+}
+
+///|
+/// Whether these bytes are a Sun raster.
+fn is_ras(bytes : BytesView) -> Bool {
+  bytes.length() >= 32 &&
+  bytes[0].to_int() == 0x59 &&
+  bytes[1].to_int() == 0xA6 &&
+  bytes[2].to_int() == 0x6A &&
+  bytes[3].to_int() == 0x95
+}
 
 ///|
 /// Whether these bytes start with a TIFF header.

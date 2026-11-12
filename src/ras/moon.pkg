@@ -1,0 +1,14 @@
+// Sun Raster: the image format of SunOS, read and written.
+//
+// Thirty-two bytes of header, a colour map of three planes, then rows padded to
+// a sixteen-bit boundary — or, in the byte-encoded flavour, runs.
+//
+// https://www.fileformat.info/format/sunraster/egff.htm
+import {
+  "moonbitstack/moonimage/raster",
+  "moonbitstack/moonimage/wire",
+}
+
+import {
+  "moonbitstack/moonimage/raster",
+} for "test"

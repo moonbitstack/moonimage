@@ -62,6 +62,22 @@ def channels_carried(mine, reference):
     return 4
 
 
+def pair_channels(mine, theirs):
+    """How many channels two readers can disagree about.
+
+    A format may carry something the other reader cannot see — this library
+    writes the alpha of a Sun raster into the fourth byte of a pixel, which
+    every other reader calls padding — and counting that as a disagreement
+    would report a difference of a hundred steps between two readers that agree
+    about every colour.
+    """
+    if mine is None or theirs is None or mine.shape != theirs.shape:
+        return 4
+    if np.unique(theirs[:, :, 3]).size == 1 and np.unique(mine[:, :, 3]).size > 1:
+        return 3
+    return 4
+
+
 def distance(mine, theirs, channels=4):
     """The distance between two pictures, in the terms a reader can check."""
     if mine is None or theirs is None or mine.shape != theirs.shape:
@@ -148,7 +164,7 @@ def main() -> int:
             if mine is None:
                 rows.append((name, size, None, None, "cannot read it back", 0))
                 continue
-            ours = distance(mine, theirs)
+            ours = distance(mine, theirs, pair_channels(mine, theirs))
             alpha = channels_carried(mine, reference)
             cost = distance(mine, reference, alpha) if not deep else None
             rows.append(

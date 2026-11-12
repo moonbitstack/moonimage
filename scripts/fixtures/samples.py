@@ -604,6 +604,315 @@ def extra_tga_samples():
     return cases
 
 
+# --------------------------------------------------------------------------
+# PCX samples.
+
+
+def pillow_pcx(image: Image.Image) -> bytes:
+    handle = io.BytesIO()
+    image.save(handle, format="PCX")
+    return handle.getvalue()
+
+
+def pcx_file(width, height, bits, planes, rows, palette16=None, trailer=None, encoding=1):
+    """A PCX assembled field by field, for the depths Pillow does not write."""
+    stride = (width * bits + 7) // 8
+    stride += stride % 2
+    header = bytearray(128)
+    header[0] = 0x0A
+    header[1] = 5
+    header[2] = encoding
+    header[3] = bits
+    struct.pack_into("<HHHH", header, 4, 0, 0, width - 1, height - 1)
+    struct.pack_into("<HH", header, 12, 72, 72)
+    palette16 = palette16 or [(i * 17, i * 17, i * 17) for i in range(16)]
+    for index, (r, g, b) in enumerate(palette16[:16]):
+        header[16 + index * 3 : 19 + index * 3] = bytes((r, g, b))
+    header[65] = planes
+    struct.pack_into("<H", header, 66, stride)
+    body = bytearray()
+    for row in rows:
+        padded = bytes(row) + b"\x00" * (stride - len(row))
+        if encoding == 0:
+            body += padded
+            continue
+        index = 0
+        while index < len(padded):
+            run = 1
+            while index + run < len(padded) and padded[index + run] == padded[index] and run < 63:
+                run += 1
+            if run > 1 or padded[index] >= 0xC0:
+                body += bytes((0xC0 | run, padded[index]))
+            else:
+                body += bytes((padded[index],))
+            index += run
+    if trailer is not None:
+        body += b"\x0c" + bytes(trailer)
+    return bytes(header + body)
+
+
+def pcx_samples():
+    cases = []
+    base = sources.pattern(37, 23)
+    written = [
+        ("pillow-24", pillow_pcx(base.convert("RGB"))),
+        ("pillow-grey", pillow_pcx(base.convert("L"))),
+        ("pillow-8-palette", pillow_pcx(base.convert("RGB").quantize(colors=200))),
+        ("pillow-1bit", pillow_pcx(base.convert("1"))),
+    ]
+    cases.extend((name, data, digest_of(read_back(data))) for name, data in written)
+
+    # Four bits a pixel: two pixels a byte, sixteen colours from the header.
+    width, height = 26, 14
+    picture = sources.pattern(width, height)
+    indices = [((x * 5 + y * 3) // 7) % 16 for y in range(height) for x in range(width)]
+    rows = []
+    for y in range(height):
+        row = bytearray()
+        for x in range(0, width, 2):
+            high = indices[y * width + x] & 0x0F
+            low = indices[y * width + x + 1] & 0x0F if x + 1 < width else 0
+            row.append((high << 4) | low)
+        rows.append(row)
+    palette = [(i * 17, 255 - i * 17, (i * 37) % 256) for i in range(16)]
+    data = pcx_file(width, height, 4, 1, rows, palette16=palette)
+    expected = Image.new("RGBA", (width, height))
+    expected.putdata([palette[i] + (255,) for i in indices])
+    cases.append(("built-4bit", data, digest_of(expected)))
+
+    # Two bits a pixel, four colours: the CGA shape.
+    width, height = 17, 9
+    indices = [((x // 2 + y // 2) % 4) for y in range(height) for x in range(width)]
+    rows = []
+    for y in range(height):
+        row = bytearray()
+        for x in range(0, width, 4):
+            batch = [indices[y * width + x + k] if x + k < width else 0 for k in range(4)]
+            row.append((batch[0] << 6) | (batch[1] << 4) | (batch[2] << 2) | batch[3])
+        rows.append(row)
+    palette = [(0, 0, 0), (0, 170, 0), (170, 0, 0), (170, 85, 0)] + [(0, 0, 0)] * 12
+    data = pcx_file(width, height, 2, 1, rows, palette16=palette)
+    expected = Image.new("RGBA", (width, height))
+    expected.putdata([palette[i] + (255,) for i in indices])
+    cases.append(("built-2bit", data, digest_of(expected)))
+
+    # No run lengths at all: the same bytes, written flat.
+    width, height = 21, 11
+    picture = sources.pattern(width, height).convert("RGB")
+    flat = []
+    for y in range(height):
+        for channel in range(3):
+            flat.append(bytes(picture.getpixel((x, y))[channel] for x in range(width)))
+    data = pcx_file(width, height, 8, 3, flat, encoding=0)
+    cases.append(("built-24-raw", data, digest_of(picture.convert("RGBA"))))
+    return cases
+
+
+# --------------------------------------------------------------------------
+# SGI samples.
+
+
+def pillow_sgi(image: Image.Image) -> bytes:
+    handle = io.BytesIO()
+    image.save(handle, format="SGI")
+    return handle.getvalue()
+
+
+def sgi_file(width, height, channels, rows, storage=0, bpc=1):
+    """An SGI assembled field by field: the header, then each channel."""
+    header = struct.pack(
+        ">HBBHHHHIII",
+        474,
+        storage,
+        bpc,
+        3,
+        width,
+        height,
+        channels,
+        0,
+        255,
+        0,
+    )
+    header += b"\x00" * 80 + struct.pack(">I", 0) + b"\x00" * 404
+    assert len(header) == 512
+    if storage == 0:
+        return header + b"".join(row for channel in rows for row in channel)
+    table = bytearray()
+    body = bytearray()
+    for channel in rows:
+        for row in channel:
+            packets = bytearray()
+            index = 0
+            while index < len(row):
+                run = 1
+                while index + run < len(row) and row[index + run] == row[index] and run < 127:
+                    run += 1
+                if run >= 3:
+                    packets += bytes((run, row[index]))
+                else:
+                    start = index
+                    while index < len(row) and (index - start) < 127:
+                        ahead = 1
+                        while index + ahead < len(row) and row[index + ahead] == row[index] and ahead < 3:
+                            ahead += 1
+                        if ahead >= 3 and index > start:
+                            break
+                        index += 1
+                    block = row[start:index]
+                    packets += bytes((0x80 | len(block),)) + bytes(block)
+                    continue
+                index += run
+            packets += b"\x00"
+            table += struct.pack(">II", len(body), len(packets))
+            body += packets
+    return header + bytes(table) + bytes(body)
+
+
+def sgi_samples():
+    cases = []
+    base = sources.pattern(37, 23)
+    for name, mode in (("pillow-rgb", "RGB"), ("pillow-rgba", "RGBA"), ("pillow-grey", "L")):
+        data = pillow_sgi(base.convert(mode))
+        cases.append((name, data, digest_of(read_back(data))))
+
+    # Two bytes a sample, which Pillow reads as eight bits and this library keeps
+    # at sixteen.
+    width, height = 11, 7
+    values = [
+        [
+            [((x * 2900 + y * 137 + channel * 4000) & 0xFFFF) for x in range(width)]
+            for y in range(height)
+        ]
+        for channel in range(3)
+    ]
+    rows16 = [
+        [struct.pack(">%dH" % width, *values[channel][y]) for y in range(height)]
+        for channel in range(3)
+    ]
+    data = sgi_file(width, height, 3, rows16, bpc=2)
+    # The rows are stored bottom first, so the picture read back is the one that
+    # went in turned over.
+    wide = Image.new("RGBA", (width, height))
+    wide.putdata([
+        (values[0][y][x] >> 8, values[1][y][x] >> 8, values[2][y][x] >> 8, 255)
+        for y in reversed(range(height))
+        for x in range(width)
+    ])
+    assert digest_of(read_back(data)) == digest_of(wide), "Pillow disagrees about the sixteen-bit file"
+    cases.append(("built-16bit", data, digest_of_wide(values, width, height)))
+    return cases
+
+
+def digest_of_wide(values, width, height):
+    """The digest of a picture that stays at sixteen bits, as Rgba16 bytes."""
+    body = bytearray()
+    for y in reversed(range(height)):
+        for x in range(width):
+            for channel in range(3):
+                value = values[channel][y][x]
+                body += bytes(((value >> 8) & 0xFF, value & 0xFF))
+            body += b"\xff\xff"
+    return moonbit.digest(bytes(body))
+
+
+# --------------------------------------------------------------------------
+# Sun raster samples. Pillow reads these and does not write them, so every one
+# is built here and Pillow's reading of it is the oracle.
+
+
+def ras_file(width, height, depth, rows, kind=1, palette=None, rle=False):
+    stride = ((width * depth + 15) // 16) * 2
+    data = bytearray()
+    for row in rows:
+        padded = bytes(row) + b"\x00" * (stride - len(row))
+        if not rle:
+            data += padded
+            continue
+        index = 0
+        while index < len(padded):
+            run = 1
+            while index + run < len(padded) and padded[index + run] == padded[index] and run < 255:
+                run += 1
+            if run >= 3 or padded[index] == 0x80:
+                data += bytes((0x80, run, padded[index]))
+                index += run
+            else:
+                data += bytes((padded[index],))
+                index += 1
+    colour_map = b""
+    if palette is not None:
+        entries = len(palette)
+        colour_map = bytes(colour_map_channel(palette, 0, entries))
+        colour_map += bytes(colour_map_channel(palette, 1, entries))
+        colour_map += bytes(colour_map_channel(palette, 2, entries))
+    header = struct.pack(
+        ">IIIIIIII",
+        0x59A66A95,
+        width,
+        height,
+        depth,
+        len(data),
+        kind,
+        1 if palette is not None else 0,
+        len(colour_map),
+    )
+    return header + colour_map + bytes(data)
+
+
+def colour_map_channel(palette, channel, entries):
+    return [palette[i][channel] if i < len(palette) else 0 for i in range(entries)]
+
+
+def ras_samples():
+    cases = []
+    base = sources.pattern(23, 11).convert("RGB")
+
+    # Eight bits with a palette, plain.
+    width, height = 23, 11
+    palette = [((i * 7) % 256, (i * 13) % 256, (i * 29) % 256) for i in range(256)]
+    indices = [((x * 5 + y * 11) // 3) % 256 for y in range(height) for x in range(width)]
+    rows = [bytes(indices[y * width:(y + 1) * width]) for y in range(height)]
+    data = ras_file(width, height, 8, rows, palette=palette)
+    expected = Image.new("RGBA", (width, height))
+    expected.putdata([palette[i] + (255,) for i in indices])
+    # Pillow reads a Sun colour map as RGB triples where the format says three
+    # planes, so its opinion of a palette file is not usable here; the builder is
+    # the oracle, and the same palette read as triples is what Pillow would show.
+    cases.append(("built-8-palette", data, digest_of(expected)))
+
+    # The same indices, byte-encoded.
+    data = ras_file(width, height, 8, rows, palette=palette, rle=True)
+    cases.append(("built-8-rle", data, digest_of(expected)))
+
+    # Twenty-four bits, blue first, which is what a Sun framebuffer held.
+    rows = []
+    for y in range(height):
+        row = bytearray()
+        for x in range(width):
+            r, g, b = base.getpixel((x, y))
+            row += bytes((b, g, r))
+        rows.append(row)
+    data = ras_file(width, height, 24, rows)
+    assert digest_of(read_back(data)) == digest_of(base.convert("RGBA")), "Pillow disagrees about the colour file"
+    cases.append(("built-24", data, digest_of(base.convert("RGBA"))))
+
+    # Thirty-two bits: the fourth byte is this library's alpha and every other
+    # reader's padding.
+    opaque = Image.new("RGBA", (width, height))
+    rows = []
+    for y in range(height):
+        row = bytearray()
+        for x in range(width):
+            r, g, b = base.getpixel((x, y))
+            row += bytes((b, g, r, 255))
+        rows.append(row)
+    opaque.putdata([base.getpixel((x, y)) + (255,) for y in range(height) for x in range(width)])
+    data = ras_file(width, height, 32, rows)
+    assert digest_of(read_back(data)) == digest_of(opaque), "Pillow disagrees about the thirty-two bit file"
+    cases.append(("built-32", data, digest_of(opaque)))
+    return cases
+
+
 def main() -> None:
     def emit(path, header, cases):
         body = ["let samples : Array[(String, Bytes, String)] = ["]
@@ -638,6 +947,39 @@ def main() -> None:
 // sixteen-bit and top-down and colour-mapped shapes it does not write. Each
 // carries a digest of the pixels it should decode to.""",
         tga_cases,
+    )
+
+    emit(
+        ROOT / "src" / "pcx" / "samples_test.mbt",
+        """\
+// Generated by scripts/fixtures/samples.py. Do not edit.
+//
+// PCX files Pillow wrote — eight bits a plane, a palette, one bit a pixel — and
+// files built here for the two depths and the flat stream it does not write.
+// Each carries a digest of the pixels it should decode to.""",
+        pcx_samples(),
+    )
+
+    emit(
+        ROOT / "src" / "sgi" / "samples_test.mbt",
+        """\
+// Generated by scripts/fixtures/samples.py. Do not edit.
+//
+// SGI files Pillow wrote, and a run-length one and a sixteen-bit one built here
+// because Pillow does not write those, each with a digest of the pixels it
+// should decode to.""",
+        sgi_samples(),
+    )
+
+    emit(
+        ROOT / "src" / "ras" / "samples_test.mbt",
+        """\
+// Generated by scripts/fixtures/samples.py. Do not edit.
+//
+// Sun raster files built here, since no Python writes them, each read back by
+// Pillow before its digest is recorded: the palette form, the byte-encoded one,
+// twenty-four bits blue first, and thirty-two.""",
+        ras_samples(),
     )
 
 

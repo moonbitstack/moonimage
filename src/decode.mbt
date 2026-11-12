@@ -73,6 +73,9 @@ pub fn decode(
     Exr => @exr.decode(bytes, limits~)
     Farbfeld => @farbfeld.decode(bytes, limits~)
     Dds => @dds.decode(bytes, limits~)
+    Pcx => @pcx.decode(bytes, limits~)
+    Sgi => @sgi.decode(bytes, limits~)
+    Ras => @ras.decode(bytes, limits~)
   }
   match format {
     Some(target) => image.convert(target)
@@ -214,6 +217,9 @@ pub fn encode(
     Exr => @exr.encode(image)
     Farbfeld => @farbfeld.encode(image)
     Dds => @dds.encode(image)
+    Pcx => @pcx.encode(image)
+    Sgi => @sgi.encode(image)
+    Ras => @ras.encode(image)
   }
 }
 

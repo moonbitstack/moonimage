@@ -127,6 +127,9 @@ fn formats() -> Array[(String, @moonimage.Format)] {
     ("pnm", @moonimage.Format::Pnm),
     ("hdr", @moonimage.Format::Hdr),
     ("exr", @moonimage.Format::Exr),
+    ("pcx", @moonimage.Format::Pcx),
+    ("sgi", @moonimage.Format::Sgi),
+    ("ras", @moonimage.Format::Ras),
   ]
 }
 
@@ -144,7 +147,17 @@ fn name_of(format : String) -> @moonimage.Format? {
 ///|
 fn write(format : String, path : String) -> Result[String, String] {
   let image = picture()
-  let bytes = if format == "farbfeld" {
+  let bytes = if format == "pcx-24" {
+    // The thirty-two bit spelling of PCX is written by the library, and Pillow
+    // refuses that shape by name ("unknown PCX mode"), so the file the check
+    // hands it is the twenty-four bit one.
+    @moonimage.encode(
+      image.convert(@moonimage.PixelFormat::Rgb8),
+      @moonimage.Format::Pcx,
+    ) catch {
+      error => return Err("pcx-24: \{error}")
+    }
+  } else if format == "farbfeld" {
     @farbfeld.encode(image)
   } else if format == "pnm" {
     // PPM rather than the PAM a picture with alpha would otherwise get, because
