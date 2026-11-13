@@ -1,6 +1,6 @@
 name = "moonbitstack/moonimage"
 
-version = "0.1.4"
+version = "0.2.0"
 
 readme = "README.md"
 
@@ -104,5 +104,5 @@ source = "src"
 import {
   "moonbitstack/moonzip@0.3.8",
   "moonbitstack/moonrgba@0.1.3",
-  "moonbitstack/moonbase@0.4.5",
+  "moonbitstack/moonbase@0.5.0",
 }
