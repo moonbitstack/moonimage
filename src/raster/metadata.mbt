@@ -125,7 +125,7 @@ pub(all) enum Text {
     keyword~ : String,
     language~ : String,
     translated~ : String,
-    text~ : String
+    text~ : String,
   )
 }
 

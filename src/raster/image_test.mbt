@@ -18,7 +18,7 @@ test "a new image is the size it says, with tight rows and zeros" {
 
 ///|
 test "an image over existing bytes keeps its stride, and refuses a short one" {
-  let pixels = Bytes::new(2 * 20)
+  let pixels = Bytes::make(2 * 20, b'\x00')
   let padded = @raster.Image::of(
     2,
     2,
@@ -30,7 +30,14 @@ test "an image over existing bytes keeps its stride, and refuses a short one" {
   }
   assert_eq(padded.stride, 20)
   let too_short = try {
-    ignore(@raster.Image::of(2, 2, @raster.PixelFormat::Rgba8, Bytes::new(8)))
+    ignore(
+      @raster.Image::of(
+        2,
+        2,
+        @raster.PixelFormat::Rgba8,
+        Bytes::make(8, b'\x00'),
+      ),
+    )
     None
   } catch {
     error => Some(error)
@@ -42,7 +49,7 @@ test "an image over existing bytes keeps its stride, and refuses a short one" {
         2,
         2,
         @raster.PixelFormat::Rgba8,
-        Bytes::new(32),
+        Bytes::make(32, b'\x00'),
         stride=4,
       ),
     )

@@ -53,7 +53,7 @@ pub fn Image::new(
     height,
     format,
     stride,
-    pixels: Bytes::new(length),
+    pixels: Bytes::make(length, b'\x00'),
     premultiplied: premultiplied.unwrap_or(false),
     metadata: metadata.unwrap_or(Metadata::default()),
   }

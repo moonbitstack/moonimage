@@ -459,7 +459,7 @@ fn avif_planes(path : String, out : String) -> Result[String, String] {
   let planes = @avif.decode_planes(bytes) catch {
     error => return Err("\{path}: \{error}")
   }
-  let samples = @buffer.Buffer(size_hint=planes.width * planes.height * 3 / 2)
+  let samples = @buffer.Buffer(capacity=planes.width * planes.height * 3 / 2)
   let put = fn(plane : @avif.Plane, w : Int32, h : Int32) {
     for y in 0..<h {
       for x in 0..<w {

@@ -136,7 +136,7 @@ fn encode_frames(
       }
     }
   }
-  write_chunk(writer, "IEND", Bytes::new(0))
+  write_chunk(writer, "IEND", b"")
   writer.to_bytes()
 }
 
@@ -264,7 +264,7 @@ fn filter_pass(
 ) -> Unit {
   let pixel = image.format.bytes()
   let row_bytes = width * pixel
-  let mut previous = Bytes::new(row_bytes)
+  let mut previous = Bytes::make(row_bytes, b'\x00')
   for row in 0..<height {
     let current = FixedArray::make(row_bytes, b'\x00')
     let source_row = (y0 + row * dy) * image.stride
@@ -296,7 +296,7 @@ fn choose_filter(
     Filter::Adaptive => {
       let mut best = 0
       let mut best_score = -1
-      let mut best_bytes = Bytes::new(0)
+      let mut best_bytes = b""
       for candidate in 0..<5 {
         let filtered = apply_filter(candidate, row, previous, bytes_per_pixel)
         let score = score_of(filtered)
@@ -641,6 +641,6 @@ fn paletted(image : @raster.Image, options : EncodeOptions) -> Bytes? {
     )
     offset = offset + take
   }
-  write_chunk(writer, "IEND", Bytes::new(0))
+  write_chunk(writer, "IEND", b"")
   Some(writer.to_bytes())
 }
